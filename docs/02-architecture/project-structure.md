@@ -58,20 +58,23 @@ ninja/
 │   ├── drizzle.config.ts
 │   └── src/
 │       ├── main.ts               # khởi động: nạp .env, mở pool, dựng app, đóng sạch khi có tín hiệu
-│       ├── app.ts                # (M1) dựng Fastify: cors, jwt, route, xử lý lỗi thống nhất
+│       ├── app.ts                # (M1) dựng Fastify: cors, jwt, route, xử lý lỗi thống nhất; (M2) thêm thế giới + WebSocket
 │       ├── config/               # (M1) env.ts (kiểm biến môi trường), dotenv.ts
 │       ├── http/                 # (M1) parseRequest, auth.ts (preHandler xác thực)
 │       ├── security/             # (M1) password.ts (Argon2id), tokens.ts (JWT + refresh token)
 │       ├── db/                   # (M1) schema.ts, client.ts, migrate.ts
+│       ├── net/                  # (M2) gateway WS gắn vào Fastify (`/ws`), phiên kết nối, bảng phiên theo nhân vật
+│       ├── core/                 # (M2) tick.ts (một interval dùng chung), room-manager.ts
+│       ├── world/                # (M2) game-data.ts (nạp + kiểm), map.ts, movement.ts, room.ts, world-service.ts
 │       ├── modules/account/      # (M1) đăng ký/đăng nhập/làm mới/đăng xuất
-│       ├── modules/character/    # (M1) tạo/liệt kê nhân vật
-│       ├── test/                 # (M1) global-setup + tiện ích database kiểm thử
+│       ├── modules/character/    # (M1) tạo/liệt kê nhân vật; (M2) chọn nhân vật để vào game
+│       ├── modules/chat/         # (M2) giới hạn tần suất + tạo tin nhắn kênh map
+│       ├── modules/npc/          # (M2) hội thoại NPC theo game-data
+│       ├── test/                 # (M1) global-setup + database kiểm thử; (M2) server thật trên cổng 0 + client ws
 │       # thêm ở cột mốc sau:
-│       #   net/                  WS server, connection registry, codec, handshake
-│       #   core/                 tick scheduler, event bus, room manager, id generator
-│       #   world/                map instance, spawn quái, kiểm tra di chuyển, tầm nhìn
-│       #   modules/<hệ thống>    inventory, skill, battle, quest, npc, social, guild, arena, event, mail, admin
-│       #   security/             rate-limit, chống gian lận, audit log
+│       #   world/                spawn quái, tầm nhìn (M3)
+│       #   modules/<hệ thống>    inventory, skill, battle, quest, social, guild, arena, event, mail, admin
+│       #   security/             rate-limit chung, chống gian lận, audit log
 │
 ├── shared/                       # HỢP ĐỒNG CHUNG client ↔ server
 │   └── src/
@@ -116,7 +119,7 @@ ninja/
 | Đấu theo lượt, quái, rơi đồ | `modules/battle`, `world/` | `battle/` | `game-data/monsters/` |
 | Kỹ năng, chiêu thức | `modules/skill` | `battle/`, `ui/` | `game-data/skills/` |
 | Túi đồ, trang bị, cường hóa | `modules/inventory` | `ui/` | `game-data/items/` |
-| Chat, bạn, nhóm | `modules/social` (chat khu vực ở MVP nằm trong `net/` + `world/`) | `ui/` (chat) | bảng `friends` |
+| Chat, bạn, nhóm | `modules/chat` (chat khu vực — M2) + `modules/social` (bạn/nhóm, mốc sau) | `ui/` (chat) | bảng `friends` |
 | Bang hội | `modules/guild` | `ui/` | bảng `guilds` |
 | Lôi Đài, xếp hạng | `modules/arena` | `scenes/` (lôi đài) | Redis + bảng `arena_rank` |
 | Sự kiện, quà đăng nhập | `modules/event` | `ui/` | `game-data/events/` |
@@ -132,7 +135,7 @@ ninja/
 | Class/Type | PascalCase | `BattleRoom`, `CharacterDto` |
 | Hàm/biến | camelCase | `resolveDamage()` |
 | Opcode | UPPER_SNAKE | `C2S_MOVE`, `S2C_ENTER_MAP` |
-| File dữ liệu | tiền tố loại + kebab-case | `map-lang-khoi-nguon.json`, `skill-otama.json` |
+| File dữ liệu | kebab-case, map/NPC theo tiền tố loại | `lang-khoi-nguon.json` (map), `npc-thay-hieu-truong.json`, `skill-otama.json` |
 
 Chữ trong code/giao diện: tiếng Anh cho định danh, chuỗi hiển thị nằm trong `i18n/` (tiếng Việt trước, thêm tiếng Anh sau nếu cần).
 
@@ -142,7 +145,8 @@ Chữ trong code/giao diện: tiếng Anh cho định danh, chuỗi hiển thị
 |---|---|
 | M0 (nền móng) | `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, CI, `infra/docker/docker-compose.dev.yml`, `tools/data-validator` |
 | M1 (đã xong) | `client/src/app/{core,pages/login,pages/characters}`, `server/src/{config,db,http,security,modules/{account,character}}`, `shared/src/schemas`, `server/drizzle`, `tests/e2e` (8 kịch bản tài khoản & nhân vật) |
-| M2–M3 (MVP còn lại) | `server/src/{net,core,world,modules/{npc,inventory,battle,skill}}`, `client/src/app/{net,battle,ui,input}`, `game-data/{maps,monsters,items,skills,classes,npcs}` |
+| M2 (phía server đã xong) | `server/src/{net,core,world,modules/{chat,npc}}`, `game-data/{maps,npcs}` (2 bản đồ + 1 NPC có hội thoại), `server/src/net/ws.spec.ts` (kiểm thử WebSocket với client `ws`) |
+| M2 (phần client) – M3 | `client/src/app/{net,battle,ui,input}`, `server/src/modules/{inventory,battle,skill}`, `game-data/{monsters,items,skills,classes}` |
 | M4–M6 (Alpha) | `modules/{quest,social,arena,mail}`, mở rộng `game-data/{quests,shops}`, `tools/{map-editor,asset-pipeline}`, thêm kịch bản e2e cho thế giới/chat rồi chiến đấu |
 | M7–M8 (Beta) | `modules/{guild,event}`, `tools/gm-cli`, `infra/deploy`, `tests/load` |
 
