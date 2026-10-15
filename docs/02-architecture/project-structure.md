@@ -37,38 +37,47 @@ ninja/
 │       ├── main.ts               # bootstrap Angular
 │       ├── index.html
 │       ├── styles.css            # biến màu, nền tối dùng chung
-│       └── app/                  # (M0 đã có)
+│       └── app/
 │           ├── app.ts            # component gốc + <router-outlet />
-│           ├── app.routes.ts     # '' → Home, 'play' → WorldCanvas (lazy)
-│           ├── app.config.ts
-│           ├── pages/home/       # trang chủ
+│           ├── app.routes.ts     # '' → Home, 'play' → WorldCanvas, 'login', 'characters'
+│           ├── app.config.ts     # provider: router + HttpClient (withFetch)
+│           ├── core/             # (M1) api/, auth/ (service + guard), character/, game-labels.ts
+│           ├── pages/home/       # (M0) trang chủ
+│           ├── pages/login/      # (M1) đăng nhập + đăng ký
+│           ├── pages/characters/ # (M1) danh sách + tạo nhân vật
 │           └── game/             # (M0) world-scene.ts, game-config.ts, world-canvas/
 │       # các thư mục thêm ở cột mốc sau (đặt trong src/app/):
-│       #   net/          WebSocket client (reconnect, backoff, hàng đợi), REST client
-│       #   state/        signals + service: phiên, nhân vật, túi đồ, nhiệm vụ, trận đấu
-│       #   pages/        login, chọn nhân vật, lôi đài
+│       #   net/          WebSocket client (reconnect, backoff, hàng đợi)
 │       #   battle/       UI sàn đấu theo lượt + hiệu ứng chiêu
 │       #   ui/           HUD, chat, túi, nhiệm vụ, shop, hộp thoại
 │       #   input/        bàn phím, chạm, joystick ảo
 │       #   i18n/         chuỗi giao diện (tiếng Việt trước)
 │
 ├── server/                       # GAME SERVER (Node.js + Fastify + ws)
-│   ├── src/
-│   │   ├── main.ts               # khởi động, nạp config + game-data
-│   │   ├── config/               # env, feature flags, nạp/kiểm tra game-data
-│   │   ├── net/                  # WS server, connection registry, codec, handshake xác thực
-│   │   ├── core/                 # tick scheduler, event bus, room manager, id generator
-│   │   ├── world/                # map instance, spawn quái, kiểm tra di chuyển, tầm nhìn
-│   │   ├── modules/              # nghiệp vụ theo hệ thống (xem mục 3)
-│   │   ├── db/                   # schema, migrations, repository
-│   │   └── security/             # rate-limit, chống gian lận, audit log
-│   └── (test/, package.json)
+│   ├── drizzle/                  # file SQL migration (drizzle-kit sinh)
+│   ├── drizzle.config.ts
+│   └── src/
+│       ├── main.ts               # khởi động: nạp .env, mở pool, dựng app, đóng sạch khi có tín hiệu
+│       ├── app.ts                # (M1) dựng Fastify: cors, jwt, route, xử lý lỗi thống nhất
+│       ├── config/               # (M1) env.ts (kiểm biến môi trường), dotenv.ts
+│       ├── http/                 # (M1) parseRequest, auth.ts (preHandler xác thực)
+│       ├── security/             # (M1) password.ts (Argon2id), tokens.ts (JWT + refresh token)
+│       ├── db/                   # (M1) schema.ts, client.ts, migrate.ts
+│       ├── modules/account/      # (M1) đăng ký/đăng nhập/làm mới/đăng xuất
+│       ├── modules/character/    # (M1) tạo/liệt kê nhân vật
+│       ├── test/                 # (M1) global-setup + tiện ích database kiểm thử
+│       # thêm ở cột mốc sau:
+│       #   net/                  WS server, connection registry, codec, handshake
+│       #   core/                 tick scheduler, event bus, room manager, id generator
+│       #   world/                map instance, spawn quái, kiểm tra di chuyển, tầm nhìn
+│       #   modules/<hệ thống>    inventory, skill, battle, quest, npc, social, guild, arena, event, mail, admin
+│       #   security/             rate-limit, chống gian lận, audit log
 │
-├── shared/                       # HỢP ĐỒNG CHUNG client ↔ server (M0 đã có)
+├── shared/                       # HỢP ĐỒNG CHUNG client ↔ server
 │   └── src/
 │       ├── protocol/             # PROTOCOL_VERSION (opcode, gói tin thêm ở cột mốc sau)
 │       ├── constants/            # enum: trường, phái, quan hệ trường–phái
-│       ├── schemas/              # (M0) schema zod của dữ liệu game: skill, item
+│       ├── schemas/              # schema zod: skill, item (M0), account, character (M1)
 │       └── index.ts              # điểm xuất chung
 │       # thêm ở cột mốc sau: types/ (DTO), utils/ (toán, RNG xác định)
 │
@@ -132,8 +141,9 @@ Chữ trong code/giao diện: tiếng Anh cho định danh, chuỗi hiển thị
 | Giai đoạn | Thêm mới vào cấu trúc |
 |---|---|
 | M0 (nền móng) | `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, CI, `infra/docker/docker-compose.dev.yml`, `tools/data-validator` |
-| M1–M3 (MVP) | `client/src/*`, `server/src/{net,core,world}`, `modules/{account,character,npc,inventory,battle,skill}`, `shared/src/protocol`, `game-data/{maps,monsters,items,skills,classes,npcs}`, `tests/e2e` (kịch bản 1–3) |
-| M4–M6 (Alpha) | `modules/{quest,social,arena,mail}`, mở rộng `game-data/{quests,shops,items}`, `tools/{map-editor,asset-pipeline}`, bổ sung `tests/e2e` (kịch bản 4–5) |
+| M1 (đã xong) | `client/src/app/{core,pages/login,pages/characters}`, `server/src/{config,db,http,security,modules/{account,character}}`, `shared/src/schemas`, `server/drizzle`, `tests/e2e` (kịch bản 1–3) |
+| M2–M3 (MVP còn lại) | `server/src/{net,core,world,modules/{npc,inventory,battle,skill}}`, `client/src/app/{net,battle,ui,input}`, `game-data/{maps,monsters,items,skills,classes,npcs}` |
+| M4–M6 (Alpha) | `modules/{quest,social,arena,mail}`, mở rộng `game-data/{quests,shops}`, `tools/{map-editor,asset-pipeline}`, thêm kịch bản e2e 4–5 |
 | M7–M8 (Beta) | `modules/{guild,event}`, `tools/gm-cli`, `infra/deploy`, `tests/load` |
 
 Chi tiết tiêu chí từng mốc xem `docs/03-plan/roadmap.md`.
@@ -147,4 +157,4 @@ Chi tiết tiêu chí từng mốc xem `docs/03-plan/roadmap.md`.
 
 `shared` được **build ra `dist/`** trước khi `server` và `tools/data-validator` dùng, nên chúng import `@ninja/shared` qua `exports` trong `package.json` (không trỏ thẳng vào file `.ts`). Vì vậy các script gốc `validate:data`, `typecheck`, `test` đều chạy `pnpm build:shared` trước.
 
-`client` hiện **chưa** phụ thuộc `@ninja/shared` (M0 chưa có giao tiếp mạng); sẽ thêm khi làm phần mạng ở M2.
+`client` đã phụ thuộc `@ninja/shared` từ M1 để dùng chung schema dữ liệu với server (kiểm biểu mẫu, suy ra kiểu).

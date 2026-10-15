@@ -1,71 +1,84 @@
 # client/ — Client web (Angular + Phaser)
 
-Chạy trên trình duyệt. **Angular** lo giao diện, định tuyến, trạng thái, chat/túi đồ/nhiệm vụ (HUD).
+Chạy trên trình duyệt. **Angular** lo giao diện, định tuyến, trạng thái, xác thực, biểu mẫu, HUD.
 **Phaser** chỉ vẽ thế giới 2D (bản đồ, nhân vật, quái, hiệu ứng) trong một component.
 
-Client **không phải nguồn sự thật**: không tự quyết máu, sát thương, tiền, vật phẩm — chỉ gửi "ý định" lên server và hiển thị kết quả server trả về.
+Client **không phải nguồn sự thật**: không tự quyết máu, sát thương, tiền, vật phẩm — chỉ gửi yêu cầu lên server và hiển thị kết quả server trả về. Việc kiểm tra dữ liệu trên client chỉ để phản hồi nhanh cho người chơi; server luôn kiểm tra lại.
 
 ## Công nghệ
 
 | Thành phần | Phiên bản / ghi chú |
 |---|---|
 | Angular | 22 (standalone component, signals, router, `ChangeDetectionStrategy.OnPush`) |
-| Render thế giới 2D | Phaser 4, nhúng trong `WorldCanvas` |
+| Gọi API | `HttpClient` + `provideHttpClient(withFetch())`, đường dẫn tương đối `/api/...` |
+| Hợp đồng dữ liệu | `@ninja/shared` (schema zod dùng chung với server) |
+| Render thế giới 2D | Phaser 4, nhúng trong `WorldCanvas` (lazy chunk của route `/play`) |
 | Build/dev | Angular CLI (`ng serve`, `ng build`) |
 | Kiểm thử | Vitest qua `ng test` (jsdom) |
 | Lint | ESLint + angular-eslint (`ng lint`) |
-
-Phaser nằm trong **lazy chunk** của route `/play`, nên bundle khởi tạo nhẹ (khoảng 212 kB) và chỉ tải engine khi vào thế giới.
 
 ## Cấu trúc hiện tại
 
 ```text
 client/
-├── angular.json
-├── eslint.config.js          # cấu hình do angular-eslint sinh ra
-├── tsconfig.json             # cấu hình của Angular (không kế thừa tsconfig.base.json)
-├── tsconfig.app.json
-├── tsconfig.spec.json
+├── angular.json            # có proxyConfig cho lệnh serve (chỉ cấu hình development)
+├── proxy.conf.json         # chuyển /api → http://127.0.0.1:3000 khi chạy ng serve
+├── eslint.config.js
+├── tsconfig*.json
 ├── public/
 └── src/
-    ├── main.ts               # bootstrap ứng dụng
-    ├── index.html
-    ├── styles.css            # biến màu, nền tối dùng chung
+    ├── main.ts, index.html, styles.css
     └── app/
-        ├── app.ts            # component gốc, chỉ chứa <router-outlet />
-        ├── app.html
-        ├── app.routes.ts     # '' → Home, 'play' → WorldCanvas (lazy)
-        ├── app.config.ts     # provider của ứng dụng
-        ├── pages/home/       # trang chủ
-        └── game/
-            ├── world-scene.ts     # cảnh Phaser (hiện vẽ lưới gạch mẫu)
-            ├── game-config.ts     # hàm dựng cấu hình Phaser (tách để kiểm thử)
-            └── world-canvas/      # component bọc canvas Phaser
+        ├── app.ts, app.html, app.config.ts   # provider: router + HttpClient
+        ├── app.routes.ts                     # '' → Home, 'play' → WorldCanvas, 'login', 'characters'
+        ├── core/                             # (M1) dịch vụ dùng chung
+        │   ├── api/                          # api.service.ts, api-error.ts, endpoints.ts, schema.ts
+        │   ├── auth/                         # auth.service.ts (signals) + auth.guard.ts
+        │   ├── character/                    # character.service.ts
+        │   └── game-labels.ts                # nhãn tiếng Việt cho trường/phái
+        ├── game/                             # (M0) world-scene, game-config, world-canvas
+        └── pages/
+            ├── home/                         # (M0) trang chủ
+            ├── login/                        # (M1) đăng nhập / đăng ký trong cùng một trang
+            └── characters/                   # (M1) danh sách + tạo nhân vật
 ```
 
-Cấu trúc đích đầy đủ (đến hết Alpha) xem `docs/02-architecture/project-structure.md` — sẽ bổ sung `net/`, `state/`, `battle/`, `ui/`, `input/`, `i18n/`.
+## Luồng M1 (tài khoản & nhân vật)
+
+1. `/login`: một trang cho cả đăng nhập và đăng ký (chuyển bằng tab). Biểu mẫu được kiểm bằng
+   `RegisterRequestSchema` / `LoginRequestSchema` của `@ninja/shared` trước khi gọi API.
+2. Đăng ký/đăng nhập thành công → lưu `accessToken` + `refreshToken` vào `localStorage`
+   (`ninja.accessToken`, `ninja.refreshToken`) và chuyển sang `/characters`.
+3. `/characters` (có guard): hiện danh sách nhân vật và biểu mẫu tạo nhân vật; chọn trường thì
+   danh sách phái chỉ còn hai phái của trường đó (`SCHOOL_CLASSES`).
+4. Tải lại trang: `AuthService` khôi phục phiên từ `localStorage` và gọi `/api/auth/me`;
+   token còn hạn thì vào thẳng, hết hạn thì đưa về `/login`.
 
 ## Lệnh
 
 ```bash
-pnpm --filter @ninja/client dev     # ng serve → http://localhost:4200
-pnpm --filter @ninja/client build   # ng build
-pnpm --filter @ninja/client test    # ng test --no-watch
-pnpm --filter @ninja/client lint    # ng lint
+pnpm --filter @ninja/client dev            # ng serve → http://localhost:4200 (cần server ở cổng 3000)
+pnpm --filter @ninja/client build          # ng build
+pnpm --filter @ninja/client test           # ng test --no-watch (Vitest + jsdom)
+pnpm --filter @ninja/client lint           # ng lint
 pnpm --filter @ninja/client typecheck
 ```
 
-Từ gốc repo có thể dùng `pnpm dev`, `pnpm build`, `pnpm test`, `pnpm lint`.
+Từ gốc repo: `pnpm dev` (chạy song song client + server), `pnpm build`, `pnpm test`, `pnpm lint`, `pnpm e2e`.
+
+Kiểm thử đầu-cuối trên trình duyệt thật nằm ở `tests/e2e` (Playwright), chạy bằng `pnpm e2e`.
 
 ## Quy ước
 
-1. Mọi gói tin (khi có mạng) đều dùng định nghĩa trong `@ninja/shared` — không tự phát minh format riêng.
+1. Mọi dữ liệu vào/ra đều dùng schema trong `@ninja/shared`, không tự định nghĩa lại kiểu.
 2. Component dùng `ChangeDetectionStrategy.OnPush`; route nặng dùng `loadComponent`.
-3. Phần vẽ nằm trong `game/`; phần giao diện nằm trong `pages/` và `ui/` (thêm sau). Không trộn logic nghiệp vụ vào component.
-4. Tài nguyên hình/âm chỉ lấy từ `assets/` của dự án (xem `assets/README.md`).
+3. Phần vẽ nằm trong `game/`; giao diện nằm trong `pages/` và `ui/` (sẽ thêm sau).
+4. State dùng signals trong service, không để logic nghiệp vụ trong component.
 
 ## Ghi chú về kiểm thử
 
-- `game-config.spec.ts` **mock Phaser**: jsdom không cài đặt canvas 2D nên không nạp được Phaser thật trong unit test. Test này kiểm tra cấu hình (phần tử cha, cảnh, chế độ co giãn, màu nền).
-- Vì vậy **việc vẽ thật của Phaser chưa được unit test che phủ**. Cách kiểm: `pnpm --filter @ninja/client build` phải thành công, và mở `ng serve` vào `/play` phải thấy lưới gạch.
-- Muốn kiểm tự động phần render thì cần Playwright (e2e) — nằm trong `tests/e2e/` ở cột mốc sau.
+- `game-config.spec.ts` **mock Phaser**: jsdom không cài đặt canvas 2D nên không nạp được Phaser thật.
+  Vì vậy phần vẽ thật của Phaser chưa được unit test che phủ; kiểm bằng `ng build` và bằng Playwright
+  khi cần (`/play` render được canvas).
+- `ng serve` mặc định chỉ bind IPv6 `[::1]`. Khi cần gọi từ `127.0.0.1` (ví dụ Playwright) thì chạy
+  `pnpm --filter @ninja/client dev --host 0.0.0.0`.

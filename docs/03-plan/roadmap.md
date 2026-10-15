@@ -35,9 +35,40 @@ Nội dung: monorepo pnpm (`client`, `server`, `shared`, `tools/*`), tsconfig ba
 
 **Ghi chú:** CI trên GitHub chạy lại đúng các bước trên từ **checkout sạch**. Lần chạy đầu tiên đã phát hiện một lỗi thật mà máy dev che mất: `validate:data` cần `shared` đã build (máy dev có sẵn `shared/dist`). Đã sửa bằng script gốc `build:shared`.
 
-### M1 — Tài khoản & nhân vật (~1,5 tuần)
-Nội dung: đăng ký/đăng nhập (argon2 + JWT), tạo nhân vật (chọn trường/phái, kiểm tra trùng tên), danh sách nhân vật; màn hình login + chọn nhân vật trên web; schema + migration ban đầu.
+### M1 — Tài khoản & nhân vật (~1,5 tuần) — ✅ **ĐÃ XONG (2026-10-15)**
+
+**Đã giao:**
+
+- **Đăng ký / đăng nhập**: mật khẩu băm Argon2id; access token JWT 15 phút + refresh token 32 byte
+  ngẫu nhiên lưu dạng băm SHA-256 và **xoay mỗi lần làm mới**; đăng xuất thu hồi token.
+- **Nhân vật**: tạo và liệt kê; tối đa 4 nhân vật mỗi tài khoản; tên duy nhất toàn máy chủ (không phân
+  biệt hoa thường); phái phải thuộc trường đã chọn (chặn ở cả client, schema dùng chung và ràng buộc CHECK trong database).
+- **Giao diện web**: trang `/login` (đăng nhập + đăng ký, kiểm dữ liệu ngay trên trình duyệt),
+  trang `/characters` (danh sách + tạo nhân vật, có guard chặn khi chưa đăng nhập, giữ phiên qua `localStorage`).
+- **Dữ liệu**: Drizzle ORM + PostgreSQL; bảng `accounts`, `characters`, `refresh_tokens`; migration
+  đầu tiên do drizzle-kit sinh; `pnpm --filter @ninja/server db:migrate` để áp dụng.
+
 **Xong khi:** tạo tài khoản mới trên trình duyệt, tạo được nhân vật, đăng nhập lại vẫn thấy nhân vật; mật khẩu sai bị chặn; dữ liệu nằm đúng trong PostgreSQL.
+
+**Kiểm chứng đã chạy (máy dev, PostgreSQL 16 thật và trình duyệt thật):**
+
+| Hạng mục | Kết quả |
+|---|---|
+| `pnpm test` | 116 test xanh — shared 20, server 41, client 51, tools 4 |
+| `pnpm e2e` (Playwright, Chromium) | **7/7 kịch bản xanh**, gồm luồng đăng ký → tạo nhân vật → tải lại trang vẫn còn phiên |
+| `pnpm lint`, `pnpm typecheck`, `pnpm build`, `pnpm validate:data` | đều exit 0 |
+| Gọi API thật bằng curl | đăng ký 201, `/me` 200, tạo nhân vật 201, trùng tên 409, sai mật khẩu 401, chưa đăng nhập 401 |
+| Kiểm trong PostgreSQL bằng psql | tài khoản có `password_hash` dạng `$argon2id$…`, nhân vật gắn đúng `account_id`, refresh token lưu dạng băm |
+
+**Lỗi thật đã phát hiện và sửa trong quá trình kiểm chứng:**
+
+1. `drizzle-kit` không nạp được `@ninja/shared` (chỉ có ESM) → thêm bản CommonJS (`dist-cjs`) cho thư viện dùng chung.
+2. Lỗi vi phạm ràng buộc duy nhất của PostgreSQL nằm trong `cause` do Drizzle bọc lại → `isUniqueViolation` phải đi theo chuỗi `cause`, nếu không thì trùng tên trả 500 thay vì 409.
+3. Trang `/login` hỏng khi mở trực tiếp: `withComponentInputBinding` gán `undefined` cho input `redirectTo`; đồng thời lỗi điều hướng bị nuốt thành thông báo chung nên che mất nguyên nhân. Đã tách phần điều hướng khỏi `try` của lời gọi API và xử lý trường hợp thiếu tham số.
+4. `ng serve` chỉ bind IPv6 `[::1]` khiến Playwright không kết nối được `127.0.0.1` → phải chạy `--host 0.0.0.0`.
+
+**Chưa kiểm chứng được:** `docker compose up` (máy dev chưa cài Docker — PostgreSQL đang chạy trực tiếp
+từ bộ binaries, xem `infra/README.md`).
 
 ### M2 — Thế giới, di chuyển, chat (~2 tuần)
 Nội dung: 2 bản đồ đầu tiên (làng khởi nguồn + bãi luyện tập), tilemap hiển thị, di chuyển (bàn phím + chạm), đồng bộ người chơi giữa nhiều client, chat khu vực, NPC đầu tiên (hội thoại).

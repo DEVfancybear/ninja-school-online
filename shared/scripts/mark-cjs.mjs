@@ -5,4 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
-await writeFile(join(packageRoot, 'dist-cjs', 'package.json'), JSON.stringify({ type: 'commonjs' }, null, 2) + '\n');
+await writeFile(
+  join(packageRoot, 'dist-cjs', 'package.json'),
+  JSON.stringify({ type: 'commonjs' }, null, 2) + '\n',
+);

@@ -2,20 +2,25 @@
 
 Dự án game **nhập vai 2D nhiều người chơi (MMORPG nhẹ)**, chiến đấu theo lượt, **chơi trực tiếp trên trình duyệt** (máy tính + mobile web), lấy cảm hứng từ dòng game "Ninja School Online" nổi tiếng ở Việt Nam.
 
-> **Trạng thái: đã xong Giai đoạn 0 (nghiên cứu & thiết kế) và mốc M0 (nền móng kỹ thuật).**
-> Repo đã có monorepo chạy được: Angular + Phaser (client), Fastify (server), schema dùng chung (shared), công cụ kiểm tra dữ liệu, CI và Docker Compose. Chưa có gameplay.
+> **Trạng thái: đã xong Giai đoạn 0 (nghiên cứu & thiết kế), mốc M0 (nền móng) và mốc M1 (tài khoản & nhân vật).**
+> Chơi được trên web: đăng ký/đăng nhập, tạo nhân vật và xem danh sách nhân vật; dữ liệu lưu trong PostgreSQL.
+> Chưa có thế giới game và chiến đấu (bắt đầu từ M2).
 
 ## Lệnh nhanh
 
 ```bash
 pnpm install            # cài phụ thuộc (pnpm 12 trở lên)
-pnpm build              # build shared → server/tools/client
+cp .env.example .env    # rồi chỉnh DATABASE_URL cho đúng máy bạn
+pnpm --filter @ninja/server db:migrate   # tạo bảng trong PostgreSQL
 pnpm dev                # chạy client (ng serve) + server (tsx watch)
-pnpm lint && pnpm typecheck && pnpm test
+pnpm lint && pnpm typecheck && pnpm test # 116 test
+pnpm e2e                # 7 kịch bản trên trình duyệt thật (Playwright)
 pnpm validate:data      # kiểm tra game-data/ theo schema
+pnpm build
 ```
 
-Dịch vụ nền cho M1 (chưa cần ở M0): `docker compose -f infra/docker/docker-compose.dev.yml up -d`.
+Cần PostgreSQL đang chạy trước. Có Docker thì dùng `docker compose -f infra/docker/docker-compose.dev.yml up -d`;
+không có Docker thì xem cách chạy trực tiếp trong `infra/README.md`.
 
 ## 1. Quyết định đã chốt (theo yêu cầu)
 
@@ -65,24 +70,25 @@ ninja/
 │   ├── 01-research/        # nghiên cứu game gốc + nguồn tham khảo
 │   ├── 02-architecture/    # công nghệ, cấu trúc, mạng & dữ liệu
 │   └── 03-plan/            # lộ trình, MVP, rủi ro
-├── client/                 # Angular 22 + Phaser 4: giao diện, HUD, vẽ thế giới 2D
-├── server/                 # Node.js + Fastify: /health, /version (ws thêm ở cột mốc sau)
-├── shared/                 # PROTOCOL_VERSION, hằng số trường/phái, schema zod của game-data
+├── client/                 # Angular 22 + Phaser 4: đăng nhập, nhân vật, HUD, vẽ thế giới 2D
+├── server/                 # Node.js + Fastify: xác thực, nhân vật, /health, /version (ws ở M2)
+├── shared/                 # PROTOCOL_VERSION, hằng số trường/phái, schema zod dùng chung
 ├── game-data/              # dữ liệu nội dung game dạng JSON (đã có ví dụ skill/item)
 ├── assets/                 # chỉ có README + CREDITS; chưa có tài nguyên hình/âm thanh
 ├── tools/                  # data-validator: kiểm tra game-data theo schema
 ├── infra/                  # Docker Compose cho PostgreSQL + Redis (môi trường dev)
-└── tests/                  # chỉ có README; chưa có e2e (Playwright) và kiểm thử tải (k6)
+└── tests/                  # tests/e2e: 7 kịch bản Playwright trên trình duyệt thật
 ```
 
 Các thư mục `client/`, `server/`, `shared/`, `tools/data-validator/` đã có mã nguồn chạy được.
-`assets/` mới chỉ có `README.md` và `CREDITS.md`, `tests/` mới chỉ có `README.md`; nội dung thật sẽ có ở các cột mốc sau.
+`assets/` mới chỉ có `README.md` và `CREDITS.md`; kiểm thử tải (`tests/load`) sẽ làm ở M8.
 
-## 5. Việc tiếp theo (từ M1)
+## 5. Việc tiếp theo (từ M2)
 
 - [x] ~~Xác nhận stack~~ → **Angular + Phaser + Node.js + PostgreSQL + Redis + Docker** (2026-10-15).
 - [x] ~~M0: khởi tạo monorepo pnpm, tsconfig, ESLint/Prettier, CI, docker-compose~~ → xong (xem `docs/03-plan/roadmap.md`).
-- [ ] **M1: tài khoản + tạo nhân vật** — cần PostgreSQL chạy trước (`docker compose -f infra/docker/docker-compose.dev.yml up -d`).
+- [x] ~~M1: tài khoản + tạo nhân vật~~ → xong (xem `docs/03-plan/roadmap.md`).
+- [ ] **M2: thế giới, di chuyển, chat** (WebSocket, 2 bản đồ đầu tiên) — xem `docs/03-plan/roadmap.md`.
 - [ ] Quyết định có đổi tên sản phẩm hay không (xem mục 6).
 
 ## 6. Lưu ý bản quyền (đọc kỹ)

@@ -26,8 +26,12 @@ export class Login {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
 
-  /** Route được bảo vệ gửi kèm `?redirectTo=...` để sau khi vào quay lại đúng chỗ. */
-  readonly redirectTo = input('/characters');
+  /**
+   * Route được bảo vệ gửi kèm `?redirectTo=...` để sau khi vào quay lại đúng chỗ.
+   * Phải khai báo là `string | undefined`: khi mở thẳng `/login` (không có tham số),
+   * Angular gán giá trị `undefined` cho input nên không thể dựa vào giá trị mặc định.
+   */
+  readonly redirectTo = input<string | undefined>(undefined);
 
   readonly mode = signal<Mode>('login');
   readonly isRegister = computed(() => this.mode() === 'register');
@@ -99,12 +103,16 @@ export class Login {
     this.busy.set(true);
     try {
       await action();
-      await this.router.navigateByUrl(this.targetUrl());
     } catch (error) {
       this.formError.set(apiErrorMessage(error));
+      return;
     } finally {
       this.busy.set(false);
     }
+
+    // Điều hướng nằm ngoài `try` trên: lỗi ở bước này không phải lỗi đăng nhập/đăng ký,
+    // và trước đây bị nuốt thành thông báo chung nên rất khó tìm nguyên nhân.
+    await this.router.navigateByUrl(this.targetUrl());
   }
 
   private rejectInput(fieldErrors: FieldErrors): void {
@@ -119,6 +127,9 @@ export class Login {
 
   private targetUrl(): string {
     const target = this.redirectTo();
-    return target.startsWith('/') && !target.startsWith('//') ? target : '/characters';
+    // Chỉ nhận đường dẫn nội bộ, tránh chuyển hướng ra ngoài (open redirect).
+    return typeof target === 'string' && target.startsWith('/') && !target.startsWith('//')
+      ? target
+      : '/characters';
   }
 }
