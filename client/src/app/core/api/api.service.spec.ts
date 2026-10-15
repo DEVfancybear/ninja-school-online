@@ -37,7 +37,8 @@ describe('ApiService', () => {
       const promise = api.get('/api/auth/me', ME_SCHEMA, 'token-abc');
       // Không flush yêu cầu nào: mô phỏng kết nối "treo" (gửi được nhưng không có phản hồi).
       const assertion = expect(promise).rejects.toMatchObject({
-        code: 'network_error',
+        // Mã riêng để phân biệt "chờ quá lâu" với "mất kết nối hẳn".
+        code: 'timeout',
         message: expect.stringContaining('không phản hồi kịp'),
       });
       await vi.advanceTimersByTimeAsync(REQUEST_TIMEOUT_MS);

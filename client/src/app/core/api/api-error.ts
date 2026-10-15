@@ -6,7 +6,7 @@ import { ApiErrorCode, ApiErrorSchema } from '@ninja/shared';
  * (mất mạng, phản hồi sai hợp đồng, lỗi không xác định).
  */
 export type ApiFailureCode =
-  ApiErrorCode | 'network_error' | 'invalid_response' | 'unexpected_error';
+  ApiErrorCode | 'network_error' | 'timeout' | 'invalid_response' | 'unexpected_error';
 
 const STATUS_CODES: readonly (readonly [number, ApiErrorCode])[] = [
   [400, ApiErrorCode.VALIDATION],
@@ -86,7 +86,7 @@ export function toApiRequestError(error: unknown): ApiRequestError {
  * để người chơi biết là đã gửi được yêu cầu nhưng chờ quá lâu.
  */
 export function toTimeoutError(): ApiRequestError {
-  return new ApiRequestError(TIMEOUT_MESSAGE, 'network_error');
+  return new ApiRequestError(TIMEOUT_MESSAGE, 'timeout');
 }
 
 /** Thông điệp hiển thị cho người chơi; không lộ chi tiết kỹ thuật của lỗi lạ. */

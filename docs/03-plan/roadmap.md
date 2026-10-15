@@ -57,7 +57,7 @@ Nội dung: monorepo pnpm (`client`, `server`, `shared`, `tools/*`), tsconfig ba
 | `pnpm test` | 119 test xanh — shared 20, server 41, client 54, tools 4 |
 | `pnpm e2e` (Playwright, Chromium) | **8/8 kịch bản xanh**, gồm luồng đăng ký → tạo nhân vật → tải lại trang vẫn còn phiên và kịch bản chứng minh đăng xuất thu hồi token |
 | `pnpm lint`, `pnpm typecheck`, `pnpm build`, `pnpm validate:data` | đều exit 0 |
-| Bundle sau M1 | khởi tạo **703 kB** (nén ~151 kB) do thêm `HttpClient`; Phaser vẫn nằm trong lazy chunk riêng (1,39 MB) |
+| Bundle sau M1 | khởi tạo **~706,7 kB** (nén ~151,8 kB); số lệch ±0,01 kB giữa các lần build do tên file có hash. Do thêm `HttpClient` và thời hạn yêu cầu; Phaser vẫn nằm trong lazy chunk riêng (1,39 MB) |
 | Gọi API thật bằng curl | đăng ký 201, `/me` 200, tạo nhân vật 201, trùng tên 409, sai mật khẩu 401, chưa đăng nhập 401 |
 | Kiểm trong PostgreSQL bằng psql | tài khoản có `password_hash` dạng `$argon2id$…`, nhân vật gắn đúng `account_id`, refresh token lưu dạng băm |
 

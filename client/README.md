@@ -10,7 +10,7 @@ Client **không phải nguồn sự thật**: không tự quyết máu, sát th�
 | Thành phần | Phiên bản / ghi chú |
 |---|---|
 | Angular | 22 (standalone component, signals, router, `ChangeDetectionStrategy.OnPush`) |
-| Gọi API | `HttpClient` + `provideHttpClient(withFetch())`, đường dẫn tương đối `/api/...`; mọi yêu cầu có thời hạn 15 giây (`REQUEST_TIMEOUT_MS`) |
+| Gọi API | `HttpClient` + `provideHttpClient(withFetch())`, đường dẫn tương đối `/api/...`; mọi yêu cầu có thời hạn 15 giây (`REQUEST_TIMEOUT_MS`, lỗi quá hạn có mã riêng `timeout`) |
 | Hợp đồng dữ liệu | `@ninja/shared` (schema zod dùng chung với server) |
 | Render thế giới 2D | Phaser 4, nhúng trong `WorldCanvas` (lazy chunk của route `/play`) |
 | Build/dev | Angular CLI (`ng serve`, `ng build`) |

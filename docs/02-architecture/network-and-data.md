@@ -147,12 +147,12 @@ Game gốc xử lý gần hết ở client nên bị chế auto/mod dễ dàng. 
 
 | Loại | File ví dụ | Trường chính |
 |---|---|---|
-| Bản đồ | `maps/map-lang-khoi-nguon.json` | kích thước, tileset, lớp gạch, cổng dịch chuyển, điểm spawn, NPC |
-| Quái | `monsters/mob-quai-xanh.json` | máu, sát thương, tốc độ, EXP, Yên, bảng rơi đồ, thời gian hồi sinh |
-| Vật phẩm | `items/item-kiem-go.json` | loại, ô trang bị, chỉ số, cấp yêu cầu, giá, mốc cường hóa |
-| Chiêu thức | `skills/skill-otama.json` | hệ, sát thương gốc, hệ số, năng lượng, hồi chiêu, hiệu ứng, số mục tiêu |
-| Nhiệm vụ | `quests/quest-chao-lang.json` | cấp yêu cầu, các bước (nói chuyện/đánh/thu thập), thưởng |
-| Trường/phái | `classes/school-haruna.json` | danh sách phái, hệ số chỉ số khi lên cấp, trang bị khởi đầu |
+| Bản đồ | `maps/map-lang-khoi-nguon.json` (sẽ tạo ở M2) | kích thước, tileset, lớp gạch, cổng dịch chuyển, điểm spawn, NPC |
+| Quái | `monsters/mob-quai-xanh.json` (sẽ tạo ở M3) | máu, sát thương, tốc độ, EXP, Yên, bảng rơi đồ, thời gian hồi sinh |
+| Vật phẩm | `items/item-kiem-go.json` (đã có) | loại, ô trang bị, chỉ số, cấp yêu cầu, giá, mốc cường hóa |
+| Chiêu thức | `skills/skill-tram-co-ban.json` (đã có) | hệ, sát thương gốc, hệ số, năng lượng, hồi chiêu, hiệu ứng, số mục tiêu |
+| Nhiệm vụ | `quests/quest-chao-lang.json` (sẽ tạo ở M5) | cấp yêu cầu, các bước (nói chuyện/đánh/thu thập), thưởng |
+| Trường/phái | `classes/school-haruna.json` (sẽ tạo ở M3) | danh sách phái, hệ số chỉ số khi lên cấp, trang bị khởi đầu |
 
 Ví dụ một chiêu (minh họa định dạng, số liệu tự đặt):
 
