@@ -21,7 +21,8 @@
     "@angular/router": "^22.2.0",
     "phaser": "4.2.1",
     "rxjs": "~7.8.0",
-    "tslib": "^2.3.0"
+    "tslib": "^2.3.0",
+    "@ninja/shared": "workspace:*"
   },
   "devDependencies": {
     "@angular-eslint/builder": "22.6.0",
@@ -37,5 +38,5 @@
     "typescript-eslint": "8.71.0",
     "vitest": "^5.0.0"
   },
-  "description": "Client web: Angular lo giao diện/HUD/state, Phaser vẽ thế giới 2D."
+  "description": "Client web: Angular lo giao di\u1ec7n/HUD/state, Phaser v\u1ebd th\u1ebf gi\u1edbi 2D."
 }
