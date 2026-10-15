@@ -3,6 +3,7 @@ docs/
 *.md
 node_modules/
 dist/
+dist-cjs/
 out-tsc/
 .angular/
 coverage/

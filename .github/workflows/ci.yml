@@ -14,6 +14,26 @@ jobs:
   build:
     name: Lint, typecheck, test, build
     runs-on: ubuntu-latest
+
+    # PostgreSQL thật cho các test tích hợp của server (tài khoản, nhân vật).
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ninja
+          POSTGRES_PASSWORD: ninja_dev_password
+          POSTGRES_DB: ninja_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ninja -d ninja_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      TEST_DATABASE_URL: postgresql://ninja:ninja_dev_password@127.0.0.1:5432/ninja_test
+
     steps:
       - name: Lấy mã nguồn
         uses: actions/checkout@v7

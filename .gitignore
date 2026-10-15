@@ -4,6 +4,7 @@ node_modules/
 
 # === Kết quả build ===
 dist/
+dist-cjs/
 build/
 out/
 *.tsbuildinfo

@@ -19,7 +19,9 @@ describe('RegisterRequestSchema', () => {
   });
 
   it('từ chối tên đăng nhập có chữ hoa', () => {
-    expect(() => RegisterRequestSchema.parse({ username: 'Ninja01', password: 'matkhau123' })).toThrow();
+    expect(() =>
+      RegisterRequestSchema.parse({ username: 'Ninja01', password: 'matkhau123' }),
+    ).toThrow();
   });
 
   it('từ chối mật khẩu quá ngắn', () => {
@@ -28,7 +30,11 @@ describe('RegisterRequestSchema', () => {
 
   it('từ chối email sai định dạng', () => {
     expect(() =>
-      RegisterRequestSchema.parse({ username: 'ninja_01', password: 'matkhau123', email: 'khong-phai-email' }),
+      RegisterRequestSchema.parse({
+        username: 'ninja_01',
+        password: 'matkhau123',
+        email: 'khong-phai-email',
+      }),
     ).toThrow();
   });
 });
@@ -50,7 +56,11 @@ describe('CreateCharacterRequestSchema', () => {
   });
 
   it('từ chối phái không thuộc trường đã chọn', () => {
-    const result = CreateCharacterRequestSchema.safeParse({ name: 'HoaLong', school: 'haruna', class: 'kunai' });
+    const result = CreateCharacterRequestSchema.safeParse({
+      name: 'HoaLong',
+      school: 'haruna',
+      class: 'kunai',
+    });
     expect(result.success).toBe(false);
     expect(result.error?.issues[0]?.path).toEqual(['class']);
   });
@@ -62,13 +72,17 @@ describe('CreateCharacterRequestSchema', () => {
   });
 
   it('từ chối tên ngắn hơn 3 ký tự', () => {
-    expect(() => CreateCharacterRequestSchema.parse({ name: 'ab', school: 'ookaza', class: 'cung' })).toThrow();
+    expect(() =>
+      CreateCharacterRequestSchema.parse({ name: 'ab', school: 'ookaza', class: 'cung' }),
+    ).toThrow();
   });
 });
 
 describe('AccountSchema', () => {
   it('từ chối thời gian không phải ISO', () => {
-    expect(() => AccountSchema.parse({ id: 'khong-phai-uuid', username: 'a', createdAt: 'hom qua' })).toThrow();
+    expect(() =>
+      AccountSchema.parse({ id: 'khong-phai-uuid', username: 'a', createdAt: 'hom qua' }),
+    ).toThrow();
   });
 
   it('chấp nhận uuid và thời gian ISO', () => {

@@ -1,0 +1,13 @@
+{
+  "_comment": "B\u1ea3n CommonJS ch\u1ec9 \u0111\u1ec3 c\u00e1c c\u00f4ng c\u1ee5 CJS (drizzle-kit, script c\u0169) require \u0111\u01b0\u1ee3c @ninja/shared. TS 6 \u0111\u00e1nh d\u1ea5u moduleResolution Node10 l\u00e0 deprecated; ta ch\u1ea5p nh\u1eadn t\u1ea1m v\u00e0 s\u1ebd b\u1ecf khi TS 7 ra.",
+  "extends": "./tsconfig.build.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Node10",
+    "ignoreDeprecations": "6.0",
+    "declaration": false,
+    "declarationMap": false,
+    "outDir": "dist-cjs",
+    "verbatimModuleSyntax": false
+  }
+}

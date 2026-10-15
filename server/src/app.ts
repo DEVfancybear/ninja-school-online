@@ -1,25 +1,91 @@
-import Fastify, { type FastifyInstance } from 'fastify';
-import { PROTOCOL_VERSION } from '@ninja/shared';
+import cors from '@fastify/cors';
+import jwt from '@fastify/jwt';
+import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
+import { sql } from 'drizzle-orm';
+import { ApiErrorCode, PROTOCOL_VERSION } from '@ninja/shared';
+import type { Env } from './config/env.js';
+import type { Db } from './db/client.js';
+import { AppError } from './errors.js';
+import { authenticate } from './http/auth.js';
+import { AccountService } from './modules/account/service.js';
+import { registerAccountRoutes } from './modules/account/routes.js';
+import { CharacterService } from './modules/character/service.js';
+import { registerCharacterRoutes } from './modules/character/routes.js';
+import { argon2PasswordHasher } from './security/password.js';
+import { TokenService } from './security/tokens.js';
 
-export interface AppOptions {
-  logLevel?: string;
-  corsOrigin?: string;
+export interface CreateAppOptions {
+  env: Env;
+  db: Db;
 }
 
-/** Tạo instance Fastify. Tách khỏi main.ts để kiểm thử bằng app.inject(). */
-export function createApp(options: AppOptions = {}): FastifyInstance {
-  const app = Fastify({ logger: { level: options.logLevel ?? 'info' } });
+/** Ghép toàn bộ plugin, dịch vụ và route thành một instance Fastify (kiểm thử bằng app.inject()). */
+export async function createApp(options: CreateAppOptions): Promise<FastifyInstance> {
+  const { env, db } = options;
+  const app = Fastify({ logger: { level: env.LOG_LEVEL } });
 
-  app.get('/health', async () => ({
-    status: 'ok',
-    protocolVersion: PROTOCOL_VERSION,
-    uptimeSeconds: Math.round(process.uptime()),
-  }));
+  await app.register(cors, { origin: env.CORS_ORIGIN.split(',').map((o) => o.trim()) });
+  await app.register(jwt, {
+    secret: env.JWT_SECRET,
+    sign: { expiresIn: env.JWT_ACCESS_TTL_SECONDS },
+  });
+  app.decorate('authenticate', authenticate);
+
+  const tokens = new TokenService(db, { refreshTtlDays: env.JWT_REFRESH_TTL_DAYS });
+  const accountService = new AccountService({
+    db,
+    hasher: argon2PasswordHasher,
+    tokens,
+    signAccessToken: (payload) => app.jwt.sign(payload),
+  });
+  const characterService = new CharacterService(db);
+
+  app.get('/health', async () => {
+    let database: 'up' | 'down' = 'up';
+    try {
+      await db.execute(sql`select 1`);
+    } catch {
+      database = 'down';
+    }
+    return {
+      status: database === 'up' ? 'ok' : 'degraded',
+      database,
+      protocolVersion: PROTOCOL_VERSION,
+      uptimeSeconds: Math.round(process.uptime()),
+    };
+  });
 
   app.get('/version', async () => ({
     protocolVersion: PROTOCOL_VERSION,
-    corsOrigin: options.corsOrigin ?? null,
+    corsOrigin: env.CORS_ORIGIN,
   }));
+
+  registerAccountRoutes(app, accountService);
+  registerCharacterRoutes(app, characterService);
+
+  app.setNotFoundHandler((request, reply) => {
+    return reply
+      .status(404)
+      .send({
+        error: ApiErrorCode.NOT_FOUND,
+        message: `không có đường dẫn ${request.method} ${request.url}`,
+      });
+  });
+
+  app.setErrorHandler((error: FastifyError, request, reply) => {
+    if (error instanceof AppError) {
+      return reply.status(error.statusCode).send({ error: error.code, message: error.message });
+    }
+    if (error.validation) {
+      return reply
+        .status(400)
+        .send({ error: ApiErrorCode.VALIDATION, message: 'dữ liệu gửi lên không hợp lệ' });
+    }
+    request.log.error(error);
+    return reply
+      .status(500)
+      .send({ error: ApiErrorCode.INTERNAL, message: 'lỗi hệ thống, hãy thử lại sau' });
+  });
 
   return app;
 }
