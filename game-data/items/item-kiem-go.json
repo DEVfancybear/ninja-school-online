@@ -1,0 +1,17 @@
+{
+  "id": "item-kiem-go",
+  "name": "Ki\u1ebfm G\u1ed7",
+  "kind": "weapon",
+  "slot": "weapon",
+  "levelRequired": 1,
+  "price": 100,
+  "stats": {
+    "strength": 2,
+    "agility": 0,
+    "spirit": 0,
+    "hp": 0,
+    "mp": 0
+  },
+  "upgradeMaxLevel": 5,
+  "description": "V\u0169 kh\u00ed t\u1eadp luy\u1ec7n c\u1ee7a h\u1ecdc vi\u00ean m\u1edbi."
+}

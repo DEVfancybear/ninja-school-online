@@ -1,6 +1,6 @@
 # server/ — Game server
 
-**Trạng thái:** trống, chưa có mã nguồn.
+**Trạng thái:** đã có khung (M0): `main.ts`, `app.ts` (`/health`, `/version`), `config/env.ts`. WebSocket và các module nghiệp vụ sẽ thêm ở M1 trở đi.
 
 ## Vai trò
 Là **nguồn sự thật** của toàn bộ trò chơi: tài khoản, nhân vật, bản đồ, chiến đấu theo lượt, vật phẩm, nhiệm vụ, bang hội, xếp hạng, sự kiện.

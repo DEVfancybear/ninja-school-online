@@ -1,6 +1,6 @@
 # shared/ — Thư viện dùng chung client ↔ server
 
-**Trạng thái:** trống, chưa có mã nguồn.
+**Trạng thái:** đã có mã nguồn (M0): `protocol/version.ts`, `constants/game.ts`, `schemas/{skill,item}.ts`.
 
 ## Vai trò
 Chứa **hợp đồng chung** giữa client và server để hai bên không bao giờ lệch định nghĩa:

@@ -1,0 +1,24 @@
+{
+  "name": "@ninja/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Game server: ngu\u1ed3n s\u1ef1 th\u1eadt c\u1ee7a tr\u00f2 ch\u01a1i (HTTP API + WebSocket \u1edf c\u00e1c giai \u0111o\u1ea1n sau).",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ninja/shared": "workspace:*",
+    "fastify": "5.12.7",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "tsx": "4.23.15"
+  }
+}

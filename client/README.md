@@ -1,41 +1,72 @@
-# client/ — Client web (chạy trên trình duyệt)
+# client/ — Client web (Angular + Phaser)
 
-**Trạng thái:** trống, chưa có mã nguồn.
+Chạy trên trình duyệt. **Angular** lo giao diện, định tuyến, trạng thái, chat/túi đồ/nhiệm vụ (HUD).
+**Phaser** chỉ vẽ thế giới 2D (bản đồ, nhân vật, quái, hiệu ứng) trong một component.
 
-## Vai trò
-Render thế giới 2D, nhận thao tác người chơi, gửi "ý định" (intent) lên server và hiển thị kết quả server trả về.
-Client **không phải nguồn sự thật**: không tự quyết máu, sát thương, tiền, vật phẩm.
+Client **không phải nguồn sự thật**: không tự quyết máu, sát thương, tiền, vật phẩm — chỉ gửi "ý định" lên server và hiển thị kết quả server trả về.
 
-## Công nghệ dự kiến
-- TypeScript (strict) + Vite
-- Phaser 3 — render tilemap, nhân vật, hiệu ứng, input
-- HUD/UI (túi đồ, chat, nhiệm vụ, shop) dựng bằng HTML/CSS overlay cho nhanh và dễ chỉnh
-- Zustand (state client), howler.js (âm thanh), vite-plugin-pwa (cài như app)
+## Công nghệ
 
-## Cấu trúc dự kiến khi bắt đầu code
+| Thành phần | Phiên bản / ghi chú |
+|---|---|
+| Angular | 22 (standalone component, signals, router, `ChangeDetectionStrategy.OnPush`) |
+| Render thế giới 2D | Phaser 4, nhúng trong `WorldCanvas` |
+| Build/dev | Angular CLI (`ng serve`, `ng build`) |
+| Kiểm thử | Vitest qua `ng test` (jsdom) |
+| Lint | ESLint + angular-eslint (`ng lint`) |
+
+Phaser nằm trong **lazy chunk** của route `/play`, nên bundle khởi tạo nhẹ (khoảng 212 kB) và chỉ tải engine khi vào thế giới.
+
+## Cấu trúc hiện tại
+
 ```text
 client/
-├── index.html
-├── public/            # favicon, manifest, tài nguyên tĩnh
-├── src/
-│   ├── main.ts        # điểm khởi động
-│   ├── core/          # bootstrap, vòng lặp, quản lý scene, nạp tài nguyên, âm thanh
-│   ├── net/           # WebSocket client (reconnect, hàng đợi gói tin), REST client
-│   ├── state/         # store: phiên đăng nhập, nhân vật, túi đồ, trận đấu
-│   ├── scenes/        # đăng nhập, chọn nhân vật, thế giới, trận đấu, lôi đài
-│   ├── world/         # render bản đồ, thực thể, camera
-│   ├── battle/        # sàn đấu theo lượt (UI + hiệu ứng)
-│   ├── ui/            # HUD, chat, túi, nhiệm vụ, shop, hộp thoại
-│   ├── input/         # bàn phím, chạm, joystick ảo
-│   └── i18n/
-└── vite.config.ts
+├── angular.json
+├── eslint.config.js          # cấu hình do angular-eslint sinh ra
+├── tsconfig.json             # cấu hình của Angular (không kế thừa tsconfig.base.json)
+├── tsconfig.app.json
+├── tsconfig.spec.json
+├── public/
+└── src/
+    ├── main.ts               # bootstrap ứng dụng
+    ├── index.html
+    ├── styles.css            # biến màu, nền tối dùng chung
+    └── app/
+        ├── app.ts            # component gốc, chỉ chứa <router-outlet />
+        ├── app.html
+        ├── app.routes.ts     # '' → Home, 'play' → WorldCanvas (lazy)
+        ├── app.config.ts     # provider của ứng dụng
+        ├── pages/home/       # trang chủ
+        └── game/
+            ├── world-scene.ts     # cảnh Phaser (hiện vẽ lưới gạch mẫu)
+            ├── game-config.ts     # hàm dựng cấu hình Phaser (tách để kiểm thử)
+            └── world-canvas/      # component bọc canvas Phaser
 ```
 
-## Nguyên tắc
-1. Mọi gói tin đều dùng định nghĩa trong `shared/` — không tự phát minh format riêng.
-2. Chỉ nhận dữ liệu server gửi; không tải toàn bộ dữ liệu game về client (chống gian lận + nhẹ băng thông).
-3. Tài nguyên hình/âm chỉ lấy từ `assets/` của dự án (xem `assets/README.md`).
+Cấu trúc đích đầy đủ (đến hết Alpha) xem `docs/02-architecture/project-structure.md` — sẽ bổ sung `net/`, `state/`, `battle/`, `ui/`, `input/`, `i18n/`.
 
-## Tham chiếu
-- `docs/02-architecture/project-structure.md`
-- `docs/02-architecture/network-and-data.md`
+## Lệnh
+
+```bash
+pnpm --filter @ninja/shared build   # bắt buộc một lần (và mỗi khi sửa shared)
+pnpm --filter @ninja/client dev     # ng serve → http://localhost:4200
+pnpm --filter @ninja/client build   # ng build
+pnpm --filter @ninja/client test    # ng test --no-watch
+pnpm --filter @ninja/client lint    # ng lint
+pnpm --filter @ninja/client typecheck
+```
+
+Từ gốc repo có thể dùng `pnpm dev`, `pnpm build`, `pnpm test`, `pnpm lint`.
+
+## Quy ước
+
+1. Mọi gói tin (khi có mạng) đều dùng định nghĩa trong `@ninja/shared` — không tự phát minh format riêng.
+2. Component dùng `ChangeDetectionStrategy.OnPush`; route nặng dùng `loadComponent`.
+3. Phần vẽ nằm trong `game/`; phần giao diện nằm trong `pages/` và `ui/` (thêm sau). Không trộn logic nghiệp vụ vào component.
+4. Tài nguyên hình/âm chỉ lấy từ `assets/` của dự án (xem `assets/README.md`).
+
+## Ghi chú về kiểm thử
+
+- `game-config.spec.ts` **mock Phaser**: jsdom không cài đặt canvas 2D nên không nạp được Phaser thật trong unit test. Test này kiểm tra cấu hình (phần tử cha, cảnh, chế độ co giãn, màu nền).
+- Vì vậy **việc vẽ thật của Phaser chưa được unit test che phủ**. Cách kiểm: `pnpm --filter @ninja/client build` phải thành công, và mở `ng serve` vào `/play` phải thấy lưới gạch.
+- Muốn kiểm tự động phần render thì cần Playwright (e2e) — nằm trong `tests/e2e/` ở cột mốc sau.

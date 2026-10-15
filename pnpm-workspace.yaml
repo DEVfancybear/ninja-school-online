@@ -1,0 +1,13 @@
+packages:
+  - 'client'
+  - 'server'
+  - 'shared'
+  - 'tools/*'
+
+# pnpm 12 đọc cấu hình từ đây (không còn đọc trường "pnpm" trong package.json).
+# Cho phép các gói dưới đây chạy script cài đặt (build binary gốc).
+allowBuilds:
+  '@parcel/watcher': true
+  esbuild: true
+  lmdb: true
+  msgpackr-extract: true

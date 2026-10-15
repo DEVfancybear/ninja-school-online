@@ -22,18 +22,20 @@
 ### 2.2 Client (trình duyệt)
 | Thành phần | Chọn | Lý do |
 |---|---|---|
-| Render game 2D | **Phaser 3** | Có sẵn tilemap, sprite, animation, input; tài liệu/cộng đồng lớn; phù hợp game 2D theo lượt |
-| Build/dev | **Vite** | Khởi động nhanh, HMR, build gọn |
-| UI/HUD (túi, chat, nhiệm vụ) | **HTML/CSS overlay** trên canvas | Dễ làm, dễ chỉnh, hỗ trợ tiếng Việt tốt; không phí công dựng UI trong engine |
-| State client | Zustand | Nhẹ, đơn giản |
-| Âm thanh | howler.js | Chuẩn web, dễ quản lý nhạc/nền/eff |
-| PWA | vite-plugin-pwa | Cài lên điện thoại như app, cache tài nguyên |
+| Framework giao diện & ứng dụng | **Angular 22** (standalone component, signals, router) | Lo toàn bộ UI/HUD, định tuyến, trạng thái, DI; khuôn mẫu rõ ràng, hệ sinh thái ổn định |
+| Render thế giới 2D | **Phaser 4**, nhúng trong một component Angular | Có sẵn tilemap, sprite, hoạt ảnh, camera; chỉ dùng cho phần vẽ thế giới |
+| UI/HUD (túi, chat, nhiệm vụ) | **Template + CSS của Angular** phủ trên canvas | Dễ làm, dễ chỉnh, hiển thị tiếng Việt tốt; không phí công dựng UI trong engine |
+| State client | **Angular signals + services** | Có sẵn trong framework, không cần thư viện ngoài |
+| Build/dev | **Angular CLI** (`ng serve`, `ng build`) | HMR sẵn, cấu hình chuẩn của framework |
+| Kiểm thử client | **Vitest qua `ng test`** (Angular 22 dùng sẵn) | Không phải dựng thêm cấu hình test |
+| Âm thanh | howler.js (thêm khi cần) | Chuẩn web, dễ quản lý nhạc nền/hiệu ứng |
+| PWA | `@angular/pwa` (thêm khi cần) | Cài lên điện thoại như app, cache tài nguyên |
 | Điều khiển | Bàn phím (desktop) + joystick ảo + nút chiêu (touch) | Chơi được cả hai nền tảng |
 
 ### 2.3 Server (Node.js)
 | Thành phần | Chọn | Lý do |
 |---|---|---|
-| Runtime | Node.js 20 LTS + TypeScript | Khớp ngôn ngữ với client; hệ sinh thái lớn |
+| Runtime | Node.js 22 LTS trở lên (đang dùng 24) + TypeScript 6.0 | Khớp ngôn ngữ với client; hệ sinh thái lớn |
 | HTTP API | Fastify + zod | Nhanh, schema validation sẵn |
 | Realtime | **ws** (WebSocket thuần), tự quản room + tick | Kiểm soát hoàn toàn luồng gói tin như server Java gốc; không "phép thuật" ẩn |
 | Mã hóa gói tin | JSON (dev) → **MessagePack** (msgpackr) khi phát hành | Nhẹ băng thông, dễ debug khi phát triển |
@@ -62,6 +64,9 @@
 
 | Phương án | Khi nào nên chọn | Đánh đổi |
 |---|---|---|
+| **Angular thuần + Canvas 2D tự viết** | Muốn kiểm soát render mức thấp, không phụ thuộc engine nào | Phải tự làm tilemap, camera, hoạt ảnh — tốn nhiều thời gian hơn |
+| **Angular thuần + DOM/CSS** | Chỉ cần bản đồ nhỏ, ít hiệu ứng | Khó mở rộng, hiệu năng kém khi đông người chơi |
+| **React/Vue + Phaser** thay Angular | Đội đã quen framework khác | Angular đã được chọn nên chỉ cân nhắc khi đổi hướng |
 | **Cocos Creator 3** (client) | Muốn dựng cảnh/hoạt ảnh bằng editor, xuất web + mobile nhanh, phổ biến ở VN | Phụ thuộc editor; khó cho quy trình code/agent hơn |
 | **PixiJS** (client) | Muốn kiểm soát render mức thấp, cần engine rất nhẹ | Phải tự làm tilemap/input/scene nhiều hơn |
 | **Java 17 + Netty** (server) | Muốn bám sát kiến trúc server gốc để học | Hai ngôn ngữ, hai hệ sinh thái; chậm hơn cho đội nhỏ |
@@ -69,17 +74,18 @@
 | **Unity WebGL** | Muốn 3D hoặc tái dùng kỹ năng Unity | Build nặng, tải chậm trên web — **không khuyến nghị** cho game 2D theo lượt |
 
 > Ghi chú: các phương án đều **giữ nguyên client web**; chỉ thay phần công nghệ tương ứng.
+> **Đã chốt (2026-10-15):** client dùng **Angular + Phaser** — Angular là framework chính, Phaser chỉ vẽ thế giới 2D.
 
 ## 4. Môi trường phát triển (máy Windows)
 
-1. Cài **Node.js 20 LTS** (khuyến nghị qua `fnm` hoặc `nvm-windows`).
-2. Cài **pnpm** (`corepack enable`), **Git**, **VS Code**.
+1. Cài **Node.js 22 LTS trở lên** (khuyến nghị qua `fnm` hoặc `nvm-windows`).
+2. Cài **pnpm** (`npm install -g pnpm`), **Git**, **VS Code**.
 3. Cài **Docker Desktop** (chạy PostgreSQL + Redis cho máy dev).
 4. Công cụ đồ họa gợi ý: **Aseprite** (pixel art), **Tiled** (bản đồ), **Audacity** (âm thanh).
 5. Công cụ AI hỗ trợ không bắt buộc.
 
 ## 5. Việc cần bạn xác nhận trước khi code
 
-- [ ] Đồng ý **Phaser 3 + Node.js + PostgreSQL + Redis + Docker**? (nếu không, chọn phương án ở mục 3)
+- [x] **Angular + Phaser + Node.js + PostgreSQL + Redis + Docker** — đã chốt ngày 2026-10-15.
 - [ ] Đồng ý dùng **MessagePack** cho gói tin khi phát hành (dev vẫn JSON để dễ debug)?
 - [ ] Có cần hỗ trợ **PWA** (cài lên điện thoại) ngay từ MVP không?

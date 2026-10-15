@@ -1,6 +1,6 @@
 # game-data/ — Dữ liệu nội dung game
 
-**Trạng thái:** trống, chưa có dữ liệu.
+**Trạng thái:** đã có 2 file ví dụ (`skills/skill-tram-co-ban.json`, `items/item-kiem-go.json`) và schema tương ứng trong `@ninja/shared`. Kiểm tra bằng `pnpm validate:data`.
 
 ## Vai trò
 Chứa **toàn bộ nội dung game dưới dạng dữ liệu** (JSON/YAML) để thiết kế và cân bằng mà không cần sửa code:

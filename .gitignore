@@ -28,8 +28,23 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+!client/.vscode/
+!client/.vscode/*
 
 # === Tạm ===
 tmp/
 .cache/
 *.local
+
+# === Angular ===
+.angular/
+out-tsc/
+.browserslistrc
+
+# === pnpm ===
+.pnpm-debug.log
+.pnpm-store/
+
+# === Prettier/ESLint cache ===
+.eslintcache
+.prettiercache

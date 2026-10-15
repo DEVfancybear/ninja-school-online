@@ -1,0 +1,31 @@
+{
+  "name": "ninja-school-online",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Game nh\u1eadp vai ninja 2D nhi\u1ec1u ng\u01b0\u1eddi ch\u01a1i, ch\u01a1i tr\u00ean tr\u00ecnh duy\u1ec7t (Angular + Phaser).",
+  "type": "module",
+  "packageManager": "pnpm@12.11.2",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter \"./client\" --filter \"./server\" dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm --filter @ninja/shared build && pnpm -r typecheck",
+    "test": "pnpm --filter @ninja/shared build && pnpm -r test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "validate:data": "pnpm --filter @ninja/data-validator start",
+    "ci": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.12.0",
+    "globals": "17.13.0",
+    "prettier": "3.9.10",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.2",
+    "vitest": "5.0.4"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@ninja/data-validator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Ki\u1ec3m tra game-data/ \u0111\u00fang schema tr\u01b0\u1edbc khi ch\u1ea1y server ho\u1eb7c ph\u00e1t h\u00e0nh.",
+  "scripts": {
+    "start": "tsx src/cli.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ninja/shared": "workspace:*",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "tsx": "4.23.15"
+  }
+}

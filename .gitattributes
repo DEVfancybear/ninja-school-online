@@ -1,0 +1,15 @@
+# Chuẩn hoá xuống dòng: lưu LF trong repo, xuất LF ra working tree (nhất quán Windows/Linux)
+* text=auto eol=lf
+
+# Tệp nhị phân không xử lý text
+*.ico binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.mp3 binary
+*.ogg binary
+*.wav binary

@@ -1,6 +1,6 @@
 # Cấu trúc dự án
 
-*Ngày viết: 2026-10-15. Đây là cấu trúc đích mà dự án sẽ theo khi bắt đầu code (hiện tại các thư mục còn trống, chỉ có README).*
+*Ngày viết: 2026-10-15. Cập nhật sau khi hoàn thành M0: **mốc M0 đã dựng thật**, các phần còn lại là cấu trúc đích cho các cột mốc sau.*
 
 ## 1. Nguyên tắc thiết kế
 
@@ -29,20 +29,28 @@ ninja/
 │   ├── 02-architecture/
 │   └── 03-plan/
 │
-├── client/                       # CLIENT WEB (Phaser 3 + Vite + TS)
-│   ├── index.html
+├── client/                       # CLIENT WEB (Angular 22 + Phaser 4)
+│   ├── angular.json              # cấu hình Angular CLI
+│   ├── eslint.config.js          # do angular-eslint sinh ra
 │   ├── public/                   # favicon, manifest PWA, tài nguyên tĩnh
 │   └── src/
-│       ├── main.ts               # điểm khởi động
-│       ├── core/                 # bootstrap, vòng lặp, scene manager, asset loader, audio
-│       ├── net/                  # WebSocket client (reconnect, backoff, hàng đợi), REST client
-│       ├── state/                # store: phiên, nhân vật, túi đồ, nhiệm vụ, trận đấu
-│       ├── scenes/               # login, chọn nhân vật, thế giới, trận đấu, lôi đài
-│       ├── world/                # render bản đồ (tilemap), thực thể, camera
-│       ├── battle/               # UI sàn đấu theo lượt + hiệu ứng chiêu
-│       ├── ui/                   # HUD, chat, túi, nhiệm vụ, shop, hộp thoại
-│       ├── input/                # bàn phím, chạm, joystick ảo
-│       └── i18n/                 # chuỗi giao diện (tiếng Việt trước)
+│       ├── main.ts               # bootstrap Angular
+│       ├── index.html
+│       ├── styles.css            # biến màu, nền tối dùng chung
+│       └── app/                  # (M0 đã có)
+│           ├── app.ts            # component gốc + <router-outlet />
+│           ├── app.routes.ts     # '' → Home, 'play' → WorldCanvas (lazy)
+│           ├── app.config.ts
+│           ├── pages/home/       # trang chủ
+│           └── game/             # (M0) world-scene.ts, game-config.ts, world-canvas/
+│       # các thư mục thêm ở cột mốc sau (đặt trong src/app/):
+│       #   net/          WebSocket client (reconnect, backoff, hàng đợi), REST client
+│       #   state/        signals + service: phiên, nhân vật, túi đồ, nhiệm vụ, trận đấu
+│       #   pages/        login, chọn nhân vật, lôi đài
+│       #   battle/       UI sàn đấu theo lượt + hiệu ứng chiêu
+│       #   ui/           HUD, chat, túi, nhiệm vụ, shop, hộp thoại
+│       #   input/        bàn phím, chạm, joystick ảo
+│       #   i18n/         chuỗi giao diện (tiếng Việt trước)
 │
 ├── server/                       # GAME SERVER (Node.js + Fastify + ws)
 │   ├── src/
@@ -128,3 +136,12 @@ Chữ trong code/giao diện: tiếng Anh cho định danh, chuỗi hiển thị
 | M7–M8 (Beta) | `modules/{guild,event}`, `tools/gm-cli`, `infra/deploy`, `tests/load` |
 
 Chi tiết tiêu chí từng mốc xem `docs/03-plan/roadmap.md`.
+
+## 6. Ghi chú về cấu hình TypeScript
+
+| Gói | Cấu hình | Vì sao |
+|---|---|---|
+| `shared`, `server`, `tools/*` | kế thừa `tsconfig.base.json` (module `nodenext`) | chạy trên Node.js, xuất ESM thật nên import tương đối phải ghi kèm `.js` |
+| `client` | dùng cấu hình do Angular CLI sinh ra (`client/tsconfig.json`) | Angular tự quyết định `module`, decorator, template; ghi đè dễ hỏng |
+
+`shared` được **build ra `dist/`** trước khi `server`/`client` dùng, nên `src` import `@ninja/shared` qua `exports` trong `package.json` (không trỏ thẳng vào file `.ts`).

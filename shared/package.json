@@ -1,0 +1,23 @@
+{
+  "name": "@ninja/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "H\u1ee3p \u0111\u1ed3ng d\u00f9ng chung gi\u1eefa client v\u00e0 server: phi\u00ean b\u1ea3n protocol, h\u1eb1ng s\u1ed1, schema d\u1eef li\u1ec7u game.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -w -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "4.6.7"
+  }
+}

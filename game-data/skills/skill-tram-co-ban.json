@@ -1,0 +1,17 @@
+{
+  "id": "skill-tram-co-ban",
+  "name": "Tr\u1ea3m C\u01a1 B\u1ea3n",
+  "school": "haruna",
+  "class": "dao",
+  "type": "active",
+  "levelRequired": 1,
+  "costMp": 5,
+  "cooldownMs": 0,
+  "targets": 1,
+  "power": 10,
+  "scale": {
+    "stat": "strength",
+    "factor": 1.2
+  },
+  "effects": []
+}

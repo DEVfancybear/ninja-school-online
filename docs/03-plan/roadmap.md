@@ -12,9 +12,26 @@
 
 ## 2. Các cột mốc chi tiết
 
-### M0 — Nền móng dự án (~1 tuần)
-Nội dung: monorepo pnpm (`client`, `server`, `shared`), tsconfig base, ESLint/Prettier, CI GitHub Actions, `docker-compose.dev.yml` (PostgreSQL + Redis), khung "hello world" (client mở trang, server trả `/health`), `tools/data-validator` chạy được.
+### M0 — Nền móng dự án (~1 tuần) — ✅ **ĐÃ XONG (2026-10-15)**
+Nội dung: monorepo pnpm (`client`, `server`, `shared`, `tools/*`), tsconfig base, ESLint + Prettier, CI GitHub Actions, `docker-compose.dev.yml` (PostgreSQL + Redis), khung "hello world" (client mở trang, server trả `/health`), `tools/data-validator` chạy được.
+
+**Đã giao:** monorepo pnpm 12 + workspace; `client` là ứng dụng Angular 22 + Phaser 4 (route `/` và `/play`); `server` Fastify có `/health` và `/version`; `shared` có `PROTOCOL_VERSION`, hằng số trường/phái, schema zod cho `skills`/`items`; `tools/data-validator` kiểm tra `game-data/` (đã có 2 file ví dụ); ESLint 10 (eslint + angular-eslint), Prettier, Vitest; `.github/workflows/ci.yml`; `infra/docker/docker-compose.dev.yml`.
+
 **Xong khi:** `pnpm install && pnpm dev` trên máy sạch dựng được cả client và server; CI xanh; container DB/Redis chạy bằng 1 lệnh.
+
+**Kiểm chứng đã chạy trên máy dev (Windows):**
+
+| Lệnh | Kết quả |
+|---|---|
+| `pnpm install` | OK (phải chấp thuận build script: `pnpm approve-builds --all`) |
+| `pnpm lint` | OK — 4/4 gói |
+| `pnpm typecheck` | OK |
+| `pnpm test` | OK — 20 test (shared 6, server 4, tools 4, client 6) |
+| `pnpm build` | OK — bundle khởi tạo 212 kB; Phaser nằm trong lazy chunk riêng |
+| `pnpm validate:data` | OK — kiểm 2 file trong `game-data/` |
+| Chạy `node server/dist/main.js` rồi `curl /health` | 200 `{"status":"ok","protocolVersion":1,...}` |
+
+**Chưa kiểm chứng được:** `docker compose up` (máy dev chưa cài Docker — cần bước này trước khi làm M1), và phần vẽ thật của Phaser (chưa có test tự động, xem `client/README.md`).
 
 ### M1 — Tài khoản & nhân vật (~1,5 tuần)
 Nội dung: đăng ký/đăng nhập (argon2 + JWT), tạo nhân vật (chọn trường/phái, kiểm tra trùng tên), danh sách nhân vật; màn hình login + chọn nhân vật trên web; schema + migration ban đầu.

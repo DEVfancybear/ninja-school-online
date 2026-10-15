@@ -1,0 +1,10 @@
+# Tài liệu viết tay, định dạng bảng có chủ đích — không cho Prettier sửa
+docs/
+*.md
+node_modules/
+dist/
+out-tsc/
+.angular/
+coverage/
+pnpm-lock.yaml
+game-data/
