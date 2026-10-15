@@ -9,7 +9,7 @@ import {
   type ServerEnterMap,
 } from '@ninja/shared';
 import { playerColor } from './entity-color.js';
-import type { MapInstance, Position } from './map.js';
+import type { MapInstance, MapPortal, Position } from './map.js';
 import { facingFor, roundPosition, stepTowards, type Facing } from './movement.js';
 
 /** Kênh gửi gói tin ra ngoài của một người chơi trong room (tầng `net/` cài đặt). */
@@ -32,6 +32,15 @@ export interface RoomPlayer {
   facing: Facing;
   /** Đích đang đi tới; `undefined` là đang đứng yên. */
   target: Position | undefined;
+}
+
+/**
+ * Một người vừa bước vào vùng cổng dẫn sang bản đồ khác trong nhịp tick. Room chỉ **báo** việc này
+ * lên (xem `Room.tick`); việc đổi room do `RoomManager` → `WorldService` làm.
+ */
+export interface PortalCrossing {
+  readonly player: RoomPlayer;
+  readonly portal: MapPortal;
 }
 
 /** Một NPC đặt sẵn trên bản đồ. */
@@ -192,9 +201,14 @@ export class Room {
    * Một nhịp tick: đẩy mọi người chơi đang di chuyển tiến thêm `MOVE_STEP_PX` về đích, rồi phát
    * **một** gói `S2C_ENTITY_MOVE` cho cả room với những thực thể đã đổi vị trí — kể cả người vừa
    * di chuyển, để client thấy vị trí mà server xác nhận.
+   *
+   * Trả về những người vừa **bước vào vùng cổng** dẫn sang bản đồ khác. Room không tự chuyển map
+   * (nó không biết các room khác) và cũng không tự xoá người chơi: `RoomManager` nhận danh sách
+   * này rồi nhờ `WorldService` đổi room, đúng một đường chuyển map duy nhất.
    */
-  tick(): void {
+  tick(): PortalCrossing[] {
     const moves: EntityMove['moves'] = [];
+    const crossings: PortalCrossing[] = [];
     for (const player of this.playersById.values()) {
       const target = player.target;
       if (!target) {
@@ -221,10 +235,20 @@ export class Room {
         y: roundPosition(player.y),
         facing: player.facing,
       });
+
+      // Cổng chỉ kích hoạt khi **bước vào** vùng cổng của bản đồ khác: đứng yên trong vùng cổng
+      // (hoặc cổng dẫn về chính bản đồ này) thì không có gì xảy ra.
+      const portal = this.map.portalAt(player.x, player.y);
+      if (portal && portal.toMap !== this.map.id) {
+        crossings.push({ player, portal });
+      }
     }
 
     if (moves.length > 0) {
       this.broadcast(Opcode.S2C_ENTITY_MOVE, { moves });
     }
+
+    // Chuyển map sau khi đã phát gói di chuyển: người đi vẫn nhận được vị trí cuối ở map cũ.
+    return crossings;
   }
 }

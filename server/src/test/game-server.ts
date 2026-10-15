@@ -58,7 +58,9 @@ export async function registerAccount(app: FastifyInstance, username: string): P
     payload: { username, password: TEST_SECRET },
   });
   if (response.statusCode !== 201) {
-    throw new Error(`đăng ký tài khoản kiểm thử thất bại (${response.statusCode}): ${response.body}`);
+    throw new Error(
+      `đăng ký tài khoản kiểm thử thất bại (${response.statusCode}): ${response.body}`,
+    );
   }
   return response.json().accessToken as string;
 }

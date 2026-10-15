@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { type Point } from '../game/world-logic';
-import {
-  MOVE_COMMAND_INTERVAL_MS,
-  MOVE_LEAD_PX,
-  MovementController,
-} from './movement-controller';
+import { MOVE_COMMAND_INTERVAL_MS, MOVE_LEAD_PX, MovementController } from './movement-controller';
 
 const SELF: Point = { x: 200, y: 200 };
 

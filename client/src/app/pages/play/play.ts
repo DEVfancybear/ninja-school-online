@@ -104,9 +104,7 @@ export class Play implements OnInit, OnDestroy {
   readonly dialog = this.world.npcDialog;
   readonly tickRateMs = this.world.tickRateMs;
 
-  readonly characterName = computed(
-    () => this.world.self()?.name ?? this.character()?.name ?? '',
-  );
+  readonly characterName = computed(() => this.world.self()?.name ?? this.character()?.name ?? '');
   readonly mapName = computed(() => this.world.mapName());
 
   /** Lỗi ở mức kết nối mà việc nối lại không giải quyết được. */

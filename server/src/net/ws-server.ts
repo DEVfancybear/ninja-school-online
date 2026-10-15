@@ -58,8 +58,7 @@ export class WebSocketGateway {
   private server: WebSocketServer | undefined;
   private unsubscribeTick: (() => void) | undefined;
   private upgradeListener:
-    | ((request: IncomingMessage, socket: Duplex, head: Buffer) => void)
-    | undefined;
+    ((request: IncomingMessage, socket: Duplex, head: Buffer) => void) | undefined;
 
   constructor(private readonly options: WebSocketGatewayOptions) {
     this.path = options.path ?? DEFAULT_WS_PATH;

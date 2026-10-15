@@ -1,6 +1,6 @@
 import type { GameData } from '../world/game-data.js';
-import { MapInstance } from '../world/map.js';
-import { Room } from '../world/room.js';
+import { MapInstance, type MapPortal } from '../world/map.js';
+import { Room, type RoomPlayer } from '../world/room.js';
 import type { TickScheduler } from './tick.js';
 
 export interface RoomManagerOptions {
@@ -8,6 +8,11 @@ export interface RoomManagerOptions {
   tick: TickScheduler;
   /** Báo lỗi khi một room hỏng trong nhịp tick — một room lỗi không được làm chết cả server. */
   onError?: (error: unknown, mapId: string) => void;
+  /**
+   * Có người vừa bước vào vùng cổng dẫn sang bản đồ khác. RoomManager không tự chuyển map (nó
+   * không giữ phiên kết nối); nó chuyển việc này cho tầng thế giới.
+   */
+  onPortal?: (room: Room, player: RoomPlayer, portal: MapPortal) => void;
 }
 
 /**
@@ -77,7 +82,11 @@ export class RoomManager {
   private tickAll(): void {
     for (const room of [...this.rooms.values()]) {
       try {
-        room.tick();
+        // Một room có thể bị xoá trong lúc xử lý cổng (người cuối cùng vừa đi khỏi), nên duyệt
+        // trên bản sao danh sách room.
+        for (const crossing of room.tick()) {
+          this.options.onPortal?.(room, crossing.player, crossing.portal);
+        }
       } catch (error) {
         this.options.onError?.(error, room.map.id);
       }

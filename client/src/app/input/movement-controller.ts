@@ -10,8 +10,7 @@ import { directionForKey, vectorForDirections, type ArrowDirection } from './key
 export const MOVE_COMMAND_INTERVAL_MS = 100;
 
 /** Nhịp bàn phím gửi đích xa hơn vị trí hiện tại hai nhịp đi, để không bị hụt bước. */
-export const MOVE_LEAD_PX =
-  ((PLAYER_SPEED_PX_PER_SEC * MOVE_COMMAND_INTERVAL_MS) / 1000) * 2;
+export const MOVE_LEAD_PX = ((PLAYER_SPEED_PX_PER_SEC * MOVE_COMMAND_INTERVAL_MS) / 1000) * 2;
 
 /**
  * Bộ điều khiển di chuyển: gom phím đang giữ và đích do bấm chuột thành **ý định**, rồi gửi

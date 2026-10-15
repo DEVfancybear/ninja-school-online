@@ -540,7 +540,7 @@ describe('chuyển map', () => {
     expect(client.packets(Opcode.S2C_ENTER_MAP)).toHaveLength(1);
   });
 
-  it('đứng trong vùng cổng → sang bãi luyện tập ở điểm spawn của cổng, rồi quay lại được', async () => {
+  it('đi bộ vào vùng cổng → tự sang bãi luyện tập, người ở lại thấy rời đi', async () => {
     const a = await accountWithCharacter(server.app, 'ninja_map_a', 'KhachDuLich');
     const b = await accountWithCharacter(server.app, 'ninja_map_b', 'NguoiOLai');
 
@@ -553,12 +553,11 @@ describe('chuyển map', () => {
       (raw) => (raw as { entity: Entity }).entity.id === b.characterId,
     );
 
-    // Đi sang vùng cổng phía đông của làng rồi xin chuyển map.
-    clientA.send(Opcode.C2S_MOVE, LAN_PORTAL_PIXEL);
-    await waitForArrival(clientA, a.characterId, LAN_PORTAL_PIXEL);
-
+    // Đi sang phía đông của làng, vào hẳn vùng cổng (ô x 35..37). Không gửi C2S_ENTER_MAP:
+    // cổng phải tự kích hoạt.
     const markB = clientB.mark();
-    clientA.send(Opcode.C2S_ENTER_MAP, { mapId: 'bai-luyen-tap' });
+    clientA.send(Opcode.C2S_MOVE, LAN_PORTAL_PIXEL);
+
     const arrived = await clientA.waitFor<ServerEnterMap>(Opcode.S2C_ENTER_MAP, (raw) => {
       return (raw as ServerEnterMap).map.id === 'bai-luyen-tap';
     });
@@ -569,8 +568,10 @@ describe('chuyển map', () => {
       x: TRAINING_SPAWN.x,
       y: TRAINING_SPAWN.y,
     });
+    // Người vừa vào không nhận chính mình trong danh sách thực thể.
     expect(arrived.entities.some((entity) => entity.id === a.characterId)).toBe(false);
-    // Room cũ nhận ENTITY_REMOVE của người vừa đi.
+
+    // Room cũ nhận ENTITY_REMOVE của người vừa đi, và không thấy thêm thực thể nào.
     const removed = await clientB.waitFor<{ id: string }>(
       Opcode.S2C_ENTITY_REMOVE,
       (raw) => (raw as { id: string }).id === a.characterId,
@@ -578,17 +579,10 @@ describe('chuyển map', () => {
     expect(removed.id).toBe(a.characterId);
     expect(clientB.since(markB, Opcode.S2C_ENTITY_ADD)).toHaveLength(0);
 
-    // Đứng ngay điểm spawn của bãi luyện tập thì chưa ở cổng nào.
-    clientA.send(Opcode.C2S_ENTER_MAP, { mapId: 'lang-khoi-nguon' });
-    const notAtPortal = await clientA.waitForError();
-    expect(notAtPortal.code).toBe(ErrorCode.UNKNOWN_MAP);
-
-    // Đi vào vùng cổng phía tây của bãi luyện tập rồi quay lại làng.
-    clientA.send(Opcode.C2S_MOVE, TRAINING_PORTAL_PIXEL);
-    await waitForArrival(clientA, a.characterId, TRAINING_PORTAL_PIXEL, 0.6);
-
+    // Đi ngược lại vào vùng cổng phía tây của bãi luyện tập → về làng ở điểm spawn mặc định.
     const markBBack = clientB.mark();
-    clientA.send(Opcode.C2S_ENTER_MAP, { mapId: 'lang-khoi-nguon' });
+    clientA.send(Opcode.C2S_MOVE, TRAINING_PORTAL_PIXEL);
+
     const back = await clientA.waitFor<ServerEnterMap>(Opcode.S2C_ENTER_MAP, (raw) => {
       return (raw as ServerEnterMap).map.id === START_MAP_ID;
     });
@@ -600,6 +594,25 @@ describe('chuyển map', () => {
     );
     expect(addedBack.entity).toMatchObject({ x: START_SPAWN.x, y: START_SPAWN.y });
     expect(clientB.since(markBBack, Opcode.S2C_ENTITY_ADD)).toHaveLength(1);
+  });
+
+  it('đi trong bãi luyện tập mà không vào cổng thì không đổi bản đồ lần nữa', async () => {
+    const a = await accountWithCharacter(server.app, 'ninja_portal_stay', 'DiQuanh');
+
+    const client = await connect();
+    await client.hello({ access: a.access });
+    client.send(Opcode.C2S_MOVE, LAN_PORTAL_PIXEL);
+    await client.waitFor<ServerEnterMap>(Opcode.S2C_ENTER_MAP, (raw) => {
+      return (raw as ServerEnterMap).map.id === 'bai-luyen-tap';
+    });
+
+    // Đi về phía đông (xa cổng phía tây) rồi đứng yên: không được có S2C_ENTER_MAP nào nữa.
+    const mark = client.mark();
+    client.send(Opcode.C2S_MOVE, { x: TRAINING_SPAWN.x + 96, y: TRAINING_SPAWN.y });
+    await waitForArrival(client, a.characterId, { x: TRAINING_SPAWN.x + 96, y: TRAINING_SPAWN.y });
+    await delay(400);
+
+    expect(client.since(mark, Opcode.S2C_ENTER_MAP)).toHaveLength(0);
   });
 });
 
@@ -656,7 +669,10 @@ describe('giới hạn thời gian (server riêng, thời gian chờ ngắn)', (
   let heartbeatServer: TestServer;
 
   beforeAll(async () => {
-    handshakeServer = await startTestServer({ handshakeTimeoutMs: 300, heartbeatTimeoutMs: 10_000 });
+    handshakeServer = await startTestServer({
+      handshakeTimeoutMs: 300,
+      heartbeatTimeoutMs: 10_000,
+    });
     heartbeatServer = await startTestServer({ handshakeTimeoutMs: 5000, heartbeatTimeoutMs: 1200 });
   });
 

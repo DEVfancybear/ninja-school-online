@@ -15,6 +15,11 @@ export class SessionRegistry {
     return previous;
   }
 
+  /** Phiên đang điều khiển một nhân vật; `undefined` nếu nhân vật không online. */
+  get(characterId: string): GameSession | undefined {
+    return this.byCharacter.get(characterId);
+  }
+
   /** Bỏ đăng ký, chỉ khi phiên đang giữ nhân vật đúng là phiên này. */
   release(characterId: string, session: GameSession): void {
     if (this.byCharacter.get(characterId) === session) {

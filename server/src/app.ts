@@ -89,6 +89,11 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
     onError: (error, mapId) => {
       app.log.error({ err: error, mapId }, 'room gặp lỗi trong nhịp tick');
     },
+    // `world` được tạo ngay dưới đây (nó cần `rooms`); hàm này chỉ chạy trong nhịp tick, lúc đó
+    // `world` đã tồn tại.
+    onPortal: (room, player, portal) => {
+      world.enterPortal(room, player, portal);
+    },
   });
   const verifyAccessToken = (raw: string): AccountToken | undefined => {
     try {

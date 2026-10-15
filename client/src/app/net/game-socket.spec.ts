@@ -69,7 +69,9 @@ describe('GameSocket', () => {
       expect(socket.status()).toBe('connecting');
 
       const webSocket = FakeWebSocket.last;
-      expect(webSocket.url).toBe(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`);
+      expect(webSocket.url).toBe(
+        `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`,
+      );
 
       webSocket.open();
       expect(socket.status()).toBe('handshaking');
@@ -313,11 +315,7 @@ describe('GameSocket', () => {
       const webSocket = FakeWebSocket.last;
       webSocket.open();
       webSocket.deliver(
-        encodePacket(
-          Opcode.S2C_NOTIFY,
-          { message: 'Chào mừng tới Làng Khởi Nguồn' },
-          2,
-        ),
+        encodePacket(Opcode.S2C_NOTIFY, { message: 'Chào mừng tới Làng Khởi Nguồn' }, 2),
       );
 
       expect(healthy).toHaveBeenCalledTimes(1);

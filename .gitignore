@@ -49,3 +49,6 @@ out-tsc/
 # === Prettier/ESLint cache ===
 .eslintcache
 .prettiercache
+
+# === Cấu hình cục bộ của công cụ soạn thảo/harness ===
+.harness/

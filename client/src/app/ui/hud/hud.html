@@ -7,7 +7,9 @@
   <div class="state">
     <span class="dot" [class.online]="online()" aria-hidden="true"></span>
     <span class="connection-status" [attr.data-status]="status()">{{ statusLabel() }}</span>
-    <span class="latency">Độ trễ: <span class="latency-value">{{ latencyLabel() }}</span></span>
+    <span class="latency"
+      >Độ trễ: <span class="latency-value">{{ latencyLabel() }}</span></span
+    >
   </div>
 
   <div class="actions">

@@ -1,11 +1,7 @@
 <section class="chat" aria-label="Khung chat">
   <ul #chatLog class="chat-log">
     @for (line of messages(); track $index) {
-      <li
-        class="chat-line"
-        [class.system]="line.channel === 'system'"
-        [class.mine]="isMine(line)"
-      >
+      <li class="chat-line" [class.system]="line.channel === 'system'" [class.mine]="isMine(line)">
         <span class="chat-from">{{ line.channel === 'system' ? 'Hệ thống' : line.fromName }}</span>
         <span class="chat-text">{{ line.text }}</span>
       </li>

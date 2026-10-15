@@ -69,6 +69,12 @@ Phần **server** của M2 đã chạy thật (kiểm thử tích hợp bằng c
 - **Quy ước toạ độ** (client vẽ theo đúng quy ước này): pixel liên tục; gốc (0,0) ở góc trên-trái, trục y
   hướng xuống; điểm spawn và NPC đặt sẵn nằm ở **tâm ô** (`ô × tileSize + tileSize/2`); vùng cổng là nửa mở
   `[x×tileSize, (x+width)×tileSize)` × `[y×tileSize, (y+height)×tileSize)`.
+- **Cổng dịch chuyển tự kích hoạt** (M2, `shared` **không** gửi vùng cổng cho client): mỗi nhịp tick,
+  server kiểm vùng cổng tại vị trí người chơi **sau khi đẩy bước đi**; vào vùng cổng dẫn sang bản đồ khác
+  thì chuyển map ngay (`S2C_ENTER_MAP` cho người đi, `S2C_ENTITY_REMOVE`/`S2C_ENTITY_ADD` cho hai room).
+  Đứng yên trong vùng cổng không kích hoạt, và cổng dẫn về chính bản đồ đang đứng bị bỏ qua ⇒ không có
+  vòng lặp. `C2S_ENTER_MAP` vẫn giữ luật cũ (phải đứng trong vùng cổng) và dùng **chung một hàm chuyển
+  map** với đường đi bộ.
 - **Chưa làm ở M2** (ghi rõ để không hiểu nhầm là đã có): chia kênh theo map, lưu vị trí vào database,
   rate limit chung cho mọi gói tin và "sai quá nhiều thì ngắt kết nối tạm thời", chat thế giới/nhóm.
 
@@ -109,7 +115,7 @@ Quy ước: `C2S_*` = client → server, `S2C_*` = server → client. Mọi gói
 | `S2C_HELLO` | S→C | Chấp nhận/từ chối (lệch phiên bản), nhịp tick, nhân vật đang điều khiển, bản đồ (M2) |
 | `C2S_SELECT_CHAR` | C→S | **Không dùng** — chọn nhân vật bằng `characterId` ngay trong `C2S_HELLO` |
 | `S2C_ENTER_WORLD` | S→C | **Không dùng** — `S2C_HELLO` (nhân vật, nhịp tick) + `S2C_ENTER_MAP` (bản đồ, thực thể) |
-| `C2S_ENTER_MAP` / `S2C_ENTER_MAP` | 2 chiều | Vào map (map id; `spawnId` bị bỏ qua) / bản đồ đầy đủ + chính mình + thực thể khác + lịch sử chat (M2) |
+| `C2S_ENTER_MAP` / `S2C_ENTER_MAP` | 2 chiều | Vào map (map id; `spawnId` bị bỏ qua; cổng đi bộ được server tự phát hiện — M2) / bản đồ đầy đủ + chính mình + thực thể khác + lịch sử chat (M2) |
 | `C2S_MOVE` | C→S | Ý định di chuyển (tọa độ đích, pixel) |
 | `S2C_ENTITY_MOVE` | S→C | Vị trí thực thể, gộp nhiều thực thể trong một gói mỗi tick (M2) |
 | `S2C_ENTITY_ADD/REMOVE` | S→C | Thực thể vào/ra tầm nhìn (M2: vào/ra room) |

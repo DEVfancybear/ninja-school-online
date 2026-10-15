@@ -349,9 +349,7 @@ describe('Play', () => {
         {
           map: MAP,
           entity: { id: 'p1', kind: 'player', name: 'Kakashi', color: '#ff8844', x: 32, y: 32 },
-          entities: [
-            { id: 'p2', kind: 'player', name: 'Sasuke', color: '#2255aa', x: 160, y: 64 },
-          ],
+          entities: [{ id: 'p2', kind: 'player', name: 'Sasuke', color: '#2255aa', x: 160, y: 64 }],
           chatBacklog: [],
         },
         2,

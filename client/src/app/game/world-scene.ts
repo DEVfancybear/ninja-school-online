@@ -256,8 +256,11 @@ export class WorldScene extends Phaser.Scene {
     const style = entityStyle(entity.kind);
     const left = -style.width / 2;
     const top = -style.height / 2;
-    const border =
-      isSelf ? SELF_BORDER_COLOR : entity.kind === 'npc' ? NPC_BORDER_COLOR : OTHER_BORDER_COLOR;
+    const border = isSelf
+      ? SELF_BORDER_COLOR
+      : entity.kind === 'npc'
+        ? NPC_BORDER_COLOR
+        : OTHER_BORDER_COLOR;
 
     view.shape.clear();
     view.shape.fillStyle(parseHexColor(entity.color), 1);

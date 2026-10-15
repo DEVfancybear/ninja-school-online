@@ -61,7 +61,7 @@ sự kiện `upgrade`), đường dẫn `/ws` (đường dẫn khác bị trả 
 |---|---|---|---|
 | `C2S_MOVE` | C→S | `{x, y}` — điểm đích tính bằng pixel | Kiểm khoảng cách/biên/ô bị chặn rồi đi dần mỗi tick |
 | `S2C_ENTITY_MOVE` | S→C | `{moves: [{id, x, y, facing}]}` | **Một** gói mỗi tick cho cả room, chỉ gồm thực thể đã đổi vị trí (kể cả người vừa di chuyển) |
-| `C2S_ENTER_MAP` | C→S | `{mapId, spawnId?}` | Chỉ nhận khi đang đứng trong vùng cổng dẫn tới map đó; `spawnId` client gửi **bị bỏ qua** |
+| `C2S_ENTER_MAP` | C→S | `{mapId, spawnId?}` | Đường chủ động (xem mục cổng bên dưới): chỉ nhận khi đang đứng trong vùng cổng dẫn tới map đó; `spawnId` client gửi **bị bỏ qua** |
 | `C2S_CHAT` | C→S | `{channel: 'map', text}` | Tối đa 200 ký tự, giãn cách 1 giây mỗi người |
 | `S2C_CHAT` | S→C | `{channel, fromId, fromName, text, at}` | Phát cho cả room, `at` = ms epoch của server |
 | `C2S_NPC_TALK` | C→S | `{npcId}` | NPC phải có trong bản đồ hiện tại |
@@ -89,6 +89,20 @@ Lỗi **không** fatal khi đang chơi: `bad_packet` (lệnh `C2S_MOVE` sai, gó
 - `app.close()` đóng sạch: gỡ listener `upgrade`, đóng socket, dọn thực thể khỏi room, dừng interval.
   `main.ts` bắt SIGINT/SIGTERM nên Ctrl+C cũng thoát êm (game-data sai thì thoát với mã 1 kèm danh sách lỗi).
 
+#### Cổng dịch chuyển
+
+- **Cổng tự kích hoạt khi đi bộ**: mỗi nhịp tick, sau khi đẩy người chơi đi, server kiểm vùng cổng
+  tại vị trí mới; vào vùng cổng dẫn sang bản đồ khác thì chuyển map **ngay**, không cần client xin
+  phép. Nhờ vậy cổng là một phần của bản đồ, không phải một hành động phải gửi gói tin — và client
+  **không** cần biết vùng cổng nằm ở đâu.
+- Đứng yên trong vùng cổng thì không có gì xảy ra (cổng chỉ kích hoạt khi **bước vào**), và cổng
+  dẫn về chính bản đồ đang đứng cũng bị bỏ qua — nên không có vòng lặp chuyển qua chuyển lại.
+- Cả hai lối vào (đi bộ và `C2S_ENTER_MAP`) dùng **chung một hàm chuyển map** trong `WorldService`:
+  gỡ khỏi room cũ + `S2C_ENTITY_REMOVE` cho người ở lại, đặt vị trí về `portals[].toSpawn`, gửi
+  `S2C_ENTER_MAP` cho người đi, `S2C_ENTITY_ADD` cho room mới. Room rỗng bị xoá như mọi khi.
+- `C2S_ENTER_MAP` vẫn giữ nguyên luật cũ (phải đang đứng trong vùng cổng). Từ khi cổng tự kích hoạt,
+  đường này để dành cho tính năng sau (dịch chuyển, cắt cảnh) và cho client công cụ.
+
 #### Chống gian lận đã cài (M2)
 
 | Quy tắc | Cách làm |
@@ -97,7 +111,7 @@ Lỗi **không** fatal khi đang chơi: `bad_packet` (lệnh `C2S_MOVE` sai, gó
 | Không đi ra ngoài bản đồ | điểm đích phải nằm trong `[0, width×tileSize) × [0, height×tileSize)` |
 | Không đi xuyên vật cản | ô chứa điểm đích không được `blocked` (xét cả lớp ground và decor) |
 | Vị trí chỉ do server quyết định | client chỉ gửi điểm đích; mọi toạ độ phát đi đều do server tính |
-| Không nhảy map tuỳ ý | `C2S_ENTER_MAP` chỉ hợp lệ khi đang trong vùng cổng; điểm đến lấy từ `portals[].toSpawn` |
+| Không nhảy map tuỳ ý | Chỉ chuyển map khi vị trí do server tính nằm trong vùng cổng (hoặc `C2S_ENTER_MAP` đúng luật); điểm đến lấy từ `portals[].toSpawn` |
 | Chống spam chat | 1 tin/giây/người (`CHAT_MIN_INTERVAL_MS`), tối đa `CHAT_MAX_LENGTH` (200) ký tự |
 | Chống treo tài khoản | một nhân vật một kết nối: kết nối mới đẩy phiên cũ ra (`S2C_NOTIFY` + đóng mã 4000) |
 | Không giữ kết nối chết | không có gói tin nào trong `HEARTBEAT_TIMEOUT_MS` (30 giây) → báo lỗi rồi đóng, dọn khỏi map |
@@ -119,11 +133,13 @@ Lỗi **không** fatal khi đang chơi: `bad_packet` (lệnh `C2S_MOVE` sai, gó
 
 #### Kiểm thử WebSocket
 
-`server/src/net/ws.spec.ts` chạy server thật trên **cổng 0** và nói chuyện bằng client `ws`, gồm: sai
-phiên bản/ token rác/ tài khoản không nhân vật, bắt tay hợp lệ, hai client thấy nhau, đồng bộ di chuyển
-(B nhận bước của A, sai số cuối ≤ 2 px), chặn di chuyển sai (quá xa/biên/ô chặn), chat + giới hạn tần
-suất, ngắt kết nối → `ENTITY_REMOVE`, NPC (3 dòng và NPC lạ), chuyển map hai chiều qua cổng, `PING`/`PONG`,
-bắt tay quá hạn, heartbeat quá hạn, đẩy phiên cũ khi cùng nhân vật đăng nhập lại. Tiện ích dùng chung:
+`server/src/net/ws.spec.ts` (28 test) chạy server thật trên **cổng 0** và nói chuyện bằng client `ws`,
+gồm: sai phiên bản/ token rác/ tài khoản không nhân vật, bắt tay hợp lệ, hai client thấy nhau, đồng bộ
+di chuyển (B nhận bước của A, sai số cuối ≤ 2 px), chặn di chuyển sai (quá xa/biên/ô chặn), chat +
+giới hạn tần suất, ngắt kết nối → `ENTITY_REMOVE`, NPC (3 dòng và NPC lạ), chuyển map (đi bộ vào vùng
+cổng tự sang bản đồ bên kia rồi quay lại; đi trong map mới mà không vào cổng thì không đổi map nữa;
+gói `C2S_ENTER_MAP` sai chỗ bị từ chối), `PING`/`PONG`, bắt tay quá hạn, heartbeat quá hạn, đẩy phiên
+cũ khi cùng nhân vật đăng nhập lại. Tiện ích dùng chung:
 `server/src/test/game-server.ts` (server + tài khoản/nhân vật qua REST) và `server/src/test/ws-client.ts`.
 
 ### Lớp nghiệp vụ

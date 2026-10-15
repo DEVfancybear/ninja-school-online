@@ -22,6 +22,7 @@ import type { GameSession } from '../net/session.js';
 import type { SessionRegistry } from '../net/session-registry.js';
 import { GameDataError, type GameData } from './game-data.js';
 import { HandshakeError } from './handshake-error.js';
+import type { MapPortal } from './map.js';
 import { checkMove, MOVE_REJECTION_MESSAGES } from './movement.js';
 import { createPlayer, playerView, type Room, type RoomPlayer } from './room.js';
 
@@ -154,6 +155,9 @@ export class WorldService {
   /**
    * `C2S_ENTER_MAP`: chỉ hợp lệ khi người chơi đang đứng trong vùng một cổng của map hiện tại dẫn
    * tới bản đồ đó. Điểm đến do cổng trong game-data quyết định, **không** dùng `spawnId` client gửi.
+   *
+   * Từ khi cổng tự kích hoạt lúc đi bộ (`enterPortal`), gói này là đường chủ động dành cho tính
+   * năng sau này (dịch chuyển, cắt cảnh) và cho client công cụ; luật kiểm tra vẫn giữ nguyên.
    */
   enterMap(session: GameSession, request: EnterMap): void {
     const located = this.locate(session);
@@ -172,26 +176,21 @@ export class WorldService {
       return;
     }
 
-    const target = this.options.rooms.getOrCreate(portal.toMap);
-    const spawn = target?.map.spawnPosition(portal.toSpawn) ?? target?.map.defaultSpawn();
-    if (!target || !spawn) {
-      session.sendError(ErrorCode.UNKNOWN_MAP, `không vào được bản đồ "${portal.toMap}"`);
+    this.transfer(room, player, portal, session);
+  }
+
+  /**
+   * Người chơi **bước vào vùng cổng** trong lúc đi (`Room.tick()` báo lên): đổi bản đồ ngay, không
+   * cần client xin phép. Server đã biết vị trí nên cổng là một phần của bản đồ, không phải một
+   * hành động của người chơi.
+   */
+  enterPortal(room: Room, player: RoomPlayer, portal: MapPortal): void {
+    const session = this.options.sessions.get(player.id);
+    if (!session) {
+      // Nhân vật không còn phiên nào (vừa bị đẩy ra hoặc vừa ngắt kết nối): không có gì để chuyển.
       return;
     }
-
-    room.removePlayer(player.id);
-    room.broadcast(Opcode.S2C_ENTITY_REMOVE, { id: player.id });
-    this.options.rooms.dropIfEmpty(room);
-
-    player.x = spawn.x;
-    player.y = spawn.y;
-    player.target = undefined;
-    player.facing = 'none';
-    target.addPlayer(player);
-    session.mapId = target.map.id;
-
-    this.sendEnterMap(session, target, player);
-    target.broadcast(Opcode.S2C_ENTITY_ADD, { entity: playerView(player) }, player.id);
+    this.transfer(room, player, portal, session);
   }
 
   /** `C2S_CHAT`: giới hạn tần suất theo từng người, rồi phát cho cả room kèm lịch sử gần nhất. */
@@ -272,6 +271,33 @@ export class WorldService {
       mapId,
       serverTime: this.now(),
     };
+  }
+
+  /**
+   * Chuyển một người chơi sang bản đồ mà cổng dẫn tới — **đường chuyển map duy nhất**, dùng chung
+   * cho cả hai lối vào (client xin bằng `C2S_ENTER_MAP` và server tự phát hiện lúc đi bộ).
+   */
+  private transfer(room: Room, player: RoomPlayer, portal: MapPortal, session: GameSession): void {
+    const target = this.options.rooms.getOrCreate(portal.toMap);
+    const spawn = target?.map.spawnPosition(portal.toSpawn) ?? target?.map.defaultSpawn();
+    if (!target || !spawn) {
+      session.sendError(ErrorCode.UNKNOWN_MAP, `không vào được bản đồ "${portal.toMap}"`);
+      return;
+    }
+
+    room.removePlayer(player.id);
+    room.broadcast(Opcode.S2C_ENTITY_REMOVE, { id: player.id });
+    this.options.rooms.dropIfEmpty(room);
+
+    player.x = spawn.x;
+    player.y = spawn.y;
+    player.target = undefined;
+    player.facing = 'none';
+    target.addPlayer(player);
+    session.mapId = target.map.id;
+
+    this.sendEnterMap(session, target, player);
+    target.broadcast(Opcode.S2C_ENTITY_ADD, { entity: playerView(player) }, player.id);
   }
 
   private sendEnterMap(session: GameSession, room: Room, player: RoomPlayer): void {

@@ -35,7 +35,11 @@ export function distance(ax: number, ay: number, bx: number, by: number): number
  *
  * Trả về lý do từ chối, hoặc `undefined` nếu lệnh hợp lệ.
  */
-export function checkMove(map: MapInstance, from: Position, to: Position): MoveRejection | undefined {
+export function checkMove(
+  map: MapInstance,
+  from: Position,
+  to: Position,
+): MoveRejection | undefined {
   if (distance(from.x, from.y, to.x, to.y) > MAX_MOVE_DISTANCE_PX) {
     return 'too_far';
   }
