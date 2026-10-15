@@ -1,6 +1,6 @@
 # Cấu trúc dự án
 
-*Ngày viết: 2026-10-15. Cập nhật sau khi hoàn thành M0: **mốc M0 đã dựng thật**, các phần còn lại là cấu trúc đích cho các cột mốc sau.*
+*Ngày viết: 2026-10-15. Cập nhật sau khi hoàn thành **M0 và M1**: các mục ghi (M0)/(M1) đã dựng thật, phần còn lại là cấu trúc đích cho các cột mốc sau.*
 
 ## 1. Nguyên tắc thiết kế
 

@@ -54,7 +54,7 @@ Nội dung: monorepo pnpm (`client`, `server`, `shared`, `tools/*`), tsconfig ba
 
 | Hạng mục | Kết quả |
 |---|---|
-| `pnpm test` | 118 test xanh — shared 20, server 41, client 53, tools 4 |
+| `pnpm test` | 119 test xanh — shared 20, server 41, client 54, tools 4 |
 | `pnpm e2e` (Playwright, Chromium) | **8/8 kịch bản xanh**, gồm luồng đăng ký → tạo nhân vật → tải lại trang vẫn còn phiên và kịch bản chứng minh đăng xuất thu hồi token |
 | `pnpm lint`, `pnpm typecheck`, `pnpm build`, `pnpm validate:data` | đều exit 0 |
 | Bundle sau M1 | khởi tạo **703 kB** (nén ~151 kB) do thêm `HttpClient`; Phaser vẫn nằm trong lazy chunk riêng (1,39 MB) |

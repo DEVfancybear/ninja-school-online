@@ -10,7 +10,7 @@ Client **không phải nguồn sự thật**: không tự quyết máu, sát th�
 | Thành phần | Phiên bản / ghi chú |
 |---|---|
 | Angular | 22 (standalone component, signals, router, `ChangeDetectionStrategy.OnPush`) |
-| Gọi API | `HttpClient` + `provideHttpClient(withFetch())`, đường dẫn tương đối `/api/...` |
+| Gọi API | `HttpClient` + `provideHttpClient(withFetch())`, đường dẫn tương đối `/api/...`; mọi yêu cầu có thời hạn 15 giây (`REQUEST_TIMEOUT_MS`) |
 | Hợp đồng dữ liệu | `@ninja/shared` (schema zod dùng chung với server) |
 | Render thế giới 2D | Phaser 4, nhúng trong `WorldCanvas` (lazy chunk của route `/play`) |
 | Build/dev | Angular CLI (`ng serve`, `ng build`) |
@@ -56,6 +56,8 @@ client/
 5. Đăng xuất: gọi `POST /api/auth/logout` để server **thu hồi refresh token** rồi mới xoá phiên ở client.
    Nếu không gọi được server (mất mạng) thì vẫn xoá phiên ở client, nhưng khi đó token cũ chỉ hết hiệu
    lực theo thời hạn của nó — `tests/e2e` có kịch bản kiểm đúng hành vi này.
+   Lưu ý: access token đã cấp vẫn dùng được tới khi hết hạn (15 phút) vì JWT không trạng thái
+   (xem `server/README.md`, mục "Giới hạn đã biết").
 
 ## Lệnh
 

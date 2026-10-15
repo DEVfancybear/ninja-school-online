@@ -26,6 +26,7 @@ const FALLBACK_MESSAGES: Record<ApiErrorCode, string> = {
 };
 
 const NETWORK_MESSAGE = 'Không kết nối được tới máy chủ. Kiểm tra kết nối mạng rồi thử lại.';
+const TIMEOUT_MESSAGE = 'Máy chủ không phản hồi kịp. Kiểm tra kết nối mạng rồi thử lại.';
 const UNEXPECTED_MESSAGE = 'Đã xảy ra lỗi không mong đợi. Vui lòng thử lại.';
 
 /** Lỗi đã chuẩn hoá (mã + thông điệp + mã HTTP) để tầng giao diện hiển thị thẳng cho người chơi. */
@@ -78,6 +79,14 @@ export function toApiRequestError(error: unknown): ApiRequestError {
     parsed.data.message.trim().length > 0 ? parsed.data.message : FALLBACK_MESSAGES[fallbackCode];
   const code = isApiErrorCode(parsed.data.error) ? parsed.data.error : fallbackCode;
   return new ApiRequestError(message, code, error.status);
+}
+
+/**
+ * Lỗi khi máy chủ không trả lời trong thời gian cho phép. Tách riêng khỏi lỗi mạng
+ * để người chơi biết là đã gửi được yêu cầu nhưng chờ quá lâu.
+ */
+export function toTimeoutError(): ApiRequestError {
+  return new ApiRequestError(TIMEOUT_MESSAGE, 'network_error');
 }
 
 /** Thông điệp hiển thị cho người chơi; không lộ chi tiết kỹ thuật của lỗi lạ. */

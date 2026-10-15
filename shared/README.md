@@ -18,7 +18,9 @@ shared/
 │   └── index.ts     # điểm xuất chung
 │   # thêm ở cột mốc sau: types/ (DTO), utils/ (toán, RNG xác định, định dạng)
 ├── scripts/         # mark-cjs.mjs: đánh dấu thư mục dist-cjs là CommonJS
-└── test/            # vitest: game-data.spec.ts (6), account-character.spec.ts (14)
+├── vitest.config.ts # cấu hình vitest
+└── src/**/*.spec.ts# test nằm cạnh mã nguồn: schemas/game-data.spec.ts (6 test),
+                   #   schemas/account-character.spec.ts (14 test)
 ```
 
 ## Nguyên tắc

@@ -1,10 +1,16 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
-import { ApiRequestError, toApiRequestError } from './api-error';
+import { TimeoutError, firstValueFrom, timeout } from 'rxjs';
+import { ApiRequestError, toApiRequestError, toTimeoutError } from './api-error';
 import { type ApiSchema, firstIssueMessage } from './schema';
 
 type ApiMethod = 'GET' | 'POST';
+
+/**
+ * Thời hạn tối đa cho một yêu cầu API. Cần có vì mạng treo (không phải mất mạng hẳn) có thể
+ * giữ người chơi ở màn hình chờ vô hạn — ví dụ bấm "Đăng xuất" mà không bao giờ được điều hướng.
+ */
+export const REQUEST_TIMEOUT_MS = 15_000;
 
 /**
  * Lớp mỏng bọc `HttpClient`: gọi endpoint dưới `/api` bằng đường dẫn tương đối
@@ -36,10 +42,14 @@ export class ApiService {
     }
 
     try {
-      const response = await firstValueFrom(this.http.request<unknown>(method, path, options));
+      const response = await firstValueFrom(
+        this.http.request<unknown>(method, path, options).pipe(timeout(REQUEST_TIMEOUT_MS)),
+      );
       return this.parse(schema, response);
     } catch (error) {
-      throw toApiRequestError(error);
+      // `TimeoutError` của rxjs không phải HttpErrorResponse nên phải xử lý riêng,
+      // nếu không người chơi sẽ nhận thông báo chung "lỗi không mong đợi" khó hiểu.
+      throw error instanceof TimeoutError ? toTimeoutError() : toApiRequestError(error);
     }
   }
 

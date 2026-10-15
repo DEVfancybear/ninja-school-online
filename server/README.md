@@ -23,6 +23,9 @@ Mọi hành động của người chơi đều được server kiểm tra hợp
 | POST | `/api/characters` | có | Tạo nhân vật (201) |
 
 - Xác thực: `Authorization: Bearer <accessToken>`. Access token là JWT (mặc định 15 phút), refresh token là chuỗi ngẫu nhiên 32 byte lưu **dạng băm SHA-256** trong database và **xoay mỗi lần dùng**.
+- **Giới hạn đã biết:** access token là JWT **không trạng thái**, nên token cấp trước khi đăng xuất vẫn dùng được cho
+  tới khi hết hạn (mặc định 15 phút), dù refresh token đã bị thu hồi. Mọi thao tác nhạy cảm ở các cột mốc sau
+  (giao dịch, đổi mật khẩu) nên kiểm thêm trạng thái phiên trong database nếu cần chặn tuyệt đối.
 - Lỗi trả về thống nhất: `{ "error": "<mã>", "message": "<mô tả tiếng Việt>" }` với mã `validation_error` (400), `unauthorized` (401), `not_found` (404), `conflict` (409), `internal_error` (500).
 - Dữ liệu vào được kiểm bằng schema zod trong `@ninja/shared` — cùng bộ schema mà client dùng, nên hai bên không lệch quy tắc.
 

@@ -2,8 +2,9 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { AccountSchema, AuthSessionSchema } from '@ninja/shared';
+import { vi } from 'vitest';
 import { ApiRequestError } from './api-error';
-import { ApiService } from './api.service';
+import { ApiService, REQUEST_TIMEOUT_MS } from './api.service';
 import { fieldSchema } from './schema';
 
 const ACCOUNT = {
@@ -28,6 +29,24 @@ describe('ApiService', () => {
 
   afterEach(() => {
     http.verify();
+  });
+
+  it('máy chủ không phản hồi kịp: ném lỗi quá hạn thay vì chờ vô hạn', async () => {
+    vi.useFakeTimers();
+    try {
+      const promise = api.get('/api/auth/me', ME_SCHEMA, 'token-abc');
+      // Không flush yêu cầu nào: mô phỏng kết nối "treo" (gửi được nhưng không có phản hồi).
+      const assertion = expect(promise).rejects.toMatchObject({
+        code: 'network_error',
+        message: expect.stringContaining('không phản hồi kịp'),
+      });
+      await vi.advanceTimersByTimeAsync(REQUEST_TIMEOUT_MS);
+
+      await assertion;
+      http.expectOne('/api/auth/me');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('trả về phần thân đã đúng hợp đồng', async () => {
