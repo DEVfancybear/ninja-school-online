@@ -102,6 +102,20 @@ Kiểm thử đầu-cuối trên trình duyệt thật nằm ở `tests/e2e` (Pl
 3. Phần vẽ nằm trong `game/`; giao diện nằm trong `pages/` và `ui/` (sẽ thêm sau).
 4. State dùng signals trong service, không để logic nghiệp vụ trong component.
 
+## Đồ họa hiện tại (chưa có tài nguyên hình)
+
+Dự án **chưa có tài nguyên đồ họa** (`assets/` chỉ có README + CREDITS) và sẽ không sao chép tài
+nguyên của game khác, nên thế giới được **sinh từ hình khối trong mã**: `game/tile-art.ts` vẽ hoa văn
+cho từng loại gạch (cỏ có nhánh cỏ, đường đất có sỏi, nước có gợn sóng, tường có mạch vữa, mái nhà
+có hàng ngói, cây có tán lá, đá có khối, cát có hạt sạn, hàng rào có thanh ngang) và vẽ nhân vật
+(đầu, tóc, mắt theo hướng đi, băng đô, tay, chân, bóng đổ; NPC đội nón lá và có râu). Mọi chi tiết
+dùng số giả ngẫu nhiên **xác định** theo toạ độ ô nên bản đồ không nhấp nháy khi vẽ lại.
+
+Camera phóng `CAMERA_ZOOM = 1.6` để nhân vật cao ~34 px trên màn hình thay vì ~22 px.
+
+Khi có tài nguyên thật, chỉ cần thay phần vẽ trong `tile-art.ts` bằng `add.image`/atlas — phần còn
+lại của cảnh (nội suy, camera, bấm chuột) không phải sửa.
+
 ## Ghi chú về kiểm thử
 
 - **137 test / 16 file** (`vitest` qua `ng test`), đếm theo từng file: `game-socket.spec` 17,

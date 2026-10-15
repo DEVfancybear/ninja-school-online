@@ -33,8 +33,10 @@ export interface EntityStyle {
 }
 
 export const ENTITY_STYLES: Record<EntityKind, EntityStyle> = {
-  player: { width: 22, height: 22, radius: 6 },
-  npc: { width: 28, height: 30, radius: 8 },
+  // Kích thước này vừa dùng để vẽ nhân vật (xem `tile-art.ts`) vừa là vùng bấm, nên rộng rãi một
+  // chút cho dễ chạm trên điện thoại; NPC vẫn cao hơn người chơi.
+  player: { width: 26, height: 34, radius: 6 },
+  npc: { width: 30, height: 44, radius: 8 },
 };
 
 /** Vùng bấm rộng hơn hình vẽ một chút cho dễ chạm trên điện thoại. */
