@@ -1,5 +1,4 @@
 import Phaser from 'phaser';
-import { WorldScene } from './world-scene';
 
 /** Màu nền sân khấu thế giới (khớp biến --bg trong styles.css). */
 export const WORLD_BACKGROUND_COLOR = '#0b1218';
@@ -7,8 +6,14 @@ export const WORLD_BACKGROUND_COLOR = '#0b1218';
 /**
  * Cấu hình Phaser cho sân khấu thế giới 2D.
  * Tách riêng khỏi component để kiểm thử được cấu hình mà không cần khởi tạo Phaser.
+ *
+ * `scene` nhận **thể hiện** cảnh (Phaser cho phép điều này) để component truyền được
+ * `hooks` vào hàm dựng của `WorldScene` mà không phải mượn registry của Phaser.
  */
-export function buildGameConfig(parent: HTMLElement): Phaser.Types.Core.GameConfig {
+export function buildGameConfig(
+  parent: HTMLElement,
+  scene: Phaser.Scene,
+): Phaser.Types.Core.GameConfig {
   return {
     type: Phaser.AUTO,
     parent,
@@ -18,6 +23,6 @@ export function buildGameConfig(parent: HTMLElement): Phaser.Types.Core.GameConf
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
     render: { pixelArt: true },
-    scene: [WorldScene],
+    scene: [scene],
   };
 }

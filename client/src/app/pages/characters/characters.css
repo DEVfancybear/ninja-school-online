@@ -196,3 +196,9 @@ select:disabled {
     width: 100%;
   }
 }
+
+.enter-world {
+  display: inline-block;
+  margin-top: 0.6rem;
+  text-decoration: none;
+}

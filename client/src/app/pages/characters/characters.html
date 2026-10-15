@@ -45,6 +45,9 @@
               <dd>{{ formatYen(character.yen) }}</dd>
             </div>
           </dl>
+          <a class="ghost enter-world" routerLink="/play" [queryParams]="{ characterId: character.id }">
+            Vào thế giới
+          </a>
         </li>
       }
     </ul>

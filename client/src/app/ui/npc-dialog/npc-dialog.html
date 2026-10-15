@@ -1,0 +1,15 @@
+<section class="npc-dialog" aria-label="Hội thoại NPC">
+  <header class="npc-head">
+    <h2 class="npc-name">{{ dialog().npcName }}</h2>
+    <button class="npc-close" type="button" (click)="closed.emit()">Đóng</button>
+  </header>
+
+  <ul class="npc-lines">
+    @for (line of dialog().lines; track $index) {
+      <li class="npc-line">
+        <span class="npc-speaker">{{ line.speaker }}</span>
+        <span class="npc-text">{{ line.text }}</span>
+      </li>
+    }
+  </ul>
+</section>

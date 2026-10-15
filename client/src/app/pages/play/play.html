@@ -1,0 +1,74 @@
+<div class="play">
+  <app-notice-bar [notice]="notice()" />
+
+  @if (noCharacter()) {
+    <section class="panel">
+      <h1>Tài khoản chưa có nhân vật</h1>
+      <p>
+        Bạn cần tạo nhân vật trước khi vào thế giới ninja. Mỗi tài khoản tạo được tối đa hai
+        nhân vật.
+      </p>
+      @if (fatalError(); as error) {
+        <p class="panel-note">{{ error.message }}</p>
+      }
+      <a class="cta" routerLink="/characters">Sang trang nhân vật</a>
+    </section>
+  } @else if (fatalError(); as error) {
+    <section class="panel">
+      <h1>Không vào được thế giới</h1>
+      <p role="alert">{{ error.message }}</p>
+      <a class="cta" routerLink="/characters">Về trang nhân vật</a>
+    </section>
+  } @else if (loading()) {
+    <section class="panel">
+      <p>Đang vào thế giới…</p>
+    </section>
+  } @else if (loadError(); as message) {
+    <section class="panel">
+      <h1>Không tải được nhân vật</h1>
+      <p role="alert">{{ message }}</p>
+      <button class="cta" type="button" (click)="start()">Thử lại</button>
+    </section>
+  } @else {
+    <div class="stage">
+      <app-world-canvas
+        [map]="map()"
+        [entities]="entities()"
+        [selfId]="selfId()"
+        [selfFacing]="localFacing()"
+        [tickRateMs]="tickRateMs()"
+        (moveTo)="onMoveTo($event)"
+        (talkTo)="talkTo($event)"
+      />
+
+      <app-hud
+        [characterName]="characterName()"
+        [mapName]="mapName()"
+        [latencyMs]="latencyMs()"
+        [status]="status()"
+        [chatVisible]="chatVisible()"
+        (toggleChat)="toggleChat()"
+      />
+
+      @if (chatVisible()) {
+        <app-chat-panel
+          [messages]="chat()"
+          [selfId]="selfId()"
+          [notice]="chatNotice()"
+          [disabled]="!online()"
+          (send)="onChatSend($event)"
+        />
+      }
+
+      @if (dialog(); as npcDialog) {
+        <app-npc-dialog [dialog]="npcDialog" (closed)="closeDialog()" />
+      }
+
+      @if (reconnecting()) {
+        <div class="connection-overlay" role="status">
+          <p class="connection-text">{{ reconnectingText() }}</p>
+        </div>
+      }
+    </div>
+  }
+</div>
