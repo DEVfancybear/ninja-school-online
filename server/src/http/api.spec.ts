@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { PROTOCOL_VERSION } from '@ninja/shared';
 import { createApp } from '../app.js';
 import { loadEnv } from '../config/env.js';
 import { accounts } from '../db/schema.js';
@@ -45,7 +46,11 @@ describe('GET /health', () => {
   it('báo database đang hoạt động', async () => {
     const res = await app.inject({ method: 'GET', url: '/health' });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toMatchObject({ status: 'ok', database: 'up', protocolVersion: 1 });
+    expect(res.json()).toMatchObject({
+      status: 'ok',
+      database: 'up',
+      protocolVersion: PROTOCOL_VERSION,
+    });
   });
 });
 
@@ -53,7 +58,7 @@ describe('GET /version', () => {
   it('trả phiên bản protocol để client kiểm tra tương thích', async () => {
     const res = await app.inject({ method: 'GET', url: '/version' });
     expect(res.statusCode).toBe(200);
-    expect(res.json().protocolVersion).toBe(1);
+    expect(res.json().protocolVersion).toBe(PROTOCOL_VERSION);
   });
 });
 

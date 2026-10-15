@@ -1,0 +1,19 @@
+{
+  "id": "npc-thay-hieu-truong",
+  "name": "Thầy Hiệu Trưởng",
+  "color": "#e0b457",
+  "lines": [
+    {
+      "speaker": "Thầy Hiệu Trưởng",
+      "text": "Chào mừng con đến với Làng Khởi Nguồn."
+    },
+    {
+      "speaker": "Thầy Hiệu Trưởng",
+      "text": "Hãy đi sang phía đông để tới Bãi Luyện Tập và rèn luyện thân thủ."
+    },
+    {
+      "speaker": "Thầy Hiệu Trưởng",
+      "text": "Khi đã sẵn sàng, con sẽ được nhận nhiệm vụ đầu tiên."
+    }
+  ]
+}
