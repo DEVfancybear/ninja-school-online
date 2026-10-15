@@ -160,10 +160,27 @@ Game gốc xử lý gần hết ở client nên bị chế auto/mod dễ dàng. 
 
 ### 6.1 Bảng PostgreSQL (dữ liệu chạy)
 
-| Bảng | Cột chính | Ghi chú |
-|---|---|---|
-| `accounts` | id, username, password_hash, email, status, created_at | 1 tài khoản nhiều nhân vật |
-| `characters` | id, account_id, name, school, class, level, exp, yen, map_id, x, y, stats(jsonb), last_login | `stats` chứa chỉ số đã tính |
+**Trạng thái: bảng này là thiết kế đích cho cả dự án, không phải danh sách "đã có".** Ở M1/M2 mới chỉ
+tồn tại `accounts`, `characters`, `refresh_tokens` (xem `server/src/db/schema.ts` và migration trong
+`server/drizzle/`); các bảng còn lại sẽ được tạo ở cột mốc tương ứng. Cột `map_id`, `x`, `y`, `stats`,
+`last_login` của `characters` **chưa có**: M2 chưa lưu vị trí vào database (xem 6.3).
+
+| Bảng | Cột chính | Ghi chú | Đã có |
+|---|---|---|---|
+| `accounts` | id, username, password_hash, email, status, created_at | 1 tài khoản nhiều nhân vật | ✅ M1 |
+| `refresh_tokens` | id, account_id, token_hash, expires_at, revoked_at | refresh token xoay vòng, lưu dạng băm | ✅ M1 |
+| `characters` | id, account_id, name, school, class, level, exp, yen, map_id, x, y, stats(jsonb), last_login | `stats` chứa chỉ số đã tính; `map_id/x/y/stats/last_login` **chưa làm** | ✅ M1 (một phần) |
+| `char_skills` | char_id, skill_id, skill_level | chiêu đã học | M3 |
+| `items` | id, owner_id, template_id, qty, upgrade_level, bound, slot, meta(jsonb) | vật phẩm trong túi/kho/trang bị | M4 |
+| `quest_progress` | char_id, quest_id, state, progress(jsonb) | nhiệm vụ | M5 |
+| `friends` | char_id, friend_id, status | bạn bè | M6 |
+| `guilds` | id, name, level, exp, notice, created_at | bang hội | M7 |
+| `guild_members` | guild_id, char_id, rank, joined_at | thành viên | M7 |
+| `mails` | id, to_char_id, from_name, title, body, attach(jsonb), is_read, expires_at | thư + quà | M6 |
+| `arena_rank` | char_id, season, rating, wins, losses | Lôi Đài | M6 |
+| `daily_limits` | char_id, kind, count, day | giới hạn theo ngày (boss, sự kiện) | M7 |
+| `audit_logs` | id, actor, action, meta(jsonb), created_at | đối soát | M4 |
+| `trade_logs` | id, kind, payload(jsonb), created_at | giao dịch quan trọng | M4 |
 | `char_skills` | char_id, skill_id, skill_level | chiêu đã học |
 | `items` | id, owner_id, template_id, qty, upgrade_level, bound, slot, meta(jsonb) | vật phẩm trong túi/kho/trang bị |
 | `quest_progress` | char_id, quest_id, state, progress(jsonb) | nhiệm vụ |

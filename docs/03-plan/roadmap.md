@@ -103,7 +103,7 @@ Nội dung: 2 bản đồ đầu tiên (làng khởi nguồn + bãi luyện tậ
 | `pnpm e2e` (Playwright) | **13/13 kịch bản xanh** — 8 kịch bản M1 + 4 kịch bản thế giới (thấy nhau, thấy nhau di chuyển, chat qua lại, đóng tab thì biến mất, hội thoại NPC) + 1 kịch bản cổng (đi bộ sang bản đồ 2 rồi quay về) |
 | `pnpm validate:data` | exit 0 — 5 file hợp lệ trong `game-data/` |
 | `pnpm lint`, `pnpm typecheck`, `pnpm build`, `pnpm format:check` | đều exit 0 |
-| Bundle sau M2 | khởi tạo **715,87 kB** (nén 153,95 kB); Phaser + trang chơi nằm trong lazy chunk riêng `play` **1,42 MB** (nén 306,06 kB). Số lệch ±0,01 kB giữa các lần build do tên file có hash |
+| Bundle sau M2 (đo lại sau khi thêm đồ họa hình khối) | khởi tạo **715,87 kB** (nén 154,10 kB); Phaser + trang chơi nằm trong lazy chunk riêng `play` **1,43 MB** (nén 308,26 kB). Số lệch ±0,01 kB giữa các lần build do tên file có hash |
 | `pnpm install --frozen-lockfile` | OK — lockfile khớp (thêm `ws` + `@types/ws`) |
 | Kiểm thử WebSocket | `server/src/net/ws.spec.ts`: 28 test trên server thật ở cổng 0, dùng client `ws` |
 
@@ -194,3 +194,4 @@ M0 đã xong, nên đây là trạng thái các việc chuẩn bị:
 | M0 | `validate:data → lint → typecheck → test → build` chạy trên **checkout sạch** (xoá hết `dist/`) | CI GitHub Actions xanh (run 38676875628, 38676965644); 20 test; bundle khởi tạo 211,86 kB |
 | M1 | Chạy lại cả chuỗi CI trên cây đã xoá sạch artifact + `pnpm e2e` trên trình duyệt thật | CI xanh (run 38689008693); 119 test; 8/8 kịch bản e2e; commit `8a09cf5` |
 | M2 | Chạy cả chuỗi CI + `pnpm e2e` **13 kịch bản** trên cây đã ghép hai phía (server + client) | 281 test; 13/13 kịch bản e2e; commit `c2e3aef` trên `main` |
+| M2 (kiểm chứng độc lập) | Verifier riêng tự viết 6 script dùng `ws` + REST, dựng server trên cổng riêng 3120–3125, kiểm lại từng con số tài liệu và tự dựng lại các tình huống cổng/chat/chống gian lận | **VERDICT: PASS** — 20/20 + 21/21 + 19/19 kiểm tra đạt, không tìm thấy lỗi mã nguồn hay câu tài liệu nào nói sai thực tế |

@@ -6,7 +6,8 @@ import { parseHexColor, type MapTile } from './world-logic';
  *
  * Dự án chưa có tài nguyên đồ họa (xem `assets/README.md`) và sẽ không sao chép tài nguyên của game
  * khác, nên bản M2 dựng hình ảnh từ hình khối. Mục tiêu là để bản đồ trông ra một thế giới chứ không
- * phải lưới ô màu: mỗi loại gạch có hoa văn riêng, nhân vật có thân/hình riêng chứ không phải ô vuông.
+ * phải lưới ô màu: mỗi loại gạch có hoa văn riêng, **mép tiếp giáp giữa các loại địa hình được vẽ
+ * theo ô bên cạnh** (cỏ vào đường đất, bờ nước, diềm mái, chân tường), và nhân vật có hình người.
  *
  * Mọi chi tiết lấy từ số giả ngẫu nhiên **xác định** theo `(cột, hàng)` nên cùng một bản đồ luôn vẽ
  * giống nhau, không bị "nhấp nháy" mỗi lần vẽ lại.
@@ -22,6 +23,16 @@ const TILE_TREE = 5;
 const TILE_ROCK = 6;
 const TILE_SAND = 7;
 const TILE_FENCE = 8;
+
+/** Gạch quanh một ô trong **cùng lớp**, dùng để vẽ mép tiếp giáp. `-1` là ô trống hoặc ngoài biên. */
+export interface TileNeighbourhood {
+  readonly up: number;
+  readonly down: number;
+  readonly left: number;
+  readonly right: number;
+}
+
+export const NO_NEIGHBOURS: TileNeighbourhood = { up: -1, down: -1, left: -1, right: -1 };
 
 /** Số giả ngẫu nhiên xác định trong [0, 1) — cùng (cột, hàng, muối) luôn ra cùng kết quả. */
 function rand01(col: number, row: number, salt: number): number {
@@ -58,6 +69,7 @@ export function drawTile(
   row: number,
   size: number,
   layer: TileLayerKind,
+  neighbours: TileNeighbourhood = NO_NEIGHBOURS,
 ): void {
   const x = col * size;
   const y = row * size;
@@ -71,31 +83,33 @@ export function drawTile(
       }
       break;
     case TILE_PATH:
-      drawDirt(graphics, x, y, size, col, row, color, ground);
+      drawPath(graphics, x, y, size, col, row, color, neighbours, ground);
       break;
     case TILE_WATER:
-      drawWater(graphics, x, y, size, col, row, color, ground);
+      drawWater(graphics, x, y, size, col, row, color, neighbours, ground);
+      break;
+    case TILE_SAND:
+      drawSand(graphics, x, y, size, col, row, color, neighbours, ground);
       break;
     case TILE_WALL:
-      drawWall(graphics, x, y, size, color, ground);
+      drawWall(graphics, x, y, size, col, row, color, neighbours, ground);
       break;
     case TILE_ROOF:
-      drawRoof(graphics, x, y, size, color, ground);
+      drawRoof(graphics, x, y, size, col, row, color, neighbours, ground);
       break;
     case TILE_TREE:
       if (ground) {
         drawGrass(graphics, x, y, size, col, row, color);
       }
+      drawContactShadow(graphics, x + size / 2, y + size * 0.72, size * 0.62, size * 0.24);
       drawTree(graphics, x, y, size, color);
       break;
     case TILE_ROCK:
       if (ground) {
         drawGrass(graphics, x, y, size, col, row, color);
       }
+      drawContactShadow(graphics, x + size / 2, y + size * 0.74, size * 0.5, size * 0.2);
       drawRock(graphics, x, y, size, color, col, row);
-      break;
-    case TILE_SAND:
-      drawSand(graphics, x, y, size, col, row, color, ground);
       break;
     case TILE_FENCE:
       if (ground) {
@@ -112,9 +126,61 @@ export function drawTile(
   }
 }
 
+/** Bóng mờ dưới vật thể: cho thấy vật thể nằm **trên** mặt đất chứ không dán vào nền. */
+function drawContactShadow(
+  graphics: Phaser.GameObjects.Graphics,
+  cx: number,
+  cy: number,
+  w: number,
+  h: number,
+): void {
+  graphics.fillStyle(0x000000, 0.2);
+  graphics.fillEllipse(cx, cy, w, h);
+}
+
+/**
+ * Vẽ một hình "có mép lởm chởm" theo từng cột: mỗi cột 1 px cao lên/xuống theo ô bên cạnh.
+ *
+ * Dùng để nối hai loại địa hình mà không cần tài nguyên hình: mép tiếp giáp thẳng đứng của lưới ô
+ * được thay bằng mép hơi nhấp nhô, nên cỏ vào đường đất hay bờ nước trông tự nhiên hơn hẳn.
+ */
+function fillWavy(
+  graphics: Phaser.GameObjects.Graphics,
+  x: number,
+  y: number,
+  size: number,
+  col: number,
+  row: number,
+  color: number,
+  edgeTop: boolean,
+  edgeBottom: boolean,
+  edgeLeft: boolean,
+  edgeRight: boolean,
+  salt: number,
+): void {
+  graphics.fillStyle(color, 1);
+  for (let dx = 0; dx < size; dx += 1) {
+    // Mép trên/dưới của **cột này** bị lấn vào bao nhiêu px (chỉ khi cột này nằm ở mép ngoài).
+    const nearLeft = edgeLeft && dx < 4;
+    const nearRight = edgeRight && dx >= size - 4;
+    const bumpTop =
+      edgeTop && (nearLeft || nearRight || rand01(col * size + dx, row, salt) < 0.45) ? 1 : 0;
+    const topInset = edgeTop ? Math.round(rand01(col, row * 31 + dx, salt) * 2) + bumpTop : 0;
+    const bottomInset = edgeBottom
+      ? Math.round(rand01(col, row * 31 + dx, salt + 7) * 2) +
+        (rand01(col, dx + row, salt + 3) < 0.35 ? 1 : 0)
+      : 0;
+    const height = size - topInset - bottomInset;
+    if (height <= 0) {
+      continue;
+    }
+    graphics.fillRect(x + dx, y + topInset, 1, height);
+  }
+}
+
 // ------------------------------------------------------------------ từng loại gạch
 
-/** Cỏ: nền xanh + từng nhánh cỏ nhỏ, không kẻ lưới ô. */
+/** Cỏ: nền xanh + nhánh cỏ, thỉnh thoảng có hoa và mảng tối. */
 function drawGrass(
   graphics: Phaser.GameObjects.Graphics,
   x: number,
@@ -127,19 +193,41 @@ function drawGrass(
   graphics.fillStyle(color, 1);
   graphics.fillRect(x, y, size, size);
 
-  const lighter = shade(color, 0.06);
-  const darker = shade(color, -0.05);
-  for (let i = 0; i < 9; i += 1) {
+  // Mảng cỏ tối hơn: phá thế phẳng đều của cả cánh đồng.
+  if (rand01(col, row, 991) < 0.22) {
+    graphics.fillStyle(shade(color, -0.045), 1);
+    const px = x + rand01(col, row, 992) * size * 0.5;
+    const py = y + rand01(col, row, 993) * size * 0.5;
+    graphics.fillEllipse(px, py, size * 0.9, size * 0.6);
+  }
+
+  const lighter = shade(color, 0.07);
+  const darker = shade(color, -0.07);
+  for (let i = 0; i < 10; i += 1) {
     const bx = x + 2 + rand01(col, row, i * 3) * (size - 4);
     const by = y + 2 + rand01(col, row, i * 3 + 1) * (size - 4);
     const tall = rand01(col, row, i * 3 + 2) > 0.5 ? 3 : 2;
     graphics.fillStyle(rand01(col, row, i * 3 + 2) > 0.5 ? lighter : darker, 1);
     graphics.fillRect(bx, by, 1, tall);
   }
+
+  // Hoa: rất thưa, để cánh đồng có điểm nhấn mà không rối.
+  if (rand01(col, row, 77) < 0.07) {
+    const fx = x + 5 + rand01(col, row, 78) * (size - 10);
+    const fy = y + 5 + rand01(col, row, 79) * (size - 10);
+    const petal = rand01(col, row, 80) < 0.5 ? 0xf6f0a8 : 0xe8a9c8;
+    graphics.fillStyle(petal, 1);
+    graphics.fillRect(fx, fy, 2, 2);
+    graphics.fillRect(fx - 2, fy, 2, 2);
+    graphics.fillRect(fx, fy - 2, 2, 2);
+    graphics.fillRect(fx + 2, fy, 2, 2);
+    graphics.fillStyle(0xf0d060, 1);
+    graphics.fillRect(fx, fy, 1, 1);
+  }
 }
 
-/** Đường đất: nền nâu + sỏi nhỏ và vài mảng sáng. */
-function drawDirt(
+/** Đường đất: cỏ ở dưới rồi tới đất có mép lởm chởm, thêm sỏi và vệt bánh xe. */
+function drawPath(
   graphics: Phaser.GameObjects.Graphics,
   x: number,
   y: number,
@@ -147,23 +235,42 @@ function drawDirt(
   col: number,
   row: number,
   color: number,
+  n: TileNeighbourhood,
   ground: boolean,
 ): void {
   if (ground) {
-    graphics.fillStyle(color, 1);
-    graphics.fillRect(x, y, size, size);
+    drawGrass(graphics, x, y, size, col, row, 0x2f5d3a);
   }
-  const light = shade(color, 0.07);
-  const dark = shade(color, -0.08);
+  fillWavy(
+    graphics,
+    x,
+    y,
+    size,
+    col,
+    row,
+    color,
+    n.up !== TILE_PATH,
+    n.down !== TILE_PATH,
+    n.left !== TILE_PATH,
+    n.right !== TILE_PATH,
+    21,
+  );
+
+  // Vệt sáng ở giữa đường: đường mòn do người đi nhiều.
+  graphics.fillStyle(shade(color, 0.05), 0.5);
+  graphics.fillEllipse(x + size / 2, y + size / 2, size * 0.8, size * 0.66);
+
+  const light = shade(color, 0.09);
+  const dark = shade(color, -0.1);
   for (let i = 0; i < 5; i += 1) {
-    const px = x + 3 + rand01(col, row, i * 5 + 1) * (size - 7);
-    const py = y + 3 + rand01(col, row, i * 5 + 2) * (size - 7);
+    const px = x + 5 + rand01(col, row, i * 5 + 1) * (size - 10);
+    const py = y + 5 + rand01(col, row, i * 5 + 2) * (size - 10);
     graphics.fillStyle(rand01(col, row, i * 5 + 3) > 0.45 ? light : dark, 1);
     graphics.fillEllipse(px, py, 3, 2);
   }
 }
 
-/** Nước: nền xanh đậm + gợn sóng sáng, bờ tối ở mép dưới. */
+/** Nước: cát ở dưới rồi tới nước có bờ lởm chởm, gợn sóng và vùng sâu tối hơn. */
 function drawWater(
   graphics: Phaser.GameObjects.Graphics,
   x: number,
@@ -172,91 +279,252 @@ function drawWater(
   col: number,
   row: number,
   color: number,
+  n: TileNeighbourhood,
   ground: boolean,
 ): void {
+  const shoreTop = n.up !== TILE_WATER;
+  const shoreBottom = n.down !== TILE_WATER;
+  const shoreLeft = n.left !== TILE_WATER;
+  const shoreRight = n.right !== TILE_WATER;
+
   if (ground) {
-    graphics.fillStyle(color, 1);
+    // Bờ: cát quanh hồ, rồi nước lấn vào.
+    graphics.fillStyle(0xb9a06a, 1);
     graphics.fillRect(x, y, size, size);
   }
-  const foam = shade(color, 0.16);
-  for (let i = 0; i < 3; i += 1) {
-    const wy = y + 6 + i * 9 + rand01(col, row, i + 40) * 3;
-    const wx = x + 3 + rand01(col, row, i + 50) * 8;
-    const wide = size - 8 - rand01(col, row, i + 60) * 6;
-    graphics.fillStyle(foam, 0.5);
-    graphics.fillRect(wx, wy, wide, 1);
-    graphics.fillRect(wx + 3, wy + 2, Math.max(2, wide - 6), 1);
+
+  fillWavy(graphics, x, y, size, col, row, color, shoreTop, shoreBottom, shoreLeft, shoreRight, 33);
+
+  // Vùng nước sâu: tối hơn ở giữa ô, làm mặt hồ có chiều sâu.
+  if (!shoreTop && !shoreBottom && !shoreLeft && !shoreRight) {
+    graphics.fillStyle(shade(color, -0.05), 0.45);
+    graphics.fillEllipse(x + size / 2, y + size / 2, size * 0.86, size * 0.86);
   }
-  if (ground) {
-    graphics.fillStyle(shade(color, -0.08), 0.5);
-    graphics.fillRect(x, y + size - 2, size, 2);
+
+  const foam = shade(color, 0.2);
+  const gy = y + size * 0.5;
+  graphics.fillStyle(foam, shoreTop || shoreBottom ? 0.65 : 0.45);
+  const wx = x + 3 + rand01(col, row, 50) * 7;
+  graphics.fillRect(wx, gy, size - 8 - rand01(col, row, 60) * 5, 1);
+  graphics.fillRect(wx + 3, gy + 3, Math.max(2, size - 12), 1);
+
+  // Bọt trắng men theo bờ.
+  graphics.fillStyle(0xdff0f5, 0.5);
+  if (shoreTop) {
+    graphics.fillRect(x + 3, y + 1, size - 6, 1);
+  }
+  if (shoreBottom) {
+    graphics.fillRect(x + 4, y + size - 2, size - 8, 1);
+  }
+  if (shoreLeft) {
+    graphics.fillRect(x + 1, y + 3, 1, size - 6);
+  }
+  if (shoreRight) {
+    graphics.fillRect(x + size - 2, y + 4, 1, size - 8);
   }
 }
 
-/** Tường: gạch xây so le, có mạch vữa. */
+/** Cát: cỏ ở ngoài, cát có mép lởm chởm, hạt sạn và vài viên sỏi. */
+function drawSand(
+  graphics: Phaser.GameObjects.Graphics,
+  x: number,
+  y: number,
+  size: number,
+  col: number,
+  row: number,
+  color: number,
+  n: TileNeighbourhood,
+  ground: boolean,
+): void {
+  const touchesWater =
+    n.up === TILE_WATER || n.down === TILE_WATER || n.left === TILE_WATER || n.right === TILE_WATER;
+
+  if (ground) {
+    if (
+      n.up === TILE_SAND ||
+      n.down === TILE_SAND ||
+      n.left === TILE_SAND ||
+      n.right === TILE_SAND
+    ) {
+      graphics.fillStyle(0xb9a06a, 1);
+      graphics.fillRect(x, y, size, size);
+    } else {
+      drawGrass(graphics, x, y, size, col, row, 0x2f5d3a);
+    }
+  }
+  fillWavy(
+    graphics,
+    x,
+    y,
+    size,
+    col,
+    row,
+    color,
+    !touchesWater && n.up !== TILE_SAND,
+    !touchesWater && n.down !== TILE_SAND,
+    !touchesWater && n.left !== TILE_SAND,
+    !touchesWater && n.right !== TILE_SAND,
+    44,
+  );
+
+  const dark = shade(color, -0.08);
+  for (let i = 0; i < 8; i += 1) {
+    const px = x + 2 + rand01(col, row, i * 7 + 2) * (size - 4);
+    const py = y + 2 + rand01(col, row, i * 7 + 3) * (size - 4);
+    graphics.fillStyle(dark, 0.7);
+    graphics.fillRect(px, py, 1, 1);
+  }
+  if (rand01(col, row, 88) < 0.18) {
+    graphics.fillStyle(shade(color, -0.14), 1);
+    graphics.fillEllipse(
+      x + 8 + rand01(col, row, 89) * (size - 16),
+      y + 8 + rand01(col, row, 90) * (size - 16),
+      4,
+      3,
+    );
+  }
+}
+
+/**
+ * Tường: gạch xây so le, **mạch vữa chạy ngang suốt cả bức tường** (không ngắt ở mỗi ô), mép trên
+ * sáng vì hứng nắng, mép dưới tối, và thỉnh thoảng có cửa sổ.
+ */
 function drawWall(
   graphics: Phaser.GameObjects.Graphics,
   x: number,
   y: number,
   size: number,
+  col: number,
+  row: number,
   color: number,
+  n: TileNeighbourhood,
   ground: boolean,
 ): void {
-  if (ground) {
-    graphics.fillStyle(shade(color, -0.14), 1);
-    graphics.fillRect(x, y, size, size);
-  }
   const brick = shade(color, 0.05);
   const brickAlt = shade(color, -0.02);
-  const mortar = shade(color, -0.16);
-  const rowHeight = Math.max(6, Math.round(size / 4));
+  const mortar = shade(color, -0.18);
+  const rowHeight = Math.max(7, Math.round(size / 4));
+
+  if (ground) {
+    graphics.fillStyle(mortar, 1);
+    graphics.fillRect(x, y, size, size);
+  }
+
+  // Mạch vữa ngang liên tục: cùng một chu kỳ hàng cho mọi ô nên trông là một bức tường dài.
   for (let r = 0; r * rowHeight < size; r += 1) {
     const by = y + r * rowHeight;
-    const offset = r % 2 === 0 ? 0 : Math.round(size / 4);
+    const offset = (row % 2 === 0 ? 0 : 1) + Math.round(size / 4);
     for (let bx = x - offset; bx < x + size; bx += Math.round(size / 2)) {
-      const left = Math.max(x, bx);
-      const right = Math.min(x + size, bx + Math.round(size / 2) - 1);
+      const left = Math.max(x, bx + 1);
+      const right = Math.min(x + size - 1, bx + Math.round(size / 2) - 1);
       if (right <= left) {
         continue;
       }
-      graphics.fillStyle(r % 2 === 0 ? brick : brickAlt, 1);
-      graphics.fillRect(left, by, right - left, rowHeight - 1);
+      graphics.fillStyle((row + r) % 2 === 0 ? brick : brickAlt, 1);
+      graphics.fillRect(left, by + 1, right - left, rowHeight - 2);
     }
   }
-  graphics.fillStyle(mortar, 0.55);
-  graphics.fillRect(x, y, size, 1);
-  graphics.fillRect(x, y, 1, size);
+
+  if (n.up !== TILE_WALL) {
+    graphics.fillStyle(shade(color, 0.16), 1);
+    graphics.fillRect(x, y, size, 2);
+    graphics.fillStyle(shade(color, 0.08), 0.8);
+    graphics.fillRect(x, y + 2, size, 1);
+  }
+  if (n.down !== TILE_WALL) {
+    graphics.fillStyle(0x000000, 0.28);
+    graphics.fillRect(x, y + size - 3, size, 3);
+  }
+  if (n.left !== TILE_WALL) {
+    graphics.fillStyle(shade(color, -0.1), 1);
+    graphics.fillRect(x, y, 1, size);
+  }
+  if (n.right !== TILE_WALL) {
+    graphics.fillStyle(shade(color, -0.1), 1);
+    graphics.fillRect(x + size - 1, y, 1, size);
+  }
+
+  // Cửa sổ: thưa, và chỉ ở ô không kề mép nào để không đè lên góc tường.
+  const interior =
+    n.up === TILE_WALL && n.down === TILE_WALL && n.left === TILE_WALL && n.right === TILE_WALL;
+  if (interior && rand01(col, row, 123) < 0.12) {
+    const ww = Math.round(size * 0.5);
+    const wh = Math.round(size * 0.42);
+    const wx = x + (size - ww) / 2;
+    const wy = y + Math.round(size * 0.26);
+    graphics.fillStyle(0x2a1a10, 1);
+    graphics.fillRect(wx - 1, wy - 1, ww + 2, wh + 2);
+    graphics.fillStyle(0x6fa8c8, 1);
+    graphics.fillRect(wx, wy, ww, wh);
+    graphics.fillStyle(0xdfeef7, 0.55);
+    graphics.fillRect(wx, wy, ww, Math.max(1, Math.round(wh / 3)));
+    graphics.fillStyle(0x2a1a10, 1);
+    graphics.fillRect(wx + Math.round(ww / 2) - 1, wy, 2, wh);
+    graphics.fillRect(wx, wy + Math.round(wh / 2) - 1, ww, 2);
+  }
 }
 
-/** Mái nhà: hàng ngói uốn lượn + bờ nóc sáng. */
+/**
+ * Mái nhà: hàng ngói chạy liên tục, **nóc sáng ở hàng trên cùng** và **diềm tối ở hàng dưới cùng**
+ * của cả mái (tính theo ô bên cạnh), nên cả khối mái đọc ra một mái nhà chứ không phải lưới ô.
+ */
 function drawRoof(
   graphics: Phaser.GameObjects.Graphics,
   x: number,
   y: number,
   size: number,
+  col: number,
+  row: number,
   color: number,
+  n: TileNeighbourhood,
   ground: boolean,
 ): void {
-  if (ground) {
-    graphics.fillStyle(shade(color, -0.1), 1);
-    graphics.fillRect(x, y, size, size);
-  }
-  const tile = shade(color, 0.05);
-  const shadow = shade(color, -0.12);
+  const base = ground ? color : shade(color, -0.04);
   const rowHeight = Math.max(7, Math.round(size / 3));
+  const shadow = shade(color, -0.14);
+
+  graphics.fillStyle(base, 1);
+  graphics.fillRect(x, y, size, size);
+
   for (let r = 0; r * rowHeight < size; r += 1) {
     const by = y + r * rowHeight;
-    graphics.fillStyle(r % 2 === 0 ? tile : shade(color, -0.03), 1);
+    graphics.fillStyle(r % 2 === 0 ? shade(base, 0.04) : shade(base, -0.02), 1);
     graphics.fillRect(x, by, size, rowHeight - 1);
-    graphics.fillStyle(shadow, 0.7);
+    graphics.fillStyle(shadow, 0.75);
     graphics.fillRect(x, by + rowHeight - 2, size, 2);
-    for (let bx = x + 2; bx < x + size; bx += 7) {
-      graphics.fillStyle(shadow, 0.35);
+    // Vảy ngói: lệch nửa viên giữa hai hàng cho ra hoa văn đều.
+    for (let bx = x + (r % 2 === 0 ? 0 : 4); bx < x + size; bx += 8) {
+      graphics.fillStyle(shadow, 0.3);
       graphics.fillRect(bx, by + 2, 1, rowHeight - 5);
+      graphics.fillStyle(shade(base, 0.08), 0.35);
+      graphics.fillRect(bx + 1, by + 2, 4, 1);
     }
   }
-  graphics.fillStyle(shade(color, 0.18), 0.9);
-  graphics.fillRect(x, y, size, 2);
+
+  if (n.up !== TILE_ROOF) {
+    // Nóc: hai dải sáng + một vệt tối ngay dưới để thấy độ dày của mái.
+    graphics.fillStyle(shade(color, 0.28), 1);
+    graphics.fillRect(x, y, size, 3);
+    graphics.fillStyle(shade(color, 0.12), 1);
+    graphics.fillRect(x, y + 3, size, 2);
+    graphics.fillStyle(0x000000, 0.18);
+    graphics.fillRect(x, y + 5, size, 1);
+  }
+  if (n.down !== TILE_ROOF) {
+    // Diềm mái: tối hơn và nhô ra 2 px để mái có bóng đổ xuống tường.
+    graphics.fillStyle(0x000000, 0.3);
+    graphics.fillRect(x, y + size - 4, size, 4);
+    graphics.fillStyle(shade(color, 0.06), 1);
+    graphics.fillRect(x, y + size - 6, size, 2);
+  }
+  if (n.left !== TILE_ROOF) {
+    graphics.fillStyle(shade(color, -0.16), 0.9);
+    graphics.fillRect(x, y, 2, size);
+  }
+  if (n.right !== TILE_ROOF) {
+    graphics.fillStyle(shade(color, -0.16), 0.9);
+    graphics.fillRect(x + size - 2, y, 2, size);
+  }
 }
 
 /** Cây: thân + ba tán lá chồng nhau, có mảng sáng ở trên-trái. */
@@ -268,21 +536,23 @@ function drawTree(
   color: number,
 ): void {
   const cx = x + size / 2;
-  const base = y + size - 2;
+  const base = y + size - 3;
   graphics.fillStyle(0x3d2a19, 1);
   graphics.fillRect(cx - 2, base - size * 0.35, 4, size * 0.35);
 
-  const dark = shade(color, -0.06);
-  const mid = shade(color, 0.04);
-  const light = shade(color, 0.16);
+  const dark = shade(color, -0.07);
+  const mid = shade(color, 0.03);
+  const light = shade(color, 0.15);
   graphics.fillStyle(dark, 1);
   graphics.fillCircle(cx, y + size * 0.42, size * 0.34);
   graphics.fillCircle(cx - size * 0.24, y + size * 0.55, size * 0.24);
   graphics.fillCircle(cx + size * 0.24, y + size * 0.54, size * 0.24);
   graphics.fillStyle(mid, 1);
-  graphics.fillCircle(cx - 2, y + size * 0.4, size * 0.26);
-  graphics.fillStyle(light, 0.85);
-  graphics.fillCircle(cx - size * 0.12, y + size * 0.32, size * 0.13);
+  graphics.fillCircle(cx - 1, y + size * 0.4, size * 0.27);
+  graphics.fillStyle(light, 0.9);
+  graphics.fillCircle(cx - size * 0.13, y + size * 0.31, size * 0.14);
+  graphics.fillStyle(shade(color, 0.22), 0.5);
+  graphics.fillCircle(cx - size * 0.2, y + size * 0.26, size * 0.06);
 }
 
 /** Đá: khối đa giác xám + mặt sáng phía trên. */
@@ -297,38 +567,14 @@ function drawRock(
 ): void {
   const w = size * (0.6 + rand01(col, row, 71) * 0.2);
   const cx = x + size / 2;
-  const bottom = y + size * 0.82;
+  const bottom = y + size * 0.8;
   const top = y + size * 0.3;
-  graphics.fillStyle(shade(color, -0.08), 1);
+  graphics.fillStyle(shade(color, -0.1), 1);
   graphics.fillTriangle(cx - w / 2, bottom, cx + w / 2, bottom, cx, top);
   graphics.fillStyle(color, 1);
   graphics.fillTriangle(cx - w / 2 + 3, bottom - 2, cx + w / 2 - 3, bottom - 2, cx, top + 3);
-  graphics.fillStyle(shade(color, 0.14), 1);
+  graphics.fillStyle(shade(color, 0.16), 1);
   graphics.fillTriangle(cx - w / 4, bottom - 5, cx, bottom - 5, cx - 2, top + 7);
-}
-
-/** Cát: nền vàng nhạt + hạt sạn. */
-function drawSand(
-  graphics: Phaser.GameObjects.Graphics,
-  x: number,
-  y: number,
-  size: number,
-  col: number,
-  row: number,
-  color: number,
-  ground: boolean,
-): void {
-  if (ground) {
-    graphics.fillStyle(color, 1);
-    graphics.fillRect(x, y, size, size);
-  }
-  const dark = shade(color, -0.07);
-  for (let i = 0; i < 7; i += 1) {
-    const px = x + 2 + rand01(col, row, i * 7 + 2) * (size - 4);
-    const py = y + 2 + rand01(col, row, i * 7 + 3) * (size - 4);
-    graphics.fillStyle(dark, 0.7);
-    graphics.fillRect(px, py, 1, 1);
-  }
 }
 
 /** Hàng rào: hai thanh ngang + cột, đi được (chỉ để trang trí). */
@@ -339,10 +585,12 @@ function drawFence(
   size: number,
   color: number,
 ): void {
-  const rail = shade(color, 0.08);
-  const post = shade(color, -0.05);
+  const rail = shade(color, 0.1);
+  const post = shade(color, -0.06);
   const top = y + size * 0.42;
   const bottom = y + size * 0.74;
+  graphics.fillStyle(0x000000, 0.18);
+  graphics.fillRect(x, bottom + 4, size, 2);
   graphics.fillStyle(rail, 1);
   graphics.fillRect(x, top, size, 3);
   graphics.fillRect(x, bottom, size, 3);
@@ -412,12 +660,12 @@ export function drawCharacter(
   const torso = art.color;
 
   // Bóng đổ dưới chân: cho cảm giác nhân vật đứng trên mặt đất.
-  graphics.fillStyle(0x000000, 0.22);
+  graphics.fillStyle(0x000000, 0.24);
   graphics.fillEllipse(0, feetY + 1, bodyWidth + 6, 6 * scale);
 
   if (art.highlight) {
-    graphics.fillStyle(0x7fd1ff, 0.16);
-    graphics.fillEllipse(0, feetY + 1, bodyWidth + 16, 11 * scale);
+    graphics.fillStyle(0x7fd1ff, 0.18);
+    graphics.fillEllipse(0, feetY + 1, bodyWidth + 18, 12 * scale);
   }
 
   const legTop = feetY - Math.round(5 * scale);
@@ -436,6 +684,9 @@ export function drawCharacter(
   graphics.fillRoundedRect(-bodyWidth / 2, bodyTop, bodyWidth, bodyHeight, 3);
   graphics.fillStyle(shade(torso, -0.12), 1);
   graphics.fillRect(-bodyWidth / 2, bodyTop + bodyHeight - 3, bodyWidth, 3);
+  // Cổ áo sáng: cùng một chi tiết nhỏ làm hình đọc ra "bộ đồng phục".
+  graphics.fillStyle(shade(torso, 0.22), 1);
+  graphics.fillRect(-Math.round(3 * scale), bodyTop + 1, Math.round(6 * scale), 2);
 
   // Tay: hướng ngang thì một tay ra trước, còn lại giấu sau thân.
   graphics.fillStyle(shade(torso, 0.08), 1);
@@ -455,12 +706,12 @@ export function drawCharacter(
   if (direction.look === 'up') {
     graphics.fillStyle(HAIR, 1);
     graphics.fillCircle(0, headCenterY, headRadius);
-    graphics.fillStyle(shade(HAIR, 0.1), 1);
+    graphics.fillStyle(shade(HAIR, 0.12), 1);
     graphics.fillCircle(0, headCenterY + 1.5, headRadius * 0.7);
   } else {
     graphics.fillStyle(HAIR, 1);
     graphics.fillCircle(0, headCenterY - headRadius * 0.55, headRadius * 0.95);
-    graphics.fillStyle(SKIN_SHADOW, 0.5);
+    graphics.fillStyle(SKIN_SHADOW, 0.45);
     graphics.fillCircle(0, headCenterY + headRadius * 0.45, headRadius * 0.55);
   }
 
@@ -468,6 +719,13 @@ export function drawCharacter(
   const bandHeight = Math.max(2, Math.round(2.6 * scale));
   graphics.fillStyle(0xd8443f, 1);
   graphics.fillRect(-headRadius, headCenterY - headRadius * 0.85, headRadius * 2, bandHeight);
+  graphics.fillStyle(0xa8322e, 1);
+  graphics.fillRect(
+    -headRadius,
+    headCenterY - headRadius * 0.85 + bandHeight - 1,
+    headRadius * 2,
+    1,
+  );
   if (direction.look !== 'down') {
     graphics.fillRect(-headRadius - 2, headCenterY - 2, 3, bandHeight - 1);
   }

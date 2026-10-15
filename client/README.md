@@ -113,6 +113,11 @@ dùng số giả ngẫu nhiên **xác định** theo toạ độ ô nên bản �
 
 Camera phóng `CAMERA_ZOOM = 1.6` để nhân vật cao ~34 px trên màn hình thay vì ~22 px.
 
+Mép tiếp giáp giữa các loại địa hình được vẽ **theo ô bên cạnh** (autotiling thủ công): cỏ lấn vào
+đường đất, bờ nước có cát và bọt, mái nhà có nóc sáng ở hàng trên và diềm tối ở hàng dưới, tường có
+mạch vữa chạy liên tục; cây/đá/hàng rào có bóng đổ xuống mặt đất. Nhờ vậy cả một dãy ô nước đọc ra
+một cái hồ chứ không phải lưới ô.
+
 Khi có tài nguyên thật, chỉ cần thay phần vẽ trong `tile-art.ts` bằng `add.image`/atlas — phần còn
 lại của cảnh (nội suy, camera, bấm chuột) không phải sửa.
 

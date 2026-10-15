@@ -1,7 +1,13 @@
 import Phaser from 'phaser';
 import { TICK_RATE_MS, type MapSnapshot } from '@ninja/shared';
 import type { Facing, WorldEntity } from '../net/world-types';
-import { drawCharacter, drawTile, lookDirection, type TileLayerKind } from './tile-art';
+import {
+  drawCharacter,
+  drawTile,
+  lookDirection,
+  type TileLayerKind,
+  type TileNeighbourhood,
+} from './tile-art';
 import {
   buildTileLookup,
   entityAtPoint,
@@ -172,7 +178,8 @@ export class WorldScene extends Phaser.Scene {
         if (!tile) {
           continue;
         }
-        drawTile(graphics, tile, col, row, tileSize, kind);
+        // Ô bên cạnh quyết định mép tiếp giáp (cỏ vào đường đất, bờ nước, diềm mái, chân tường).
+        drawTile(graphics, tile, col, row, tileSize, kind, neighbourIds(layer, col, row));
       }
     }
   }
@@ -346,6 +353,17 @@ export class WorldScene extends Phaser.Scene {
     }
     this.hooks.moveTo(tileCenterWorld(map, tile.col, tile.row));
   }
+}
+
+/** Id gạch của bốn ô kề trong cùng một lớp; `-1` khi ô trống hoặc ngoài biên. */
+function neighbourIds(layer: TileLayer, col: number, row: number): TileNeighbourhood {
+  const at = (c: number, r: number): number => layer[r]?.[c] ?? -1;
+  return {
+    up: at(col, row - 1),
+    down: at(col, row + 1),
+    left: at(col - 1, row),
+    right: at(col + 1, row),
+  };
 }
 
 function viewKey(entity: WorldEntity, isSelf: boolean): string {
