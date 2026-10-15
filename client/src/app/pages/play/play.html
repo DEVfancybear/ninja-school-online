@@ -5,8 +5,8 @@
     <section class="panel">
       <h1>Tài khoản chưa có nhân vật</h1>
       <p>
-        Bạn cần tạo nhân vật trước khi vào thế giới ninja. Mỗi tài khoản tạo được tối đa hai
-        nhân vật.
+        Bạn cần tạo nhân vật trước khi vào thế giới ninja. Mỗi tài khoản tạo được tối đa
+        {{ maxCharacters }} nhân vật.
       </p>
       @if (fatalError(); as error) {
         <p class="panel-note">{{ error.message }}</p>

@@ -15,6 +15,7 @@ import { RouterLink } from '@angular/router';
 import {
   CHAT_MAX_LENGTH,
   ErrorCode,
+  MAX_CHARACTERS_PER_ACCOUNT,
   Opcode,
   TICK_RATE_MS,
   type Character,
@@ -78,6 +79,9 @@ export class Play implements OnInit, OnDestroy {
 
   /** Nhân vật muốn vào, lấy từ `?characterId=` khi đi từ trang nhân vật. */
   readonly characterId = input<string | undefined>(undefined);
+
+  /** Giới hạn nhân vật mỗi tài khoản — dùng cho câu hướng dẫn khi tài khoản chưa có nhân vật. */
+  readonly maxCharacters = MAX_CHARACTERS_PER_ACCOUNT;
 
   readonly loading = signal(true);
   readonly loadError = signal<string | null>(null);
