@@ -1,0 +1,85 @@
+<main class="auth">
+  <section class="card">
+    <h1>Ninja School Online</h1>
+    <p class="lead">Đăng nhập hoặc tạo tài khoản mới để bước vào thế giới ninja.</p>
+
+    <div class="tabs">
+      <button type="button" class="tab" [class.active]="!isRegister()" (click)="setMode('login')">
+        Đăng nhập
+      </button>
+      <button type="button" class="tab" [class.active]="isRegister()" (click)="setMode('register')">
+        Tạo tài khoản
+      </button>
+    </div>
+
+    <form class="form" (ngSubmit)="submit()" novalidate>
+      <div class="field">
+        <label for="username">Tên đăng nhập</label>
+        <input
+          id="username"
+          name="username"
+          type="text"
+          autocomplete="username"
+          [ngModel]="username()"
+          (ngModelChange)="username.set($event)"
+          [disabled]="busy()"
+        />
+        @if (fieldError('username'); as message) {
+          <p class="error">{{ message }}</p>
+        }
+      </div>
+
+      <div class="field">
+        <label for="password">Mật khẩu</label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          [attr.autocomplete]="isRegister() ? 'new-password' : 'current-password'"
+          [ngModel]="password()"
+          (ngModelChange)="password.set($event)"
+          [disabled]="busy()"
+        />
+        @if (fieldError('password'); as message) {
+          <p class="error">{{ message }}</p>
+        }
+      </div>
+
+      @if (isRegister()) {
+        <div class="field">
+          <label for="email">Email (không bắt buộc)</label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            autocomplete="email"
+            [ngModel]="email()"
+            (ngModelChange)="email.set($event)"
+            [disabled]="busy()"
+          />
+          @if (fieldError('email'); as message) {
+            <p class="error">{{ message }}</p>
+          }
+        </div>
+      }
+
+      @if (formError(); as message) {
+        <p class="alert" role="alert">{{ message }}</p>
+      }
+
+      <button class="submit" type="submit" [disabled]="busy()">
+        {{ busy() ? 'Đang xử lý…' : submitLabel() }}
+      </button>
+    </form>
+
+    <p class="hint">
+      @if (isRegister()) {
+        Tên đăng nhập chỉ gồm chữ thường, chữ số và dấu gạch dưới; mật khẩu từ 8 ký tự trở lên.
+      } @else {
+        Chưa có tài khoản? Bấm “Tạo tài khoản” ở trên.
+      }
+    </p>
+
+    <a class="back" routerLink="/">← Về trang chủ</a>
+  </section>
+</main>

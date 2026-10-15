@@ -24,4 +24,12 @@ describe('Home', () => {
     const link = (fixture.nativeElement as HTMLElement).querySelector('a');
     expect(link?.textContent).toContain('Vào thế giới');
   });
+
+  it('có liên kết tới trang đăng nhập / tạo nhân vật', async () => {
+    const fixture = TestBed.createComponent(Home);
+    await fixture.whenStable();
+    const links = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('a'));
+    const login = links.find((link) => link.getAttribute('href') === '/login');
+    expect(login?.textContent).toContain('Đăng nhập / Tạo nhân vật');
+  });
 });

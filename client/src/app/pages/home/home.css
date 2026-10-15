@@ -34,3 +34,14 @@ h1 {
   background: var(--accent);
   color: #0b1218;
 }
+
+.enter.secondary {
+  margin-top: 0;
+  border-color: rgba(147, 167, 184, 0.4);
+  color: var(--muted);
+}
+
+.enter.secondary:hover {
+  background: rgba(147, 167, 184, 0.12);
+  color: var(--fg);
+}
