@@ -1,6 +1,6 @@
 # Cấu trúc dự án
 
-*Ngày viết: 2026-10-15. Cập nhật sau khi hoàn thành **M0 và M1**: các mục ghi (M0)/(M1) đã dựng thật, phần còn lại là cấu trúc đích cho các cột mốc sau.*
+*Ngày viết: 2026-10-15. Cập nhật sau khi hoàn thành **M0, M1 và M2**: các mục ghi (M0)/(M1)/(M2) đã dựng thật, phần còn lại là cấu trúc đích cho các cột mốc sau.*
 
 ## 1. Nguyên tắc thiết kế
 
@@ -44,14 +44,15 @@ ninja/
 │           ├── core/             # (M1) api/, auth/ (service + guard), character/, game-labels.ts
 │           ├── pages/home/       # (M0) trang chủ
 │           ├── pages/login/      # (M1) đăng nhập + đăng ký
-│           ├── pages/characters/ # (M1) danh sách + tạo nhân vật
-│           └── game/             # (M0) world-scene.ts, game-config.ts, world-canvas/
-│       # các thư mục thêm ở cột mốc sau (đặt trong src/app/):
-│       #   net/          WebSocket client (reconnect, backoff, hàng đợi)
-│       #   battle/       UI sàn đấu theo lượt + hiệu ứng chiêu
-│       #   ui/           HUD, chat, túi, nhiệm vụ, shop, hộp thoại
-│       #   input/        bàn phím, chạm, joystick ảo
-│       #   i18n/         chuỗi giao diện (tiếng Việt trước)
+│           ├── pages/characters/ # (M1) danh sách + tạo nhân vật; (M2) lối vào thế giới
+│           ├── pages/play/       # (M2) trang /play: nối WebSocket, nạp bản đồ, HUD, chat
+│           ├── net/              # (M2) game-socket.ts (WebSocket, nối lại, ping), world-state.ts (signals), ws-url.ts
+│           ├── input/            # (M2) key-map.ts (bàn phím), movement-controller.ts (gửi đích mỗi 100 ms)
+│           ├── game/             # (M0) world-canvas/, game-config; (M2) world-scene.ts, world-logic.ts, test-hook.ts
+│           ├── ui/               # (M2) hud/, chat-panel/, npc-dialog/, notice-bar/
+│           └── # các thư mục thêm ở cột mốc sau (đặt trong src/app/):
+│               #   battle/   UI sàn đấu theo lượt + hiệu ứng chiêu
+│               #   i18n/     tách chuỗi giao diện (hiện đang viết trực tiếp trong template)
 │
 ├── server/                       # GAME SERVER (Node.js + Fastify + ws)
 │   ├── drizzle/                  # file SQL migration (drizzle-kit sinh)
@@ -111,10 +112,10 @@ ninja/
 
 | Hệ thống (game-systems.md) | Server | Client | Dữ liệu |
 |---|---|---|---|
-| Tài khoản, đăng nhập | `modules/account` + `net/` | `scenes/` (login) + `net/` | bảng `accounts` |
-| Nhân vật & chỉ số | `modules/character` | `scenes/` (chọn NV), `ui/` | `game-data/classes/` |
-| Bản đồ, di chuyển | `world/` | `world/` | `game-data/maps/` |
-| NPC, hội thoại, shop | `modules/npc` | `ui/` | `game-data/npcs/`, `game-data/shops/` |
+| Tài khoản, đăng nhập | `modules/account` (+ `net/` cho WebSocket) | `pages/login/`, `core/auth/` | bảng `accounts` |
+| Nhân vật & chỉ số | `modules/character` | `pages/characters/`, `core/character/` | `game-data/classes/` |
+| Bản đồ, di chuyển | `world/` | `game/` (Phaser), `input/` | `game-data/maps/` |
+| NPC, hội thoại, shop | `modules/npc` | `ui/npc-dialog/` | `game-data/npcs/`, `game-data/shops/` |
 | Nhiệm vụ | `modules/quest` | `ui/` | `game-data/quests/` |
 | Đấu theo lượt, quái, rơi đồ | `modules/battle`, `world/` | `battle/` | `game-data/monsters/` |
 | Kỹ năng, chiêu thức | `modules/skill` | `battle/`, `ui/` | `game-data/skills/` |
@@ -145,8 +146,8 @@ Chữ trong code/giao diện: tiếng Anh cho định danh, chuỗi hiển thị
 |---|---|
 | M0 (nền móng) | `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, CI, `infra/docker/docker-compose.dev.yml`, `tools/data-validator` |
 | M1 (đã xong) | `client/src/app/{core,pages/login,pages/characters}`, `server/src/{config,db,http,security,modules/{account,character}}`, `shared/src/schemas`, `server/drizzle`, `tests/e2e` (8 kịch bản tài khoản & nhân vật) |
-| M2 (phía server đã xong) | `server/src/{net,core,world,modules/{chat,npc}}`, `game-data/{maps,npcs}` (2 bản đồ + 1 NPC có hội thoại), `server/src/net/ws.spec.ts` (kiểm thử WebSocket với client `ws`) |
-| M2 (phần client) – M3 | `client/src/app/{net,battle,ui,input}`, `server/src/modules/{inventory,battle,skill}`, `game-data/{monsters,items,skills,classes}` |
+| M2 (đã xong) | `server/src/{net,core,world,modules/{chat,npc}}`, `client/src/app/{net,input,ui,pages/play}` + `game/world-logic.ts`, `game-data/{maps,npcs}` (2 bản đồ + 1 NPC có hội thoại), `server/src/net/ws.spec.ts`, e2e thế giới/chat trong `tests/e2e` |
+| M3 | `client/src/app/battle/`, `server/src/modules/{inventory,battle,skill}`, `game-data/{monsters,items,skills,classes}` |
 | M4–M6 (Alpha) | `modules/{quest,social,arena,mail}`, mở rộng `game-data/{quests,shops}`, `tools/{map-editor,asset-pipeline}`, thêm kịch bản e2e cho thế giới/chat rồi chiến đấu |
 | M7–M8 (Beta) | `modules/{guild,event}`, `tools/gm-cli`, `infra/deploy`, `tests/load` |
 
