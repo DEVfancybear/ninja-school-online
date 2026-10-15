@@ -2,9 +2,11 @@
 
 Dự án game **nhập vai 2D nhiều người chơi (MMORPG nhẹ)**, chiến đấu theo lượt, **chơi trực tiếp trên trình duyệt** (máy tính + mobile web), lấy cảm hứng từ dòng game "Ninja School Online" nổi tiếng ở Việt Nam.
 
-> **Trạng thái: đã xong Giai đoạn 0 (nghiên cứu & thiết kế), mốc M0 (nền móng) và mốc M1 (tài khoản & nhân vật).**
-> Chơi được trên web: đăng ký/đăng nhập, tạo nhân vật và xem danh sách nhân vật; dữ liệu lưu trong PostgreSQL.
-> Chưa có thế giới game và chiến đấu (bắt đầu từ M2).
+> **Trạng thái: đã xong Giai đoạn 0 (nghiên cứu & thiết kế), mốc M0 (nền móng), M1 (tài khoản & nhân vật) và M2 (thế giới, di chuyển, chat).**
+> Chơi được trên web: đăng ký/đăng nhập, tạo nhân vật, vào thế giới 2D bằng WebSocket, đi lại bằng bàn
+> phím, thấy người chơi khác cùng bản đồ, chat trong bản đồ, nói chuyện với NPC và đi qua cổng sang bản
+> đồ thứ hai; dữ liệu tài khoản/nhân vật lưu trong PostgreSQL.
+> Chưa có chiến đấu (bắt đầu từ M3).
 
 ## Lệnh nhanh
 
@@ -13,8 +15,8 @@ pnpm install            # cài phụ thuộc (pnpm 12 trở lên)
 cp .env.example .env    # rồi chỉnh DATABASE_URL cho đúng máy bạn
 pnpm db:migrate         # tạo bảng trong PostgreSQL (tự build shared trước)
 pnpm dev                # chạy client (ng serve) + server (tsx watch)
-pnpm lint && pnpm typecheck && pnpm test # 119 test
-pnpm e2e                # 8 kịch bản trên trình duyệt thật (Playwright)
+pnpm lint && pnpm typecheck && pnpm test # 281 test
+pnpm e2e                # 13 kịch bản trên trình duyệt thật (Playwright)
 pnpm validate:data      # kiểm tra game-data/ theo schema
 pnpm build
 ```
@@ -70,14 +72,14 @@ ninja/
 │   ├── 01-research/        # nghiên cứu game gốc + nguồn tham khảo
 │   ├── 02-architecture/    # công nghệ, cấu trúc, mạng & dữ liệu
 │   └── 03-plan/            # lộ trình, MVP, rủi ro
-├── client/                 # Angular 22 + Phaser 4: đăng nhập, nhân vật, HUD, vẽ thế giới 2D
-├── server/                 # Node.js + Fastify: xác thực, nhân vật, /health, /version (ws ở M2)
-├── shared/                 # PROTOCOL_VERSION, hằng số trường/phái, schema zod dùng chung
-├── game-data/              # dữ liệu nội dung game dạng JSON (đã có ví dụ skill/item)
+├── client/                 # Angular 22 + Phaser 4: đăng nhập, nhân vật, thế giới 2D, HUD, chat
+├── server/                 # Node.js + Fastify: xác thực, nhân vật, /health, /version, WebSocket ở /ws
+├── shared/                 # PROTOCOL_VERSION (=2), hằng số trường/phái/thế giới, gói tin, schema zod
+├── game-data/              # dữ liệu nội dung game dạng JSON (2 bản đồ, 1 NPC, ví dụ skill/item)
 ├── assets/                 # chỉ có README + CREDITS; chưa có tài nguyên hình/âm thanh
 ├── tools/                  # data-validator: kiểm tra game-data theo schema
 ├── infra/                  # Docker Compose cho PostgreSQL + Redis (môi trường dev)
-└── tests/                  # tests/e2e: 8 kịch bản Playwright trên trình duyệt thật
+└── tests/                  # tests/e2e: 13 kịch bản Playwright trên trình duyệt thật
 ```
 
 Các thư mục `client/`, `server/`, `shared/`, `tools/data-validator/` đã có mã nguồn chạy được.
@@ -88,7 +90,9 @@ Các thư mục `client/`, `server/`, `shared/`, `tools/data-validator/` đã c�
 - [x] ~~Xác nhận stack~~ → **Angular + Phaser + Node.js + PostgreSQL + Redis + Docker** (2026-10-15).
 - [x] ~~M0: khởi tạo monorepo pnpm, tsconfig, ESLint/Prettier, CI, docker-compose~~ → xong (xem `docs/03-plan/roadmap.md`).
 - [x] ~~M1: tài khoản + tạo nhân vật~~ → xong (xem `docs/03-plan/roadmap.md`).
-- [ ] **M2: thế giới, di chuyển, chat** (WebSocket, 2 bản đồ đầu tiên) — xem `docs/03-plan/roadmap.md`.
+- [x] ~~M2: thế giới, di chuyển, chat~~ → xong: WebSocket ở `/ws`, 2 bản đồ, đồng bộ người chơi, chat
+      trong bản đồ, NPC có hội thoại, cổng dịch chuyển (xem `docs/03-plan/roadmap.md`).
+- [ ] **M3: chiến đấu theo lượt PvE** — kết thúc MVP.
 - [ ] Quyết định có đổi tên sản phẩm hay không (xem mục 6).
 
 ## 6. Lưu ý bản quyền (đọc kỹ)

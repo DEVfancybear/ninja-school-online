@@ -15,7 +15,7 @@ Playwright tự chạy server (`pnpm --filter @ninja/server dev`) và client
 `[::1]`, xem `tests/e2e/playwright.config.ts`), nên chỉ cần PostgreSQL đang chạy và database đã migrate.
 Mỗi lần chạy sinh tên tài khoản/nhân vật ngẫu nhiên nên không cần xoá dữ liệu cũ.
 
-### Kịch bản trong `src/auth-character-flow.spec.ts` (8 kịch bản)
+### `src/auth-character-flow.spec.ts` (8 kịch bản — M1)
 
 | # | Kịch bản | Thuộc |
 |---|---|---|
@@ -28,8 +28,27 @@ Mỗi lần chạy sinh tên tài khoản/nhân vật ngẫu nhiên nên không 
 | 7 | Tên nhân vật quá 12 ký tự bị chặn ngay trên trình duyệt | M1 ✅ |
 | 8 | Đăng xuất thu hồi refresh token ở máy chủ: token cũ không dùng lại được | M1 ✅ |
 
-Kịch bản thuộc các cột mốc sau (chưa có test): hai người chơi cùng bản đồ nhìn thấy nhau và chat (M2),
-đánh hạ quái theo lượt rồi nhận EXP/rơi đồ/lên cấp (M3).
+### `src/world-movement-chat.spec.ts` (4 kịch bản — M2)
+
+Hai **context trình duyệt riêng biệt** trong cùng một test, mỗi bên một tài khoản mới:
+
+| # | Kịch bản | Thuộc |
+|---|---|---|
+| 1 | Hai người chơi cùng bản đồ thấy nhau, và người kia thấy mình đi sang phải | M2 ✅ |
+| 2 | Chat trong bản đồ: người kia nhận đúng nội dung kèm tên người gửi | M2 ✅ |
+| 3 | Đóng tab thì nhân vật biến mất khỏi bản đồ của người còn lại | M2 ✅ |
+| 4 | Bấm vào NPC trong làng thì hiện hộp thoại đúng lời thoại | M2 ✅ |
+
+### `src/world-portal.spec.ts` (1 kịch bản — M2)
+
+| # | Kịch bản | Thuộc |
+|---|---|---|
+| 1 | Đi bộ vào vùng cổng thì tự sang bản đồ bên kia (người ở lại thấy rời đi), đi ngược lại thì về làng | M2 ✅ |
+
+**Tổng: 13 kịch bản.** Các kịch bản dùng hook `window.__ninjaWorld` — hook này **chỉ** được gắn khi
+`isDevMode()`, bản production không phơi nó (xem `client/src/app/game/test-hook.ts`).
+
+Kịch bản thuộc các cột mốc sau (chưa có test): đánh hạ quái theo lượt rồi nhận EXP/rơi đồ/lên cấp (M3).
 
 ## Dự kiến thêm sau
 

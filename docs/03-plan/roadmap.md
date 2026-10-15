@@ -71,9 +71,59 @@ Nội dung: monorepo pnpm (`client`, `server`, `shared`, `tools/*`), tsconfig ba
 **Chưa kiểm chứng được:** `docker compose up` (máy dev chưa cài Docker — PostgreSQL đang chạy trực tiếp
 từ bộ binaries, xem `infra/README.md`).
 
-### M2 — Thế giới, di chuyển, chat (~2 tuần)
+### M2 — Thế giới, di chuyển, chat (~2 tuần) — ✅ **ĐÃ XONG (2026-10-15)**
+
 Nội dung: 2 bản đồ đầu tiên (làng khởi nguồn + bãi luyện tập), tilemap hiển thị, di chuyển (bàn phím + chạm), đồng bộ người chơi giữa nhiều client, chat khu vực, NPC đầu tiên (hội thoại).
 **Xong khi:** 2 người chơi ở 2 máy khác nhau cùng vào bản đồ, thấy nhau di chuyển mượt, chat qua lại; đóng trình duyệt thì nhân vật biến mất khỏi map người kia.
+
+**Đã giao:**
+
+- **Hợp đồng mạng (`shared`, PROTOCOL_VERSION = 2)**: khung gói tin `{op, seq, payload}` dạng text JSON;
+  bảng opcode + schema zod cho từng gói (`protocol/packets.ts`); codec `encodePacket`/`decodeEnvelope`;
+  schema bản đồ/NPC; hằng số thế giới (nhịp tick 100 ms, tốc độ 160 px/s, giới hạn lệnh di chuyển 600 px,
+  chat 200 ký tự / 1 giây, nhịp tim 5 s / 30 s, lịch sử chat 20 tin).
+- **Máy chủ (`server`)**: WebSocket gắn **cùng cổng HTTP** ở `/ws`; bắt tay `C2S_HELLO` (JWT + chọn nhân
+  vật theo `characterId`); room theo bản đồ (tạo khi có người, xoá khi rỗng); **một** `setInterval` 10 Hz
+  dùng chung cho cả room lẫn quét heartbeat; di chuyển **server-authoritative** (kiểm khoảng cách, biên,
+  ô bị chặn — client chỉ gửi điểm đích); đồng bộ thực thể (`S2C_ENTITY_ADD/REMOVE/MOVE`); chat có giới hạn
+  tần suất + lịch sử gần nhất; hội thoại NPC; **cổng dịch chuyển tự kích hoạt khi đi bộ vào vùng cổng**;
+  một nhân vật một kết nối (phiên cũ bị đẩy ra); heartbeat quá hạn thì dọn khỏi map.
+- **Client (`client`)**: lớp socket (`game-socket.ts` — nối lại 1→15 s, ping/đo độ trễ, hàng đợi gói chờ
+  bắt tay), trạng thái thế giới bằng signals, Phaser vẽ tilemap + thực thể có **nội suy** (server 10 Hz →
+  vẽ 60 fps), điều khiển WASD/mũi tên, trang `/play` có HUD, khung chat, hộp thoại NPC, lớp phủ khi mất
+  kết nối.
+- **Dữ liệu nội dung**: 2 bản đồ JSON (`lang-khoi-nguon` 40×30, `bai-luyen-tap` 36×28) có cổng hai chiều,
+  1 NPC có hội thoại; `tools/data-validator` kiểm thêm map/NPC và kiểm chéo cổng/NPC giữa các bản đồ.
+
+**Kiểm chứng đã chạy (máy dev, PostgreSQL 16 thật và trình duyệt thật Chromium):**
+
+| Hạng mục | Kết quả |
+|---|---|
+| `pnpm test` | **281 test xanh**: shared 47, server 87, client 137, tools/data-validator 10 |
+| `pnpm e2e` (Playwright) | **13/13 kịch bản xanh** — 8 kịch bản M1 + 4 kịch bản thế giới (thấy nhau, thấy nhau di chuyển, chat qua lại, đóng tab thì biến mất, hội thoại NPC) + 1 kịch bản cổng (đi bộ sang bản đồ 2 rồi quay về) |
+| `pnpm validate:data` | exit 0 — 5 file hợp lệ trong `game-data/` |
+| `pnpm lint`, `pnpm typecheck`, `pnpm build`, `pnpm format:check` | đều exit 0 |
+| Bundle sau M2 | khởi tạo **715,87 kB** (nén 153,95 kB); Phaser + trang chơi nằm trong lazy chunk riêng `play` **1,42 MB** (nén 306,06 kB). Số lệch ±0,01 kB giữa các lần build do tên file có hash |
+| `pnpm install --frozen-lockfile` | OK — lockfile khớp (thêm `ws` + `@types/ws`) |
+| Kiểm thử WebSocket | `server/src/net/ws.spec.ts`: 28 test trên server thật ở cổng 0, dùng client `ws` |
+
+**Lỗi thật đã phát hiện và sửa trong quá trình kiểm chứng:**
+
+1. **Không đi được sang bản đồ thứ hai** (lỗi nặng nhất): `S2C_ENTER_MAP` không chứa vùng cổng nên client
+   không biết cổng nằm đâu, còn server chỉ đổi bản đồ khi nhận `C2S_ENTER_MAP` — gói mà client không bao
+   giờ gửi khi đi bộ. Không test nào ở cả hai phía phủ đường "đi bộ vào cổng" nên lọt. Đã sửa bằng cách
+   cho server tự phát hiện vùng cổng trong nhịp tick và dùng **chung một hàm chuyển map** với `C2S_ENTER_MAP`,
+   kèm 2 test tích hợp + 1 kịch bản e2e.
+2. **Phaser không vẽ tilemap nếu dữ liệu thế giới tới trước `create()`** — hiệu ứng Angular chạy ngay sau
+   khi dựng cảnh, nên tilemap không bao giờ được vẽ. Đã sửa cho `create()` vẽ bản đồ trước khi áp thực thể.
+3. **Đóng kết nối WebSocket trong `onClose` của Fastify là quá muộn** — `app.close()` treo khi còn kết nối
+   WebSocket đang mở. Đã chuyển sang hook `preClose`, có test phủ.
+4. **Câu chữ sai trong giao diện**: trang `/play` ghi "tối đa hai nhân vật" trong khi luật thật là **bốn**;
+   nay lấy từ hằng số `MAX_CHARACTERS_PER_ACCOUNT` dùng chung.
+
+**Chưa kiểm chứng được:** `docker compose up` (máy dev chưa cài Docker — PostgreSQL chạy trực tiếp từ bộ
+binaries, xem `infra/README.md`); nhiều tiến trình máy chủ (chưa có Redis/pub-sub nên room chỉ nằm trong
+một tiến trình); chưa có test tải 10 Hz.
 
 ### M3 — Chiến đấu theo lượt PvE (~2 tuần) — *kết thúc MVP*
 Nội dung: chạm quái để vào trận, trận theo lượt có đồng hồ 30 giây/lượt, 1 chiêu đánh thường + 1–2 chiêu thức, máu/sát thương/năng lượng, EXP → lên cấp, rơi Yên/vật phẩm, hồi sinh.
@@ -142,3 +192,5 @@ M0 đã xong, nên đây là trạng thái các việc chuẩn bị:
 | Cột mốc | Kiểm chứng | Bằng chứng |
 |---|---|---|
 | M0 | `validate:data → lint → typecheck → test → build` chạy trên **checkout sạch** (xoá hết `dist/`) | CI GitHub Actions xanh (run 38676875628, 38676965644); 20 test; bundle khởi tạo 211,86 kB |
+| M1 | Chạy lại cả chuỗi CI trên cây đã xoá sạch artifact + `pnpm e2e` trên trình duyệt thật | CI xanh (run 38689008693); 119 test; 8/8 kịch bản e2e; commit `8a09cf5` |
+| M2 | Chạy cả chuỗi CI + `pnpm e2e` **13 kịch bản** trên cây đã ghép hai phía (server + client) | 281 test; 13/13 kịch bản e2e; commit `c2e3aef` trên `main` |
