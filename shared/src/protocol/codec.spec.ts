@@ -49,6 +49,30 @@ describe('decodeClientPacket', () => {
     }
   });
 
+  it('chấp nhận characterId khi client chọn nhân vật', () => {
+    const result = decodeClientPacket(Opcode.C2S_HELLO, {
+      token: 'abc',
+      protocolVersion: PROTOCOL_VERSION,
+      characterId: '3f2504e0-4f89-41d3-9a0c-0305e82c3301',
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect((result.value as { characterId: string }).characterId).toBe(
+        '3f2504e0-4f89-41d3-9a0c-0305e82c3301',
+      );
+    }
+  });
+
+  it('từ chối characterId không phải uuid', () => {
+    expect(
+      decodeClientPacket(Opcode.C2S_HELLO, {
+        token: 'abc',
+        protocolVersion: PROTOCOL_VERSION,
+        characterId: 'khong-phai-uuid',
+      }).ok,
+    ).toBe(false);
+  });
+
   it('từ chối gói MOVE thiếu toạ độ, và nêu rõ trường sai', () => {
     const result = decodeClientPacket(Opcode.C2S_MOVE, { x: 10 });
     expect(result.ok).toBe(false);

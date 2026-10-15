@@ -34,6 +34,11 @@ export const ClientHelloSchema = z.object({
   token: z.string().min(1),
   protocolVersion: z.number().int().min(1),
   clientVersion: z.string().min(1).max(32).default('dev'),
+  /**
+   * Nhân vật muốn vào thế giới. Bỏ trống thì server chọn nhân vật tạo gần nhất của tài khoản.
+   * Tài khoản chưa có nhân vật nào thì server trả lỗi `no_character`.
+   */
+  characterId: z.uuid().optional(),
 });
 export type ClientHello = z.infer<typeof ClientHelloSchema>;
 
