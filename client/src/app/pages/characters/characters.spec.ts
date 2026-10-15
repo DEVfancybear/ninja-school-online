@@ -256,12 +256,19 @@ describe('Characters', () => {
     expect(text(fixture)).toContain('Bạn chưa có nhân vật nào');
   });
 
-  it('đăng xuất: xoá phiên và về trang đăng nhập', async () => {
+  it('đăng xuất: thu hồi refresh token ở máy chủ, xoá phiên rồi về trang đăng nhập', async () => {
     const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
     const fixture = await loadPage([]);
 
     findButton(fixture, 'Đăng xuất').click();
     await tick();
+
+    // Nút "Đăng xuất" phải yêu cầu server thu hồi refresh token, nếu không token cũ
+    // vẫn dùng lại được cho tới khi hết hạn.
+    const request = http.expectOne({ method: 'POST', url: '/api/auth/logout' });
+    expect(request.request.body).toEqual({ refreshToken: 'refresh-1' });
+    request.flush(null, { status: 204, statusText: 'No Content' });
+    await render(fixture);
 
     expect(auth.isAuthenticated()).toBe(false);
     expect(localStorage.getItem(ACCESS_TOKEN_KEY)).toBeNull();

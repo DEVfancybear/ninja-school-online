@@ -141,9 +141,9 @@ Chữ trong code/giao diện: tiếng Anh cho định danh, chuỗi hiển thị
 | Giai đoạn | Thêm mới vào cấu trúc |
 |---|---|
 | M0 (nền móng) | `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, CI, `infra/docker/docker-compose.dev.yml`, `tools/data-validator` |
-| M1 (đã xong) | `client/src/app/{core,pages/login,pages/characters}`, `server/src/{config,db,http,security,modules/{account,character}}`, `shared/src/schemas`, `server/drizzle`, `tests/e2e` (kịch bản 1–3) |
+| M1 (đã xong) | `client/src/app/{core,pages/login,pages/characters}`, `server/src/{config,db,http,security,modules/{account,character}}`, `shared/src/schemas`, `server/drizzle`, `tests/e2e` (8 kịch bản tài khoản & nhân vật) |
 | M2–M3 (MVP còn lại) | `server/src/{net,core,world,modules/{npc,inventory,battle,skill}}`, `client/src/app/{net,battle,ui,input}`, `game-data/{maps,monsters,items,skills,classes,npcs}` |
-| M4–M6 (Alpha) | `modules/{quest,social,arena,mail}`, mở rộng `game-data/{quests,shops}`, `tools/{map-editor,asset-pipeline}`, thêm kịch bản e2e 4–5 |
+| M4–M6 (Alpha) | `modules/{quest,social,arena,mail}`, mở rộng `game-data/{quests,shops}`, `tools/{map-editor,asset-pipeline}`, thêm kịch bản e2e cho thế giới/chat rồi chiến đấu |
 | M7–M8 (Beta) | `modules/{guild,event}`, `tools/gm-cli`, `infra/deploy`, `tests/load` |
 
 Chi tiết tiêu chí từng mốc xem `docs/03-plan/roadmap.md`.

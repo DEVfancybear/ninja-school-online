@@ -128,7 +128,7 @@ export class Characters implements OnInit {
   }
 
   async logout(): Promise<void> {
-    this.auth.logout();
+    await this.auth.logout();
     await this.router.navigateByUrl('/login');
   }
 }

@@ -24,6 +24,8 @@ docker compose -f infra/docker/docker-compose.dev.yml down -v     # dừng và x
 
 ## Ghi chú
 
-- Ở cột mốc M0 server **chưa dùng** PostgreSQL/Redis; hai dịch vụ này được dựng sẵn cho M1 (tài khoản, nhân vật).
+- **PostgreSQL** được dùng từ M1 (tài khoản, nhân vật).
+- **Redis** chưa được dùng ở M1 — dự kiến dùng từ M2 (phiên realtime, chống spam, bảng xếp hạng).
+- Adminer chỉ là công cụ xem dữ liệu cho lập trình viên.
 - Cổng có thể đổi qua biến trong `.env` (`POSTGRES_PORT`, `REDIS_PORT`, `ADMINER_PORT`).
 - Máy phát triển cần cài Docker Desktop. Trên máy chưa có Docker thì bỏ qua bước này — lint/typecheck/test/build vẫn chạy được.

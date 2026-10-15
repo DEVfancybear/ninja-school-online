@@ -13,8 +13,8 @@ pnpm install            # cài phụ thuộc (pnpm 12 trở lên)
 cp .env.example .env    # rồi chỉnh DATABASE_URL cho đúng máy bạn
 pnpm db:migrate         # tạo bảng trong PostgreSQL (tự build shared trước)
 pnpm dev                # chạy client (ng serve) + server (tsx watch)
-pnpm lint && pnpm typecheck && pnpm test # 116 test
-pnpm e2e                # 7 kịch bản trên trình duyệt thật (Playwright)
+pnpm lint && pnpm typecheck && pnpm test # 118 test
+pnpm e2e                # 8 kịch bản trên trình duyệt thật (Playwright)
 pnpm validate:data      # kiểm tra game-data/ theo schema
 pnpm build
 ```
@@ -77,7 +77,7 @@ ninja/
 ├── assets/                 # chỉ có README + CREDITS; chưa có tài nguyên hình/âm thanh
 ├── tools/                  # data-validator: kiểm tra game-data theo schema
 ├── infra/                  # Docker Compose cho PostgreSQL + Redis (môi trường dev)
-└── tests/                  # tests/e2e: 7 kịch bản Playwright trên trình duyệt thật
+└── tests/                  # tests/e2e: 8 kịch bản Playwright trên trình duyệt thật
 ```
 
 Các thư mục `client/`, `server/`, `shared/`, `tools/data-validator/` đã có mã nguồn chạy được.

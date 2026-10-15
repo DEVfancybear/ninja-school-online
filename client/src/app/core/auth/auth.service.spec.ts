@@ -95,19 +95,52 @@ describe('AuthService', () => {
     expect(localStorage.getItem(ACCESS_TOKEN_KEY)).toBeNull();
   });
 
-  it('đăng xuất: xoá tài khoản và token đã lưu', async () => {
+  it('đăng xuất: yêu cầu máy chủ thu hồi refresh token rồi xoá phiên đã lưu', async () => {
     const auth = createService();
     const login = auth.login({ username: 'ninja_test', password: 'matkhau123' });
     http.expectOne('/api/auth/login').flush(SESSION);
     await login;
 
-    auth.logout();
+    const promise = auth.logout();
+    const request = http.expectOne({ method: 'POST', url: '/api/auth/logout' });
+    expect(request.request.body).toEqual({ refreshToken: 'refresh-1' });
+    request.flush(null, { status: 204, statusText: 'No Content' });
+    await promise;
 
     expect(auth.isAuthenticated()).toBe(false);
     expect(auth.account()).toBeNull();
     expect(auth.accessToken()).toBeNull();
     expect(localStorage.getItem(ACCESS_TOKEN_KEY)).toBeNull();
     expect(localStorage.getItem(REFRESH_TOKEN_KEY)).toBeNull();
+  });
+
+  it('đăng xuất khi máy chủ lỗi: vẫn xoá phiên ở client', async () => {
+    const auth = createService();
+    const login = auth.login({ username: 'ninja_test', password: 'matkhau123' });
+    http.expectOne('/api/auth/login').flush(SESSION);
+    await login;
+
+    const promise = auth.logout();
+    http
+      .expectOne({ method: 'POST', url: '/api/auth/logout' })
+      .flush(
+        { error: 'internal_error', message: 'lỗi hệ thống' },
+        { status: 500, statusText: 'Internal Server Error' },
+      );
+    await promise;
+
+    expect(auth.isAuthenticated()).toBe(false);
+    expect(localStorage.getItem(ACCESS_TOKEN_KEY)).toBeNull();
+    expect(localStorage.getItem(REFRESH_TOKEN_KEY)).toBeNull();
+  });
+
+  it('đăng xuất khi không còn refresh token: không gọi máy chủ', async () => {
+    const auth = createService();
+
+    await auth.logout();
+
+    http.expectNone('/api/auth/logout');
+    expect(auth.isAuthenticated()).toBe(false);
   });
 
   it('restoreSession: chưa có token thì không gọi máy chủ', async () => {

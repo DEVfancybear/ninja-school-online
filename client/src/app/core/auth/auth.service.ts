@@ -11,8 +11,8 @@ import {
 } from '@ninja/shared';
 import { isApiRequestError } from '../api/api-error';
 import { ApiService } from '../api/api.service';
-import { LOGIN_PATH, ME_PATH, REFRESH_PATH, REGISTER_PATH } from '../api/endpoints';
-import { fieldSchema } from '../api/schema';
+import { LOGIN_PATH, LOGOUT_PATH, ME_PATH, REFRESH_PATH, REGISTER_PATH } from '../api/endpoints';
+import { EMPTY_RESPONSE, fieldSchema } from '../api/schema';
 
 /** Khoá `localStorage` giữ phiên đăng nhập. */
 export const ACCESS_TOKEN_KEY = 'ninja.accessToken';
@@ -68,9 +68,24 @@ export class AuthService {
     return session.account;
   }
 
-  /** Quên phiên ở client; token đã cấp vẫn mất hiệu lực theo thời hạn phía server. */
-  logout(): void {
-    this.clearSession();
+  /**
+   * Đăng xuất: yêu cầu server **thu hồi refresh token** rồi mới xoá phiên ở client.
+   *
+   * Nếu không gọi được server (mất mạng, server đang bảo trì) thì vẫn xoá phiên ở client —
+   * người chơi không thể bị giữ trong trạng thái đã đăng nhập chỉ vì lỗi mạng — nhưng khi đó
+   * refresh token cũ chỉ hết hiệu lực theo thời hạn của nó.
+   */
+  async logout(): Promise<void> {
+    const refreshToken = this.refreshTokenSignal();
+    try {
+      if (refreshToken) {
+        await this.api.post(LOGOUT_PATH, { refreshToken }, EMPTY_RESPONSE);
+      }
+    } catch {
+      // Bỏ qua: việc quan trọng là phiên ở client được xoá.
+    } finally {
+      this.clearSession();
+    }
   }
 
   /**

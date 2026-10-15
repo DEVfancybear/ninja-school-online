@@ -27,7 +27,7 @@ Nội dung: monorepo pnpm (`client`, `server`, `shared`, `tools/*`), tsconfig ba
 | `pnpm lint` | OK — 4/4 gói |
 | `pnpm typecheck` | OK |
 | `pnpm test` | OK — 20 test (shared 6, server 4, tools 4, client 6) |
-| `pnpm build` | OK — bundle khởi tạo 212 kB; Phaser nằm trong lazy chunk riêng |
+| `pnpm build` | OK — lúc đó bundle khởi tạo 212 kB; Phaser nằm trong lazy chunk riêng |
 | `pnpm validate:data` | OK — kiểm 2 file trong `game-data/` |
 | Chạy `node server/dist/main.js` rồi `curl /health` | 200 `{"status":"ok","protocolVersion":1,...}` |
 
@@ -40,7 +40,7 @@ Nội dung: monorepo pnpm (`client`, `server`, `shared`, `tools/*`), tsconfig ba
 **Đã giao:**
 
 - **Đăng ký / đăng nhập**: mật khẩu băm Argon2id; access token JWT 15 phút + refresh token 32 byte
-  ngẫu nhiên lưu dạng băm SHA-256 và **xoay mỗi lần làm mới**; đăng xuất thu hồi token.
+  ngẫu nhiên lưu dạng băm SHA-256 và **xoay mỗi lần làm mới**; nút "Đăng xuất" gọi server để **thu hồi** refresh token.
 - **Nhân vật**: tạo và liệt kê; tối đa 4 nhân vật mỗi tài khoản; tên duy nhất toàn máy chủ (không phân
   biệt hoa thường); phái phải thuộc trường đã chọn (chặn ở cả client, schema dùng chung và ràng buộc CHECK trong database).
 - **Giao diện web**: trang `/login` (đăng nhập + đăng ký, kiểm dữ liệu ngay trên trình duyệt),
@@ -54,9 +54,10 @@ Nội dung: monorepo pnpm (`client`, `server`, `shared`, `tools/*`), tsconfig ba
 
 | Hạng mục | Kết quả |
 |---|---|
-| `pnpm test` | 116 test xanh — shared 20, server 41, client 51, tools 4 |
-| `pnpm e2e` (Playwright, Chromium) | **7/7 kịch bản xanh**, gồm luồng đăng ký → tạo nhân vật → tải lại trang vẫn còn phiên |
+| `pnpm test` | 118 test xanh — shared 20, server 41, client 53, tools 4 |
+| `pnpm e2e` (Playwright, Chromium) | **8/8 kịch bản xanh**, gồm luồng đăng ký → tạo nhân vật → tải lại trang vẫn còn phiên và kịch bản chứng minh đăng xuất thu hồi token |
 | `pnpm lint`, `pnpm typecheck`, `pnpm build`, `pnpm validate:data` | đều exit 0 |
+| Bundle sau M1 | khởi tạo **703 kB** (nén ~151 kB) do thêm `HttpClient`; Phaser vẫn nằm trong lazy chunk riêng (1,39 MB) |
 | Gọi API thật bằng curl | đăng ký 201, `/me` 200, tạo nhân vật 201, trùng tên 409, sai mật khẩu 401, chưa đăng nhập 401 |
 | Kiểm trong PostgreSQL bằng psql | tài khoản có `password_hash` dạng `$argon2id$…`, nhân vật gắn đúng `account_id`, refresh token lưu dạng băm |
 

@@ -12,5 +12,6 @@ const AUTH_BASE = `${API_BASE}/auth`;
 export const REGISTER_PATH = `${AUTH_BASE}/register`;
 export const LOGIN_PATH = `${AUTH_BASE}/login`;
 export const REFRESH_PATH = `${AUTH_BASE}/refresh`;
+export const LOGOUT_PATH = `${AUTH_BASE}/logout`;
 export const ME_PATH = `${AUTH_BASE}/me`;
 export const CHARACTERS_PATH = `${API_BASE}/characters`;

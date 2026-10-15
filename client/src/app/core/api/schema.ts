@@ -40,3 +40,19 @@ export function fieldSchema<T>(field: string, schema: ApiSchema<T>): ApiSchema<T
 export function firstIssueMessage(issues: readonly SchemaIssue[]): string {
   return issues[0]?.message ?? 'dữ liệu không hợp lệ';
 }
+
+/**
+ * Phản hồi không có thân (ví dụ `204 No Content` của `POST /api/auth/logout`).
+ * Angular trả `null` khi thân rỗng nên chỉ cần chấp nhận đúng trường hợp đó.
+ */
+export const EMPTY_RESPONSE: ApiSchema<null> = {
+  safeParse(value: unknown): SchemaResult<null> {
+    if (value === null || value === undefined || value === '') {
+      return { success: true, data: null };
+    }
+    return {
+      success: false,
+      error: { issues: [{ path: [], message: 'mong đợi phản hồi rỗng từ máy chủ' }] },
+    };
+  },
+};

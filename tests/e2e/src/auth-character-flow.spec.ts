@@ -147,3 +147,20 @@ test('tên nhân vật dài quá 12 ký tự bị chặn ngay trên trình duy�
   await expect(page.locator('.field .error').first()).toContainText('tối đa 12 ký tự');
   await expect(page.locator('.list .card')).toHaveCount(0);
 });
+
+test('đăng xuất thu hồi refresh token ở máy chủ: token cũ không dùng lại được', async ({
+  page,
+}) => {
+  await registerAccount(page, `e2e${uniqueSuffix()}`);
+
+  const refreshToken = await page.evaluate(() => localStorage.getItem('ninja.refreshToken'));
+  expect(refreshToken).toBeTruthy();
+
+  await page.getByRole('button', { name: 'Đăng xuất' }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  expect(await page.evaluate(() => localStorage.getItem('ninja.refreshToken'))).toBeNull();
+
+  // Máy chủ phải đã thu hồi token: dùng lại token cũ để làm mới phiên phải bị từ chối.
+  const response = await page.request.post('/api/auth/refresh', { data: { refreshToken } });
+  expect(response.status()).toBe(401);
+});

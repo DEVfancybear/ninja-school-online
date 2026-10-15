@@ -53,6 +53,9 @@ client/
    danh sách phái chỉ còn hai phái của trường đó (`SCHOOL_CLASSES`).
 4. Tải lại trang: `AuthService` khôi phục phiên từ `localStorage` và gọi `/api/auth/me`;
    token còn hạn thì vào thẳng, hết hạn thì đưa về `/login`.
+5. Đăng xuất: gọi `POST /api/auth/logout` để server **thu hồi refresh token** rồi mới xoá phiên ở client.
+   Nếu không gọi được server (mất mạng) thì vẫn xoá phiên ở client, nhưng khi đó token cũ chỉ hết hiệu
+   lực theo thời hạn của nó — `tests/e2e` có kịch bản kiểm đúng hành vi này.
 
 ## Lệnh
 
