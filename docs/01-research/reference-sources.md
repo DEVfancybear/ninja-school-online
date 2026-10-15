@@ -50,6 +50,6 @@
 ### Quy tắc của dự án này
 1. **Không** tải, chạy, sửa hoặc phát hành mã server/private server của game gốc.
 2. **Không** dùng tài nguyên (hình, âm, chữ, cốt truyện) của NSO hay game khác.
-3. **Không** dùng tên "Ninja School" cho sản phẩm; đặt tên và thế giới quan **nguyên bản**.
+3. Tên sản phẩm hiện dùng là **Ninja School Online** theo quyết định của chủ dự án — rủi ro thương hiệu và khuyến nghị đổi tên trước khi phát hành rộng rãi được ghi ở `README.md` mục 6. Thế giới quan, nhân vật và tên chiêu thức vẫn phải **nguyên bản**.
 4. **Không** làm cờ bạc trong game (Tài Xỉu...), không làm nạp tiền thật trong giai đoạn học tập.
 5. Nếu sau này muốn phát hành chính thức: hỏi luật sư về bản quyền + thủ tục cấp phép game tại Việt Nam.

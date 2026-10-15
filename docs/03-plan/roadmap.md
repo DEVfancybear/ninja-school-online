@@ -23,7 +23,7 @@ Nội dung: monorepo pnpm (`client`, `server`, `shared`, `tools/*`), tsconfig ba
 
 | Lệnh | Kết quả |
 |---|---|
-| `pnpm install` | OK (phải chấp thuận build script: `pnpm approve-builds --all`) |
+| `pnpm install` | OK — `pnpm-workspace.yaml` có sẵn `allowBuilds` cho `@parcel/watcher`, `esbuild`, `lmdb`, `msgpackr-extract` nên không cần chấp thuận thủ công |
 | `pnpm lint` | OK — 4/4 gói |
 | `pnpm typecheck` | OK |
 | `pnpm test` | OK — 20 test (shared 6, server 4, tools 4, client 6) |
@@ -32,6 +32,8 @@ Nội dung: monorepo pnpm (`client`, `server`, `shared`, `tools/*`), tsconfig ba
 | Chạy `node server/dist/main.js` rồi `curl /health` | 200 `{"status":"ok","protocolVersion":1,...}` |
 
 **Chưa kiểm chứng được:** `docker compose up` (máy dev chưa cài Docker — cần bước này trước khi làm M1), và phần vẽ thật của Phaser (chưa có test tự động, xem `client/README.md`).
+
+**Ghi chú:** CI trên GitHub chạy lại đúng các bước trên từ **checkout sạch**. Lần chạy đầu tiên đã phát hiện một lỗi thật mà máy dev che mất: `validate:data` cần `shared` đã build (máy dev có sẵn `shared/dist`). Đã sửa bằng script gốc `build:shared`.
 
 ### M1 — Tài khoản & nhân vật (~1,5 tuần)
 Nội dung: đăng ký/đăng nhập (argon2 + JWT), tạo nhân vật (chọn trường/phái, kiểm tra trùng tên), danh sách nhân vật; màn hình login + chọn nhân vật trên web; schema + migration ban đầu.
@@ -96,7 +98,7 @@ Có trong MVP: đăng nhập, tạo nhân vật (3 trường/6 phái — chỉ s
 ## 6. Việc cần chốt trước khi bắt đầu M0
 
 - [ ] Tên dự án + tên miền dự kiến (nguyên bản).
-- [ ] Xác nhận stack: Phaser 3 + Node.js + PostgreSQL + Redis + Docker (xem `tech-stack.md` mục 5).
+- [ ] Xác nhận stack: **Angular + Phaser 4** + Node.js + PostgreSQL + Redis + Docker (đã chốt 2026-10-15, xem `tech-stack.md` mục 5).
 - [ ] Chọn cách làm tài nguyên: tự làm / mua / thuê (xem `assets/README.md`).
 - [ ] Giấy phép mã nguồn cho repo (ví dụ MIT cho code — lưu ý tài nguyên hình/âm có thể dùng license khác).
 - [ ] `git init` và commit đầu tiên.

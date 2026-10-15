@@ -7,7 +7,7 @@ Là **nguồn sự thật** của toàn bộ trò chơi: tài khoản, nhân v�
 Mọi hành động của người chơi đều được server kiểm tra hợp lệ trước khi áp dụng.
 
 ## Công nghệ dự kiến
-- Node.js 20 LTS + TypeScript
+- Node.js 22 LTS trở lên (đang dùng 24) + TypeScript 6
 - Fastify — HTTP API (đăng ký/đăng nhập, API phụ trợ, webhook)
 - `ws` — WebSocket cho thời gian thực; tự quản room theo bản đồ và tick nội bộ
 - zod — kiểm tra dữ liệu vào/ra; msgpackr — mã hóa gói tin

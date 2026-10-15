@@ -11,12 +11,13 @@
   "scripts": {
     "dev": "pnpm --parallel --filter \"./client\" --filter \"./server\" dev",
     "build": "pnpm -r build",
+    "build:shared": "pnpm --filter @ninja/shared build",
     "lint": "pnpm -r lint",
-    "typecheck": "pnpm --filter @ninja/shared build && pnpm -r typecheck",
-    "test": "pnpm --filter @ninja/shared build && pnpm -r test",
+    "typecheck": "pnpm build:shared && pnpm -r typecheck",
+    "test": "pnpm build:shared && pnpm -r test",
+    "validate:data": "pnpm build:shared && pnpm --filter @ninja/data-validator start",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "validate:data": "pnpm --filter @ninja/data-validator start",
     "ci": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {

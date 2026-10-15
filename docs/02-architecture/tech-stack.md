@@ -56,7 +56,7 @@
 |---|---|
 | Dev local | Docker Compose (PostgreSQL, Redis) + pnpm dev |
 | Triển khai | VPS Ubuntu: nginx (TLS + file tĩnh + proxy WS) → Node.js server (systemd/PM2) + PostgreSQL + Redis |
-| CI | GitHub Actions: lint → typecheck → test → build |
+| CI | GitHub Actions: validate:data → lint → typecheck → test → build |
 | Kiểm thử | Vitest (đơn vị), Playwright (e2e), k6 (tải) |
 | Chất lượng code | ESLint + Prettier, TypeScript strict, commit theo Conventional Commits |
 

@@ -85,7 +85,7 @@ Mỗi phái có bộ chiêu thức riêng; người chơi chọn phái ngay từ
 
 **Không được sao chép (có thể vi phạm bản quyền/thương hiệu):**
 - Mã nguồn game gốc hoặc mã nguồn rò rỉ/private server.
-- Hình ảnh, âm thanh, cốt truyện, hội thoại, tên nhân vật, tên chiêu thức, tên game.
+- Hình ảnh, âm thanh, cốt truyện, hội thoại, tên nhân vật, tên chiêu thức của NSO. (Về tên sản phẩm, xem ghi chú ở `README.md` mục 6.)
 - Toàn bộ danh mục nội dung (bảng cân bằng, bản đồ) sao y bản chính.
 
 ## 11. Nguồn tham khảo

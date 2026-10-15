@@ -48,7 +48,6 @@ Cấu trúc đích đầy đủ (đến hết Alpha) xem `docs/02-architecture/p
 ## Lệnh
 
 ```bash
-pnpm --filter @ninja/shared build   # bắt buộc một lần (và mỗi khi sửa shared)
 pnpm --filter @ninja/client dev     # ng serve → http://localhost:4200
 pnpm --filter @ninja/client build   # ng build
 pnpm --filter @ninja/client test    # ng test --no-watch

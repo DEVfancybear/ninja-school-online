@@ -3,8 +3,10 @@
 ## Đã có (M0): `data-validator`
 
 ```bash
-pnpm validate:data                     # kiểm tra game-data/ ở gốc repo
-pnpm --filter @ninja/data-validator start -- <đường-dẫn-khác>
+pnpm validate:data                     # kiểm tra game-data/ ở gốc repo (tự build shared trước)
+
+# Kiểm một thư mục khác (phải build shared trước nếu chưa có shared/dist)
+pnpm build:shared && pnpm --filter @ninja/data-validator start -- <đường-dẫn-khác>
 ```
 
 Công cụ đọc `game-data/skills/*.json` và `game-data/items/*.json`, đối chiếu với schema zod trong

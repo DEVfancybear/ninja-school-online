@@ -18,4 +18,4 @@ shared/
 1. `shared/` **không** chứa nghiệp vụ game và không truy cập DB/mạng — chỉ định nghĩa và tiện ích thuần.
 2. Mọi gói tin đều có schema (zod) để kiểm tra ở server và suy ra kiểu TypeScript cho client.
 3. Thay đổi protocol phải tăng số phiên bản protocol (`PROTOCOL_VERSION`) để client cũ bị chặn rõ ràng.
-4. Giữ ít phụ thuộc ngoài nhất có thể (chỉ zod, msgpackr) để client bundle nhẹ.
+4. Giữ ít phụ thuộc ngoài nhất có thể (hiện chỉ `zod`) để bundle client nhẹ.

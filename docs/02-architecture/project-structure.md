@@ -21,7 +21,7 @@ ninja/
 ├── README.md
 ├── .gitignore
 ├── package.json                  # workspace root (M0)
-├── pnpm-workspace.yaml           # khai báo workspace: client, server, shared
+├── pnpm-workspace.yaml           # khai báo workspace: client, server, shared, tools/*
 ├── tsconfig.base.json            # cấu hình TS chung
 │
 ├── docs/                         # tài liệu dự án (đã có)
@@ -64,12 +64,13 @@ ninja/
 │   │   └── security/             # rate-limit, chống gian lận, audit log
 │   └── (test/, package.json)
 │
-├── shared/                       # HỢP ĐỒNG CHUNG client ↔ server
+├── shared/                       # HỢP ĐỒNG CHUNG client ↔ server (M0 đã có)
 │   └── src/
-│       ├── protocol/             # opcode, định nghĩa gói tin, encode/decode, PROTOCOL_VERSION
-│       ├── constants/            # enum: trường/phái, loại vật phẩm, mã lỗi
-│       ├── types/                # kiểu DTO: nhân vật, vật phẩm, nhiệm vụ, trận đấu
-│       └── utils/                # toán, RNG xác định, định dạng
+│       ├── protocol/             # PROTOCOL_VERSION (opcode, gói tin thêm ở cột mốc sau)
+│       ├── constants/            # enum: trường, phái, quan hệ trường–phái
+│       ├── schemas/              # (M0) schema zod của dữ liệu game: skill, item
+│       └── index.ts              # điểm xuất chung
+│       # thêm ở cột mốc sau: types/ (DTO), utils/ (toán, RNG xác định)
 │
 ├── game-data/                    # NỘI DUNG GAME (JSON, chỉ server nạp)
 │   ├── maps/ monsters/ items/ skills/ quests/ npcs/ shops/ classes/ events/
@@ -144,4 +145,6 @@ Chi tiết tiêu chí từng mốc xem `docs/03-plan/roadmap.md`.
 | `shared`, `server`, `tools/*` | kế thừa `tsconfig.base.json` (module `nodenext`) | chạy trên Node.js, xuất ESM thật nên import tương đối phải ghi kèm `.js` |
 | `client` | dùng cấu hình do Angular CLI sinh ra (`client/tsconfig.json`) | Angular tự quyết định `module`, decorator, template; ghi đè dễ hỏng |
 
-`shared` được **build ra `dist/`** trước khi `server`/`client` dùng, nên `src` import `@ninja/shared` qua `exports` trong `package.json` (không trỏ thẳng vào file `.ts`).
+`shared` được **build ra `dist/`** trước khi `server` và `tools/data-validator` dùng, nên chúng import `@ninja/shared` qua `exports` trong `package.json` (không trỏ thẳng vào file `.ts`). Vì vậy các script gốc `validate:data`, `typecheck`, `test` đều chạy `pnpm build:shared` trước.
+
+`client` hiện **chưa** phụ thuộc `@ninja/shared` (M0 chưa có giao tiếp mạng); sẽ thêm khi làm phần mạng ở M2.
