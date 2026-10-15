@@ -21,7 +21,8 @@ export const routes: Routes = [
   {
     path: 'play',
     title: 'Ninja School Online — Thế giới',
-    loadComponent: () => import('./game/world-canvas/world-canvas').then((m) => m.WorldCanvas),
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/play/play').then((m) => m.Play),
   },
   { path: '**', redirectTo: '' },
 ];

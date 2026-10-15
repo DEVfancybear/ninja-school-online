@@ -1,0 +1,35 @@
+.notice-bar {
+  position: absolute;
+  top: 3rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  max-width: calc(100vw - 1.5rem);
+  padding: 0.45rem 0.9rem;
+  border: 1px solid rgba(127, 209, 255, 0.4);
+  border-radius: 999px;
+  background: rgba(11, 18, 24, 0.92);
+  color: var(--fg);
+  font-size: 0.85rem;
+  text-align: center;
+  pointer-events: none;
+  animation: notice-in 0.18s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notice-bar {
+    animation: none;
+  }
+}
+
+@keyframes notice-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -0.5rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}

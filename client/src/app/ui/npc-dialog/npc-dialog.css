@@ -1,0 +1,68 @@
+.npc-dialog {
+  position: absolute;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  width: min(32rem, calc(100vw - 1.5rem));
+  max-height: 45vh;
+  overflow-y: auto;
+  border: 1px solid rgba(240, 217, 160, 0.5);
+  border-radius: 0.6rem;
+  background: rgba(11, 18, 24, 0.92);
+  color: var(--fg);
+  font-size: 0.88rem;
+}
+
+.npc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.7rem;
+  border-bottom: 1px solid rgba(240, 217, 160, 0.3);
+}
+
+.npc-name {
+  margin: 0;
+  font-size: 1rem;
+  color: #f0d9a0;
+}
+
+.npc-close {
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.npc-lines {
+  margin: 0;
+  padding: 0.6rem 0.7rem;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.npc-line {
+  display: flex;
+  gap: 0.4rem;
+  line-height: 1.4;
+}
+
+.npc-speaker {
+  color: #f0d9a0;
+  white-space: nowrap;
+}
+
+.npc-speaker::after {
+  content: ':';
+}
+
+.npc-text {
+  word-break: break-word;
+}

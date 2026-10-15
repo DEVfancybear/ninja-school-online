@@ -1,0 +1,37 @@
+<section class="chat" aria-label="Khung chat">
+  <ul #chatLog class="chat-log">
+    @for (line of messages(); track $index) {
+      <li
+        class="chat-line"
+        [class.system]="line.channel === 'system'"
+        [class.mine]="isMine(line)"
+      >
+        <span class="chat-from">{{ line.channel === 'system' ? 'Hệ thống' : line.fromName }}</span>
+        <span class="chat-text">{{ line.text }}</span>
+      </li>
+    } @empty {
+      <li class="chat-empty">Chưa có tin nhắn nào. Gõ bên dưới để bắt chuyện.</li>
+    }
+  </ul>
+
+  <form class="compose" (ngSubmit)="submit()">
+    <input
+      class="chat-input"
+      type="text"
+      name="chat"
+      autocomplete="off"
+      placeholder="Nhập tin nhắn…"
+      [attr.maxlength]="maxLength"
+      [value]="draft()"
+      [disabled]="disabled()"
+      (input)="onDraft($event)"
+    />
+    <button class="chat-send" type="submit" [disabled]="disabled() || draft().trim().length === 0">
+      Gửi
+    </button>
+  </form>
+
+  @if (notice(); as text) {
+    <p class="chat-notice" role="status">{{ text }}</p>
+  }
+</section>

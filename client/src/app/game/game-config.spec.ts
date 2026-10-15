@@ -16,19 +16,25 @@ import { WorldScene } from './world-scene';
 
 describe('buildGameConfig', () => {
   const host = document.createElement('div');
-
-  it('gắn Phaser vào đúng phần tử cha', () => {
-    expect(buildGameConfig(host).parent).toBe(host);
+  const scene = new WorldScene({
+    moveTo: () => undefined,
+    talkTo: () => undefined,
   });
 
-  it('dùng cảnh thế giới và chế độ co giãn RESIZE', () => {
-    const config = buildGameConfig(host);
-    expect(config.scene).toEqual([WorldScene]);
+  it('gắn Phaser vào đúng phần tử cha', () => {
+    expect(buildGameConfig(host, scene).parent).toBe(host);
+  });
+
+  it('dùng đúng thể hiện cảnh thế giới đã dựng và chế độ co giãn RESIZE', () => {
+    const config = buildGameConfig(host, scene);
+    expect(config.scene).toEqual([scene]);
     expect(config.scale?.mode).toBe(Phaser.Scale.RESIZE);
     expect(config.scale?.autoCenter).toBe(Phaser.Scale.CENTER_BOTH);
   });
 
-  it('dùng màu nền của thế giới', () => {
-    expect(buildGameConfig(host).backgroundColor).toBe(WORLD_BACKGROUND_COLOR);
+  it('dùng màu nền của thế giới và kiểu vẽ AUTO', () => {
+    const config = buildGameConfig(host, scene);
+    expect(config.backgroundColor).toBe(WORLD_BACKGROUND_COLOR);
+    expect(config.type).toBe(Phaser.AUTO);
   });
 });

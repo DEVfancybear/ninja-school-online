@@ -1,0 +1,19 @@
+<header class="hud">
+  <div class="who">
+    <strong class="character-name">{{ characterName() || 'Khách' }}</strong>
+    <span class="map-name" title="Bản đồ hiện tại">{{ mapName() || '…' }}</span>
+  </div>
+
+  <div class="state">
+    <span class="dot" [class.online]="online()" aria-hidden="true"></span>
+    <span class="connection-status" [attr.data-status]="status()">{{ statusLabel() }}</span>
+    <span class="latency">Độ trễ: <span class="latency-value">{{ latencyLabel() }}</span></span>
+  </div>
+
+  <div class="actions">
+    <button type="button" class="ghost" (click)="toggleChat.emit()">
+      {{ chatVisible() ? 'Ẩn chat' : 'Hiện chat' }}
+    </button>
+    <a class="ghost" routerLink="/characters">Về trang nhân vật</a>
+  </div>
+</header>
