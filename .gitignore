@@ -1,0 +1,35 @@
+# === Phụ thuộc ===
+node_modules/
+.pnpm-store/
+
+# === Kết quả build ===
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# === Biến môi trường & bí mật ===
+.env
+.env.*
+!.env.example
+
+# === Log ===
+*.log
+logs/
+
+# === Kiểm thử ===
+coverage/
+playwright-report/
+test-results/
+
+# === Editor / Hệ điều hành ===
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# === Tạm ===
+tmp/
+.cache/
+*.local
