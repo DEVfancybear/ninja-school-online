@@ -117,7 +117,7 @@ jobs:
           } > .env
 
       - name: Chạy migration
-        run: pnpm --filter @ninja/server db:migrate
+        run: pnpm db:migrate
 
       - name: Cài trình duyệt cho Playwright
         run: pnpm --filter @ninja/e2e exec playwright install --with-deps chromium

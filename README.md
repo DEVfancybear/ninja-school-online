@@ -11,7 +11,7 @@ Dự án game **nhập vai 2D nhiều người chơi (MMORPG nhẹ)**, chiến �
 ```bash
 pnpm install            # cài phụ thuộc (pnpm 12 trở lên)
 cp .env.example .env    # rồi chỉnh DATABASE_URL cho đúng máy bạn
-pnpm --filter @ninja/server db:migrate   # tạo bảng trong PostgreSQL
+pnpm db:migrate         # tạo bảng trong PostgreSQL (tự build shared trước)
 pnpm dev                # chạy client (ng serve) + server (tsx watch)
 pnpm lint && pnpm typecheck && pnpm test # 116 test
 pnpm e2e                # 7 kịch bản trên trình duyệt thật (Playwright)

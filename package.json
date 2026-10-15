@@ -9,17 +9,19 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "pnpm --parallel --filter \"./client\" --filter \"./server\" dev",
+    "dev": "pnpm build:shared && pnpm --parallel --filter \"./client\" --filter \"./server\" dev",
     "build": "pnpm -r build",
     "build:shared": "pnpm --filter @ninja/shared build",
+    "db:migrate": "pnpm build:shared && pnpm --filter @ninja/server db:migrate",
+    "db:generate": "pnpm build:shared && pnpm --filter @ninja/server db:generate",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm build:shared && pnpm -r typecheck",
     "test": "pnpm build:shared && pnpm -r test",
+    "e2e": "pnpm build:shared && pnpm --filter @ninja/e2e e2e",
     "validate:data": "pnpm build:shared && pnpm --filter @ninja/data-validator start",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "ci": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
-    "e2e": "pnpm build:shared && pnpm --filter @ninja/e2e e2e"
+    "ci": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

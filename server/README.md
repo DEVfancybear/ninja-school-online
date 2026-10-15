@@ -62,12 +62,21 @@ server/src/
 ## Lệnh
 
 ```bash
-pnpm --filter @ninja/server db:migrate   # chạy migration lên DATABASE_URL
-pnpm --filter @ninja/server db:generate  # sinh migration mới sau khi sửa db/schema.ts
-pnpm --filter @ninja/server dev          # tsx watch (đọc .env ở gốc repo)
-pnpm --filter @ninja/server test         # vitest, cần PostgreSQL (TEST_DATABASE_URL)
+# Từ gốc repo (khuyến nghị — các lệnh này tự build @ninja/shared trước):
+pnpm db:migrate        # chạy migration lên DATABASE_URL
+pnpm db:generate       # sinh migration mới sau khi sửa db/schema.ts
+pnpm dev               # chạy client + server song song
+pnpm test              # vitest (server cần PostgreSQL qua TEST_DATABASE_URL)
+
+# Trong gói server (phải chạy `pnpm build:shared` một lần trước đó):
+pnpm --filter @ninja/server dev
+pnpm --filter @ninja/server test
 pnpm --filter @ninja/server build && pnpm --filter @ninja/server start
 ```
+
+> `@ninja/shared` là thư viện đã build (`dist/` cho ESM, `dist-cjs/` cho công cụ CJS), không trỏ thẳng
+> vào file nguồn. Từ máy sạch, `pnpm install` chạy script `prepare` của gói này nên `dist` đã sẵn có;
+> chỉ khi sửa nguồn `shared` mới cần build lại (`pnpm build:shared`).
 
 ## Chưa làm (các cột mốc sau)
 

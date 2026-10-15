@@ -16,7 +16,8 @@
     "dev": "tsc -w -p tsconfig.build.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepare": "pnpm run build"
   },
   "dependencies": {
     "zod": "4.6.7"

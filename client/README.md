@@ -57,6 +57,7 @@ client/
 ## Lệnh
 
 ```bash
+# Từ gốc repo: pnpm dev (chạy song song client + server, tự build @ninja/shared trước)
 pnpm --filter @ninja/client dev            # ng serve → http://localhost:4200 (cần server ở cổng 3000)
 pnpm --filter @ninja/client build          # ng build
 pnpm --filter @ninja/client test           # ng test --no-watch (Vitest + jsdom)
