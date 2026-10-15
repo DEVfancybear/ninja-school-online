@@ -1,13 +1,12 @@
 import { eq, sql } from 'drizzle-orm';
 import {
-  MAX_CHARACTERS_PER_ACCOUNT,
   type Account,
   type AuthSession,
   type LoginRequest,
   type RegisterRequest,
 } from '@ninja/shared';
 import type { Db } from '../../db/client.js';
-import { accounts, characters } from '../../db/schema.js';
+import { accounts } from '../../db/schema.js';
 import { conflictError, unauthorizedError } from '../../errors.js';
 import type { PasswordHasher } from '../../security/password.js';
 import type { TokenService } from '../../security/tokens.js';
@@ -105,20 +104,6 @@ export class AccountService {
   async findById(id: string): Promise<AccountRow | undefined> {
     const [row] = await this.options.db.select().from(accounts).where(eq(accounts.id, id));
     return row;
-  }
-
-  /** Đếm số nhân vật của tài khoản (dùng cho giới hạn tạo nhân vật). */
-  async countCharacters(accountId: string): Promise<number> {
-    const [row] = await this.options.db
-      .select({ total: sql<number>`count(*)::int` })
-      .from(characters)
-      .where(eq(characters.accountId, accountId));
-    return row?.total ?? 0;
-  }
-
-  /** Giới hạn số nhân vật, đọc từ hợp đồng dùng chung. */
-  get maxCharacters(): number {
-    return MAX_CHARACTERS_PER_ACCOUNT;
   }
 
   private async createSession(row: AccountRow): Promise<AuthSession> {

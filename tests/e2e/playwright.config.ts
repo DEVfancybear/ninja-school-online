@@ -31,7 +31,8 @@ export default defineConfig({
       stdout: 'pipe',
     },
     {
-      command: 'pnpm --filter @ninja/client dev',
+      // --host 0.0.0.0: mặc định của Angular chỉ bind IPv6 [::1] nên 127.0.0.1 không kết nối được.
+      command: 'pnpm --filter @ninja/client dev --host 0.0.0.0',
       url: CLIENT_URL,
       reuseExistingServer: !process.env.CI,
       timeout: 180_000,
