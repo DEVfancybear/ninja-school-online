@@ -1,0 +1,127 @@
+<main class="characters">
+  <header class="top">
+    <div>
+      <h1>Nhân vật của bạn</h1>
+      @if (accountName()) {
+        <p class="account">Tài khoản: {{ accountName() }}</p>
+      }
+    </div>
+    <div class="top-actions">
+      <a class="ghost" routerLink="/">Trang chủ</a>
+      <button type="button" class="ghost" (click)="logout()">Đăng xuất</button>
+    </div>
+  </header>
+
+  @if (loading()) {
+    <p class="hint">Đang tải danh sách nhân vật…</p>
+  } @else if (loadError(); as message) {
+    <p class="alert" role="alert">{{ message }}</p>
+    <button type="button" class="ghost" (click)="load()">Thử lại</button>
+  } @else if (characterList().length === 0) {
+    <p class="hint">
+      Bạn chưa có nhân vật nào. Hãy đặt tên và chọn trường, phái cho nhân vật đầu tiên ở biểu mẫu
+      bên dưới.
+    </p>
+  } @else {
+    <ul class="list">
+      @for (character of characterList(); track character.id) {
+        <li class="card">
+          <h2>{{ character.name }}</h2>
+          <dl>
+            <div>
+              <dt>Trường</dt>
+              <dd>{{ schoolLabel(character.school) }}</dd>
+            </div>
+            <div>
+              <dt>Phái</dt>
+              <dd>{{ classLabel(character.class) }}</dd>
+            </div>
+            <div>
+              <dt>Cấp</dt>
+              <dd>{{ character.level }}</dd>
+            </div>
+            <div>
+              <dt>Yên</dt>
+              <dd>{{ formatYen(character.yen) }}</dd>
+            </div>
+          </dl>
+        </li>
+      }
+    </ul>
+  }
+
+  <section class="create">
+    <h2>Tạo nhân vật</h2>
+
+    @if (!canCreate()) {
+      <p class="hint">
+        Tài khoản đã đủ {{ maxCharacters }} nhân vật — mỗi tài khoản chỉ tạo được tối đa
+        {{ maxCharacters }} nhân vật.
+      </p>
+    } @else {
+      <form class="form" (ngSubmit)="createCharacter()" novalidate>
+        <div class="field">
+          <label for="character-name">Tên nhân vật</label>
+          <input
+            id="character-name"
+            name="name"
+            type="text"
+            autocomplete="off"
+            placeholder="Ví dụ: Naruto9x"
+            [ngModel]="name()"
+            (ngModelChange)="name.set($event)"
+            [disabled]="busy()"
+          />
+          @if (fieldError('name'); as message) {
+            <p class="error">{{ message }}</p>
+          }
+        </div>
+
+        <div class="field">
+          <label for="character-school">Trường</label>
+          <select
+            id="character-school"
+            name="school"
+            [ngModel]="school()"
+            (ngModelChange)="changeSchool($event)"
+            [disabled]="busy()"
+          >
+            @for (option of schools; track option) {
+              <option [value]="option">{{ schoolLabel(option) }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="character-class">Phái</label>
+          <select
+            id="character-class"
+            name="class"
+            [ngModel]="class()"
+            (ngModelChange)="class.set($event)"
+            [disabled]="busy()"
+          >
+            @for (option of availableClasses(); track $index) {
+              <option [value]="option" [selected]="option === class()">
+                {{ classLabel(option) }}
+              </option>
+            }
+          </select>
+          @if (fieldError('class'); as message) {
+            <p class="error">{{ message }}</p>
+          }
+        </div>
+
+        <button class="submit" type="submit" [disabled]="busy()">
+          {{ busy() ? 'Đang xử lý…' : 'Tạo nhân vật' }}
+        </button>
+
+        <p class="count">Đã dùng {{ characterList().length }}/{{ maxCharacters }} nhân vật.</p>
+      </form>
+    }
+
+    @if (formError(); as message) {
+      <p class="alert" role="alert">{{ message }}</p>
+    }
+  </section>
+</main>

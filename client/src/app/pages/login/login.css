@@ -1,0 +1,139 @@
+.auth {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: 1.5rem;
+}
+
+.card {
+  width: min(420px, 100%);
+  padding: 1.75rem 1.5rem;
+  border: 1px solid rgba(147, 167, 184, 0.25);
+  border-radius: 16px;
+  background: rgba(147, 167, 184, 0.06);
+}
+
+h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.4rem;
+  letter-spacing: 0.01em;
+}
+
+.lead {
+  margin: 0 0 1.25rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.tab {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(147, 167, 184, 0.35);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.tab.active {
+  border-color: var(--accent);
+  background: rgba(240, 180, 41, 0.14);
+  color: var(--accent);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+label {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+input {
+  padding: 0.6rem 0.7rem;
+  border: 1px solid rgba(147, 167, 184, 0.35);
+  border-radius: 8px;
+  background: rgba(11, 18, 24, 0.6);
+  color: var(--fg);
+  font: inherit;
+}
+
+input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+input:disabled {
+  opacity: 0.6;
+}
+
+.error {
+  margin: 0;
+  color: #ff9c9c;
+  font-size: 0.8rem;
+}
+
+.alert {
+  margin: 0;
+  padding: 0.6rem 0.7rem;
+  border-radius: 8px;
+  background: rgba(255, 110, 110, 0.12);
+  color: #ffb3b3;
+  font-size: 0.85rem;
+}
+
+.submit {
+  margin-top: 0.35rem;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--accent);
+  color: #0b1218;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.submit:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.hint {
+  margin: 1rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.back {
+  display: inline-block;
+  margin-top: 1rem;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 420px) {
+  .card {
+    padding: 1.25rem 1rem;
+  }
+}
