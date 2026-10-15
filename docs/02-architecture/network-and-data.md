@@ -37,6 +37,18 @@
 4. Client gửi `C2S_ENTER_WORLD` (chọn nhân vật) → server nạp nhân vật từ DB/Redis vào bộ nhớ.
 5. Server gửi `S2C_ENTER_MAP` (thông tin map hiện tại, danh sách thực thể xung quanh).
 
+## 2b. Hiện trạng đã cài đặt (M1)
+
+Trước khi có WebSocket, phần tài khoản và nhân vật đã chạy bằng **HTTP API** dưới `/api`
+(xem `server/README.md` để có bảng endpoint đầy đủ):
+
+- `POST /api/auth/register`, `/api/auth/login`, `/api/auth/refresh`, `/api/auth/logout`, `GET /api/auth/me`
+- `GET /api/characters`, `POST /api/characters`
+
+Kiểu dữ liệu vào/ra của các endpoint này nằm trong `shared/src/schemas/` (zod), dùng chung cho
+server và client. Khi thêm WebSocket ở M2, các bước xác thực vẫn dùng access token JWT như hiện nay:
+client lấy token qua HTTP rồi đưa vào gói `C2S_HELLO` khi mở kết nối.
+
 ## 3. Định dạng gói tin
 
 Mỗi gói tin WebSocket (nhị phân):

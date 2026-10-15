@@ -64,12 +64,10 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
   registerCharacterRoutes(app, characterService);
 
   app.setNotFoundHandler((request, reply) => {
-    return reply
-      .status(404)
-      .send({
-        error: ApiErrorCode.NOT_FOUND,
-        message: `không có đường dẫn ${request.method} ${request.url}`,
-      });
+    return reply.status(404).send({
+      error: ApiErrorCode.NOT_FOUND,
+      message: `không có đường dẫn ${request.method} ${request.url}`,
+    });
   });
 
   app.setErrorHandler((error: FastifyError, request, reply) => {

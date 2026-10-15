@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../app.js';
 import { loadEnv } from '../config/env.js';
+import { accounts } from '../db/schema.js';
 import { closeTestDb, getTestDb, resetDatabase, TEST_DATABASE_URL } from '../test/database.js';
 
 let app: FastifyInstance;
@@ -119,6 +120,18 @@ describe('GET /api/auth/me', () => {
       method: 'GET',
       url: '/api/auth/me',
       headers: { authorization: 'Bearer token-gia' },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('trả 401 khi tài khoản đã bị xoá sau khi token được cấp', async () => {
+    const token = await registerAndGetToken();
+    const db = await getTestDb();
+    await db.delete(accounts);
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      headers: { authorization: `Bearer ${token}` },
     });
     expect(res.statusCode).toBe(401);
   });

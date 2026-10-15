@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { LoginRequestSchema, RefreshRequestSchema, RegisterRequestSchema } from '@ninja/shared';
+import { unauthorizedError } from '../../errors.js';
 import { parseRequest } from '../../http/validate.js';
-import type { AccountService } from './service.js';
+import { toAccountDto, type AccountService } from './service.js';
 
 /** Các route xác thực, đều nằm dưới tiền tố /api/auth. */
 export function registerAccountRoutes(app: FastifyInstance, service: AccountService): void {
@@ -30,9 +31,9 @@ export function registerAccountRoutes(app: FastifyInstance, service: AccountServ
   app.get('/api/auth/me', { preHandler: app.authenticate }, async (request) => {
     const account = await service.findById(request.user.sub);
     if (!account) {
-      return { account: null };
+      // Token hợp lệ nhưng tài khoản đã bị xoá: coi như chưa đăng nhập.
+      throw unauthorizedError('tài khoản không còn tồn tại');
     }
-    const { toAccountDto } = await import('./service.js');
     return { account: toAccountDto(account) };
   });
 }
