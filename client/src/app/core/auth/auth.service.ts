@@ -11,16 +11,12 @@ import {
 } from '@ninja/shared';
 import { isApiRequestError } from '../api/api-error';
 import { ApiService } from '../api/api.service';
+import { LOGIN_PATH, ME_PATH, REFRESH_PATH, REGISTER_PATH } from '../api/endpoints';
 import { fieldSchema } from '../api/schema';
 
 /** Khoá `localStorage` giữ phiên đăng nhập. */
 export const ACCESS_TOKEN_KEY = 'ninja.accessToken';
 export const REFRESH_TOKEN_KEY = 'ninja.refreshToken';
-
-const REGISTER_PATH = '/api/auth/register';
-const LOGIN_PATH = '/api/auth/login';
-const ME_PATH = '/api/auth/me';
-const REFRESH_PATH = '/api/auth/refresh';
 
 function readStoredToken(key: string): string | null {
   try {

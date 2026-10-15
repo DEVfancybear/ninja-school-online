@@ -6,9 +6,8 @@ import {
   type CreateCharacterRequest,
 } from '@ninja/shared';
 import { ApiService } from '../api/api.service';
+import { CHARACTERS_PATH } from '../api/endpoints';
 import { AuthService } from '../auth/auth.service';
-
-const CHARACTERS_PATH = '/api/characters';
 
 /** Nhân vật của tài khoản đang đăng nhập: chỉ gọi API, mọi quy tắc đều do server quyết. */
 @Injectable({ providedIn: 'root' })

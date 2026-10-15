@@ -132,6 +132,21 @@ describe('Login', () => {
     http.expectNone('/api/auth/register');
   });
 
+  it('email sai định dạng: hiện lỗi tiếng Việt và không gọi API', async () => {
+    const fixture = await createPage();
+    openRegisterTab(fixture);
+    await render(fixture);
+    setInput(fixture, 'username', 'ninja_test');
+    setInput(fixture, 'password', 'matkhau123');
+    setInput(fixture, 'email', 'khong-phai-email');
+
+    submitForm(fixture);
+    await render(fixture);
+
+    expect(text(fixture)).toContain('địa chỉ email không hợp lệ');
+    http.expectNone('/api/auth/register');
+  });
+
   it('đăng nhập thành công: khoá nút khi đang gửi, lưu phiên và sang /characters', async () => {
     const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
     const fixture = await createPage();

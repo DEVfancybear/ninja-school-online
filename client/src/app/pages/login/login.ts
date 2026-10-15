@@ -8,6 +8,12 @@ import { AuthService } from '../../core/auth/auth.service';
 
 type Mode = 'login' | 'register';
 
+/**
+ * Vài quy tắc của schema dùng chung còn câu mặc định tiếng Anh của zod (`EmailSchema`);
+ * giao diện tiếng Việt nên đổi lại cho đúng ô nhập đang báo lỗi.
+ */
+const FIELD_MESSAGES: FieldErrors = { email: 'địa chỉ email không hợp lệ' };
+
 /** Một trang cho cả đăng nhập và đăng ký; đổi qua lại bằng hai tab trên đầu. */
 @Component({
   selector: 'app-login',
@@ -35,7 +41,11 @@ export class Login {
   readonly email = signal('');
 
   fieldError(field: string): string | undefined {
-    return this.fieldErrors()[field];
+    const message = this.fieldErrors()[field];
+    if (message === undefined) {
+      return undefined;
+    }
+    return FIELD_MESSAGES[field] ?? message;
   }
 
   setMode(mode: Mode): void {
