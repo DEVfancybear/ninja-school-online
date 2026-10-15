@@ -51,6 +51,7 @@ Dịch vụ nền cho M1 (chưa cần ở M0): `docker compose -f infra/docker/d
 ```text
 ninja/
 ├── README.md               # file này
+├── .gitignore, .gitattributes
 ├── package.json            # script gốc của monorepo + tooling dùng chung
 ├── pnpm-workspace.yaml     # khai báo workspace + cấu hình pnpm 12 (allowBuilds)
 ├── pnpm-lock.yaml
@@ -75,7 +76,7 @@ ninja/
 ```
 
 Các thư mục `client/`, `server/`, `shared/`, `tools/data-validator/` đã có mã nguồn chạy được.
-`assets/` và `tests/` mới chỉ có README mô tả mục đích; sẽ có nội dung ở các cột mốc sau.
+`assets/` mới chỉ có `README.md` và `CREDITS.md`, `tests/` mới chỉ có `README.md`; nội dung thật sẽ có ở các cột mốc sau.
 
 ## 5. Việc tiếp theo (từ M1)
 

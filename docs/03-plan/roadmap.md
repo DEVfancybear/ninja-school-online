@@ -87,7 +87,7 @@ Có trong MVP: đăng nhập, tạo nhân vật (3 trường/6 phái — chỉ s
 
 | Rủi ro | Mức | Cách giảm |
 |---|---|---|
-| Bản quyền/thương hiệu | **Cao** | Nội dung nguyên bản 100%; không dùng tên "Ninja School"; tham vấn luật sư nếu phát hành chính thức |
+| Bản quyền/thương hiệu | **Cao** | Nội dung nguyên bản 100% (không mã nguồn/tài nguyên/cốt truyện của game khác). **Tên sản phẩm hiện dùng trùng tên game gốc** — rủi ro thương hiệu, đã ghi ở `README.md` mục 6; đổi tên trước khi phát hành rộng rãi và tham vấn luật sư nếu phát hành chính thức |
 | Phạm vi quá lớn (game MMO nhiều hệ thống) | **Cao** | Chốt MVP như mục 3; mỗi cột mốc phải chạy được end-to-end mới sang mốc sau |
 | Gian lận (auto, mod) | Vừa | Kiến trúc server-authoritative + rate limit; không làm API hỗ trợ tool |
 | Nội dung đồ họa/âm thanh | Vừa | Chọn phong cách pixel đơn giản; hoặc thuê/mua tài nguyên có license |
@@ -95,10 +95,18 @@ Có trong MVP: đăng nhập, tạo nhân vật (3 trường/6 phái — chỉ s
 | Sai lệch protocol client/server làm hỏng phiên chơi | Thấp | `PROTOCOL_VERSION` trong `shared/`, handshake chặn lệch phiên bản |
 | Bỏ dở giữa đường | Vừa | Cột mốc nhỏ, demo chạy được sớm (M0–M3 ≈ 6,5 tuần), tiến độ đo bằng "chơi được gì" |
 
-## 6. Việc cần chốt trước khi bắt đầu M0
+## 6. Việc chuẩn bị (trạng thái hiện tại)
+M0 đã xong, nên đây là trạng thái các việc chuẩn bị:
 
-- [ ] Tên dự án + tên miền dự kiến (nguyên bản).
-- [ ] Xác nhận stack: **Angular + Phaser 4** + Node.js + PostgreSQL + Redis + Docker (đã chốt 2026-10-15, xem `tech-stack.md` mục 5).
+- [x] ~~Xác nhận stack~~ → **Angular + Phaser 4** + Node.js + PostgreSQL + Redis + Docker (chốt 2026-10-15).
+- [x] ~~`git init` và commit đầu tiên~~ → đã init và đã push lên GitHub.
+- [x] ~~Tên repo~~ → `ninja-school-online` (**trùng tên game gốc**; rủi ro đã ghi ở `README.md` mục 6 — còn phải quyết định có đổi tên trước khi phát hành hay không).
+- [ ] Tên miền (nếu triển khai công khai).
 - [ ] Chọn cách làm tài nguyên: tự làm / mua / thuê (xem `assets/README.md`).
-- [ ] Giấy phép mã nguồn cho repo (ví dụ MIT cho code — lưu ý tài nguyên hình/âm có thể dùng license khác).
-- [ ] `git init` và commit đầu tiên.
+- [ ] Chọn giấy phép mã nguồn cho repo (ví dụ MIT cho code — tài nguyên hình/âm có thể dùng license khác).
+
+## 7. Nhật ký kiểm chứng theo cột mốc
+
+| Cột mốc | Kiểm chứng | Bằng chứng |
+|---|---|---|
+| M0 | `validate:data → lint → typecheck → test → build` chạy trên **checkout sạch** (xoá hết `dist/`) | CI GitHub Actions xanh (run 38676875628, 38676965644); 20 test; bundle khởi tạo 211,86 kB |

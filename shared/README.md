@@ -8,10 +8,12 @@ Chứa **hợp đồng chung** giữa client và server để hai bên không ba
 ```text
 shared/
 └── src/
-    ├── protocol/    # opcode (mã gói tin), định nghĩa gói tin, codec encode/decode
-    ├── constants/   # enum: trường/phái, loại vật phẩm, mã lỗi, trạng thái
-    ├── types/       # kiểu dữ liệu: nhân vật, vật phẩm, nhiệm vụ, trận đấu...
-    └── utils/       # toán, RNG xác định (deterministic), định dạng số/ngày giờ
+    ├── protocol/    # (M0) version.ts: PROTOCOL_VERSION
+    │                # thêm ở M2: opcode, định nghĩa gói tin, codec encode/decode
+    ├── constants/   # (M0) game.ts: trường, phái, quan hệ trường–phái
+    ├── schemas/     # (M0) schema zod của dữ liệu game: skill, item
+    └── index.ts     # điểm xuất chung
+    # thêm ở cột mốc sau: types/ (DTO), utils/ (toán, RNG xác định, định dạng)
 ```
 
 ## Nguyên tắc
