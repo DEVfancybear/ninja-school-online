@@ -7,7 +7,16 @@ loadRepoDotEnv();
 const env = loadEnv();
 const pool = createPool(env.DATABASE_URL);
 const db = createDb(pool);
-const app = await createApp({ env, db });
+
+let app: Awaited<ReturnType<typeof createApp>>;
+try {
+  app = await createApp({ env, db });
+} catch (error) {
+  // Không dựng được app: thường là game-data sai (GameDataError đã ghi rõ file + trường).
+  console.error(error instanceof Error ? error.message : error);
+  await pool.end();
+  process.exit(1);
+}
 
 async function shutdown(signal: string): Promise<void> {
   app.log.info(`nhận ${signal}, đang dừng server`);

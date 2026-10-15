@@ -11,12 +11,28 @@ import { AccountService } from './modules/account/service.js';
 import { registerAccountRoutes } from './modules/account/routes.js';
 import { CharacterService } from './modules/character/service.js';
 import { registerCharacterRoutes } from './modules/character/routes.js';
+import { ChatService } from './modules/chat/service.js';
+import { NpcService } from './modules/npc/service.js';
+import { RoomManager } from './core/room-manager.js';
+import { TickScheduler } from './core/tick.js';
+import { WebSocketGateway } from './net/ws-server.js';
+import { SessionRegistry } from './net/session-registry.js';
 import { argon2PasswordHasher } from './security/password.js';
 import { TokenService } from './security/tokens.js';
+import { loadGameData } from './world/game-data.js';
+import { WorldService, type AccountToken } from './world/world-service.js';
 
 export interface CreateAppOptions {
   env: Env;
   db: Db;
+  /** Thư mục game-data; mặc định là `game-data/` ở gốc repo. */
+  gameDataDir?: string;
+  /** Ghi đè tham số WebSocket — chỉ dùng cho kiểm thử (thời gian chờ bắt tay, heartbeat). */
+  websocket?: {
+    path?: string;
+    handshakeTimeoutMs?: number;
+    heartbeatTimeoutMs?: number;
+  };
 }
 
 /** Ghép toàn bộ plugin, dịch vụ và route thành một instance Fastify (kiểm thử bằng app.inject()). */
@@ -62,6 +78,46 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
 
   registerAccountRoutes(app, accountService);
   registerCharacterRoutes(app, characterService);
+
+  // --- Thế giới & realtime (M2). game-data được kiểm ngay ở đây: dữ liệu sai thì app không dựng
+  // được, nên server sẽ không khởi động với nội dung hỏng.
+  const gameData = await loadGameData(options.gameDataDir);
+  const tick = new TickScheduler();
+  const rooms = new RoomManager({
+    gameData,
+    tick,
+    onError: (error, mapId) => {
+      app.log.error({ err: error, mapId }, 'room gặp lỗi trong nhịp tick');
+    },
+  });
+  const verifyAccessToken = (raw: string): AccountToken | undefined => {
+    try {
+      return app.jwt.verify<AccountToken>(raw);
+    } catch {
+      // Chữ ký sai hoặc đã hết hạn: coi như chưa đăng nhập.
+      return undefined;
+    }
+  };
+
+  const world = new WorldService({
+    gameData,
+    rooms,
+    sessions: new SessionRegistry(),
+    characters: characterService,
+    chat: new ChatService(),
+    npcs: new NpcService(),
+    verifyToken: verifyAccessToken,
+  });
+  const gateway = new WebSocketGateway({ app, world, tick, ...options.websocket });
+  gateway.attach();
+  tick.start();
+
+  app.addHook('onClose', async () => {
+    // Gateway đã tự đóng socket + gỡ listener trong hook `preClose` của nó (xem net/ws-server.ts);
+    // ở đây chỉ còn dừng nhịp tick và xoá các room.
+    rooms.dispose();
+    tick.dispose();
+  });
 
   app.setNotFoundHandler((request, reply) => {
     return reply.status(404).send({

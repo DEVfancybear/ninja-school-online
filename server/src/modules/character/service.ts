@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import {
   MAX_CHARACTERS_PER_ACCOUNT,
   type Character,
@@ -36,6 +36,27 @@ export class CharacterService {
       .where(eq(characters.accountId, accountId))
       .orderBy(sql`${characters.createdAt} desc, ${characters.name} asc`);
     return rows.map(toCharacterDto);
+  }
+
+  /**
+   * Chọn nhân vật để vào thế giới (WebSocket): theo `characterId` nếu client chỉ định — phải thuộc
+   * tài khoản — hoặc nhân vật **tạo gần nhất** khi bỏ trống.
+   *
+   * Trả `undefined` khi không tìm thấy; người gọi tự phân biệt "id sai" và "tài khoản chưa có
+   * nhân vật" dựa trên việc client có gửi `characterId` hay không.
+   */
+  async pickForWorld(accountId: string, characterId?: string): Promise<Character | undefined> {
+    const [row] = await this.db
+      .select()
+      .from(characters)
+      .where(
+        characterId
+          ? and(eq(characters.accountId, accountId), eq(characters.id, characterId))
+          : eq(characters.accountId, accountId),
+      )
+      .orderBy(sql`${characters.createdAt} desc, ${characters.name} asc`)
+      .limit(1);
+    return row ? toCharacterDto(row) : undefined;
   }
 
   /** Tạo nhân vật mới, kiểm tra giới hạn số lượng và trùng tên (không phân biệt hoa thường). */
