@@ -17,7 +17,7 @@ pnpm install            # cài phụ thuộc (pnpm 12 trở lên)
 cp .env.example .env    # rồi chỉnh DATABASE_URL cho đúng máy bạn
 pnpm db:migrate         # tạo bảng trong PostgreSQL (tự build shared trước)
 pnpm dev                # chạy client (ng serve) + server (tsx watch)
-pnpm lint && pnpm typecheck && pnpm test # 337 test
+pnpm lint && pnpm typecheck && pnpm test # 339 test
 pnpm e2e                # 17 kịch bản trên trình duyệt thật (Playwright)
 pnpm validate:data      # kiểm tra game-data/ theo schema
 pnpm build

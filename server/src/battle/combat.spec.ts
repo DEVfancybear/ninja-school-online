@@ -13,7 +13,9 @@ import {
   type LevelUp,
   type ServerError,
 } from '@ninja/shared';
-import { closeTestDb, resetDatabase } from '../test/database.js';
+import { and, eq } from 'drizzle-orm';
+import { characters, inventoryItems } from '../db/schema.js';
+import { closeTestDb, getTestDb, resetDatabase } from '../test/database.js';
 import { accountWithCharacter, startTestServer, type TestServer } from '../test/game-server.js';
 import { copyGameDataDir, removeTemporaryGameDataDirs } from '../test/game-data-dir.js';
 import { TestGameClient, delay } from '../test/ws-client.js';
@@ -23,6 +25,49 @@ const TRAINING_MAP_ID = 'bai-luyen-tap';
 /** Ô (14, 12) → tâm ô (464, 400); cách điểm spawn 264 px nên một lệnh di chuyển là tới. */
 const SCARECROW_TARGET = { x: 464, y: 400 };
 const SCARECROW_ID = `mob:${TRAINING_MAP_ID}:0`;
+
+/** Số lượng một vật phẩm trong túi, đọc thẳng từ database cho khỏi phụ thuộc gói tin. */
+async function readBag(characterId: string, itemId: string): Promise<number> {
+  const db = await getTestDb();
+  const [row] = await db
+    .select({ quantity: inventoryItems.quantity })
+    .from(inventoryItems)
+    .where(and(eq(inventoryItems.characterId, characterId), eq(inventoryItems.itemId, itemId)))
+    .limit(1);
+  return row?.quantity ?? 0;
+}
+
+/** Máu/nội lực đang lưu trong database của một nhân vật. */
+async function readVitals(characterId: string): Promise<{ hp: number | null; mp: number | null }> {
+  const db = await getTestDb();
+  const [row] = await db
+    .select({ hp: characters.hp, mp: characters.mp })
+    .from(characters)
+    .where(eq(characters.id, characterId))
+    .limit(1);
+  return row ?? { hp: null, mp: null };
+}
+
+/** Chờ tới khi nhân vật bị đánh trúng ít nhất một lần, trả về máu trong database lúc đó. */
+/** Chờ gói kết quả mà **quái** đánh trúng mình, rồi trả về máu của mình trong gói đó. */
+async function waitUntilWounded(
+  client: TestGameClient,
+  characterId: string,
+): Promise<{ hp: number; maxHp: number }> {
+  const battle = await client.waitFor<BattleResult>(
+    Opcode.S2C_BATTLE_RESULT,
+    (payload) =>
+      (payload as BattleResult).events.some(
+        (event) => event.targetId === characterId && event.kind === 'damage',
+      ),
+    10_000,
+  );
+  const me = battle.participants.find((combatant) => combatant.id === characterId);
+  if (!me) {
+    throw new Error('không thấy nhân vật trong danh sách người tham gia');
+  }
+  return { hp: me.hp, maxHp: me.maxHp };
+}
 
 /** Sát thương của một đòn đánh thường, để kiểm tra máu giảm đúng bằng số đó. */
 function resultDamage(result: BattleResult, targetId: string): number {
@@ -459,6 +504,63 @@ describe('luật trong trận', () => {
     } finally {
       await lawServer.close();
     }
+  });
+
+  it('dùng vật phẩm trong trận khi đã đầy máu → item_no_effect, không mất món', async () => {
+    const { client, characterId } = await enterTrainingGround('ninja_m3_fullfight', 'DayMauTran');
+    client.send(Opcode.C2S_ATTACK_MOB, { targetId: SCARECROW_ID });
+    const start = await client.waitFor<BattleStart>(Opcode.S2C_BATTLE_START);
+
+    // Bù nhìn chưa kịp đánh (người chơi đi trước) nên máu vẫn đầy: dùng bánh bao lúc này là phí.
+    expect(await readBag(characterId, 'item-banh-bao')).toBe(2);
+    client.send(Opcode.C2S_BATTLE_ACTION, {
+      battleId: start.battleId,
+      action: 'item',
+      itemId: 'item-banh-bao',
+      targetId: SCARECROW_ID,
+    });
+    const error = await client.waitForError(ErrorCode.ITEM_NO_EFFECT);
+    expect(error.message).toContain('đầy');
+
+    // Lượt chưa bị tiêu vì lệnh bị từ chối: đánh thường vẫn được.
+    client.send(Opcode.C2S_BATTLE_ACTION, {
+      battleId: start.battleId,
+      action: 'attack',
+      targetId: SCARECROW_ID,
+    });
+    await client.waitFor<BattleResult>(
+      Opcode.S2C_BATTLE_RESULT,
+      (payload) => (payload as BattleResult).action === 'attack',
+    );
+    expect(await readBag(characterId, 'item-banh-bao')).toBe(2);
+  });
+
+  it('mất kết nối giữa trận thì máu đang có được ghi lại (không hồi đầy miễn phí)', async () => {
+    const { client, characterId } = await enterTrainingGround('ninja_m3_drop', 'NgatKetNoi');
+    client.send(Opcode.C2S_ATTACK_MOB, { targetId: SCARECROW_ID });
+    const start = await client.waitFor<BattleStart>(Opcode.S2C_BATTLE_START);
+
+    // Đánh một đòn để tới lượt bù nhìn, rồi chờ nó đánh trả (máu giảm) và ngắt kết nối giữa trận.
+    client.send(Opcode.C2S_BATTLE_ACTION, {
+      battleId: start.battleId,
+      action: 'attack',
+      targetId: SCARECROW_ID,
+    });
+    await client.waitFor<BattleResult>(
+      Opcode.S2C_BATTLE_RESULT,
+      (payload) => (payload as BattleResult).actorId === characterId,
+    );
+    const wounded = await waitUntilWounded(client, characterId);
+    await client.close();
+    clients.splice(clients.indexOf(client), 1);
+
+    await expect
+      .poll(async () => (await readVitals(characterId)).hp, {
+        message: 'chờ máu trong database khớp với máu lúc ngắt kết nối',
+        timeout: 5000,
+      })
+      .toBe(wounded.hp);
+    expect((await readVitals(characterId)).hp).toBeLessThan(wounded.maxHp);
   });
 
   it('trong trận mà dùng túi đồ trực tiếp → in_battle (phải dùng qua lượt)', async () => {

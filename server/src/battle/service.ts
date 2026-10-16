@@ -268,7 +268,17 @@ export class BattleService {
       return;
     }
     void this.enqueue(battle, async () => {
+      const combatant = battle.players.get(characterId);
       battle.players.delete(characterId);
+      if (combatant) {
+        // Máu/nội lực đang có phải được ghi lại: nếu không, người chơi ngắt kết nối giữa trận sẽ
+        // quay lại với số máu cũ trong database (như được hồi đầy miễn phí).
+        await this.options.characters.updateVitals(
+          combatant.id,
+          this.clamp(combatant.hp, 1, combatant.maxHp),
+          this.clamp(combatant.mp, 0, combatant.maxMp),
+        );
+      }
       if (battle.over) {
         return;
       }
@@ -351,11 +361,16 @@ export class BattleService {
         this.reject(characterId, ErrorCode.ITEM_NOT_USABLE, 'vật phẩm này không dùng được');
         return;
       }
+      // Tính trước xem có hồi được gì không: dùng vật phẩm lúc chỉ số đang đầy thì phải **không** mất món.
+      const healed = this.applyConsumable(item, actor.hp, actor.maxHp, actor.mp, actor.maxMp);
+      if (healed.hp === actor.hp && healed.mp === actor.mp) {
+        this.reject(characterId, ErrorCode.ITEM_NO_EFFECT, 'chỉ số đang đầy, dùng lúc này thì phí');
+        return;
+      }
       if (!(await this.options.inventory.take(characterId, item.id, 1))) {
         this.reject(characterId, ErrorCode.ITEM_NOT_OWNED, 'bạn không có vật phẩm này trong túi');
         return;
       }
-      const healed = this.applyConsumable(item, actor.hp, actor.maxHp, actor.mp, actor.maxMp);
       const restoredHp = healed.hp - actor.hp;
       const restoredMp = healed.mp - actor.mp;
       actor.hp = healed.hp;

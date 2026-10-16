@@ -156,12 +156,12 @@ Nội dung: chạm quái để vào trận, trận theo lượt có đồng hồ
 
 | Hạng mục | Kết quả |
 |---|---|
-| `pnpm test` | **337 test xanh**: shared 52, server 116, client 159, tools/data-validator 10 |
+| `pnpm test` | **339 test xanh**: shared 52, server 118, client 159, tools/data-validator 10 |
 | `pnpm e2e` (Playwright) | **17/17 kịch bản xanh** — 13 kịch bản M1–M2 + 4 kịch bản M3 (đánh hạ quái và nhận thưởng, ba con liên tiếp để lên ba cấp rồi dùng vật phẩm rơi, hai người chung một trận, lệnh không hợp lệ bị từ chối) |
 | `pnpm validate:data` | exit 0 — 20 file hợp lệ trong `game-data/` |
 | `pnpm lint`, `pnpm typecheck`, `pnpm build`, `pnpm format:check` | đều exit 0 |
 | Bundle sau M3 | khởi tạo **722,50 kB** (nén 155,18 kB); lazy chunk `play` **1,46 MB** (nén 315,32 kB) |
-| Test chiến đấu qua WebSocket | `server/src/battle/combat.spec.ts`: 16 test trên server thật (vào trận, luật lượt, chơi chung, thưởng, thua, chạy thoát) + 11 test công thức thuần ở `server/src/battle/engine.spec.ts` |
+| Test chiến đấu qua WebSocket | `server/src/battle/combat.spec.ts`: **18 test** trên server thật (vào trận, luật lượt, chơi chung, thưởng, thua, chạy thoát, dùng vật phẩm lúc đầy máu, ngắt kết nối giữa trận) + 11 test công thức thuần ở `server/src/battle/engine.spec.ts` |
 | Migration | `0001_inventory_and_vitals`: bảng `inventory_items`, cột `characters.hp`/`mp` (`null` = đang đầy) |
 
 **Quyết định thiết kế đã chốt ở M3 (ghi lại vì ảnh hưởng các mốc sau):**
@@ -241,4 +241,4 @@ M0 đã xong, nên đây là trạng thái các việc chuẩn bị:
 | M1 | Chạy lại cả chuỗi CI trên cây đã xoá sạch artifact + `pnpm e2e` trên trình duyệt thật | CI xanh (run 38689008693); 119 test; 8/8 kịch bản e2e; commit `8a09cf5` |
 | M2 | Chạy cả chuỗi CI + `pnpm e2e` **13 kịch bản** trên cây đã ghép hai phía (server + client) | 281 test; 13/13 kịch bản e2e; commit `c2e3aef` trên `main` |
 | M2 (kiểm chứng độc lập) | Verifier riêng tự viết 6 script dùng `ws` + REST, dựng server trên cổng riêng 3120–3125, kiểm lại từng con số tài liệu và tự dựng lại các tình huống cổng/chat/chống gian lận | **VERDICT: PASS** — 20/20 + 21/21 + 19/19 kiểm tra đạt, không tìm thấy lỗi mã nguồn hay câu tài liệu nào nói sai thực tế |
-| M3 | Chạy cả chuỗi CI + `pnpm e2e` **17 kịch bản** trên trình duyệt thật, có bài kiểm tra ba cấp và trận chung hai người | 337 test; 17/17 kịch bản e2e; commit `2b2ed2d` (client) trên `main` |
+| M3 | Chạy cả chuỗi CI + `pnpm e2e` **17 kịch bản** trên trình duyệt thật, có bài kiểm tra ba cấp và trận chung hai người | 339 test; 17/17 kịch bản e2e; commit `2b2ed2d` (client) trên `main` |
