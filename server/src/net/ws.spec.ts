@@ -588,7 +588,10 @@ describe('chuyển map', () => {
     });
     expect(back.entity).toMatchObject({ x: START_SPAWN.x, y: START_SPAWN.y });
 
-    const addedBack = await clientB.waitFor<{ entity: Entity }>(
+    // `waitForSince` chứ không phải `waitFor`: bộ đệm của B có thể còn gói ADD cũ (B vào sau,
+    // kịp nhận thông báo của A vào trước) nên `waitFor` sẽ khớp nhầm gói đó rồi kiểm tra sớm.
+    const addedBack = await clientB.waitForSince<{ entity: Entity }>(
+      markBBack,
       Opcode.S2C_ENTITY_ADD,
       (raw) => (raw as { entity: Entity }).entity.id === a.characterId,
     );

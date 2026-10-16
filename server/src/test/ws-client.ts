@@ -161,6 +161,35 @@ export class TestGameClient {
   }
 
   /**
+   * Chờ gói tin **mới** sau mốc `mark`: chỉ tìm trong các gói đến sau mốc nên không khớp nhầm gói
+   * của bước trước còn nằm trong bộ đệm — `waitFor` khớp cả gói đến trước lời gọi, đúng cho bắt tay
+   * nhưng sai khi bài kiểm thử cần đúng gói sinh ra bởi hành động vừa gửi.
+   */
+  async waitForSince<T>(
+    mark: number,
+    op: number,
+    predicate: (payload: unknown) => boolean = () => true,
+    timeoutMs = 5000,
+  ): Promise<T> {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const found = this.received
+        .slice(mark)
+        .find((packet) => packet.op === op && predicate(packet.payload));
+      if (found) {
+        return found.payload as T;
+      }
+      if (Date.now() >= deadline) {
+        throw new Error(
+          `không nhận được gói ${OPCODE_NAMES[op] ?? op} sau mốc ${mark} trong ${timeoutMs} ms ` +
+            `(đã nhận: ${this.received.map((packet) => OPCODE_NAMES[packet.op] ?? packet.op).join(', ') || 'không có gì'})`,
+        );
+      }
+      await delay(10);
+    }
+  }
+
+  /**
    * Chờ gói tin **kế tiếp** thuộc một trong các mã, tính từ vị trí `from`, và trả về luôn vị trí
    * của gói sau nó.
    *

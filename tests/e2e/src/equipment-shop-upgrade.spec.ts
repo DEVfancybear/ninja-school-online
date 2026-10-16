@@ -271,7 +271,9 @@ async function killOneMonster(page: Page, name: string): Promise<HookBattle> {
   await attackMonster(page, name);
   await waitForBattle(page);
   const finished = await fightToTheEnd(page);
-  await page.getByRole('button', { name: 'Đóng' }).click();
+  // Chỉ bấm nút trong bảng kết trận: túi đồ cũng có nút đóng (aria-label "Đóng túi đồ") nên tìm
+  // theo tên chung sẽ khớp hai nút khi túi đang mở.
+  await page.locator('.result').getByRole('button', { name: 'Đóng' }).click();
   await expect.poll(async () => (await battle(page)) === null, { timeout: 10_000 }).toBe(true);
   return finished;
 }

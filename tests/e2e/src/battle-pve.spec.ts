@@ -224,7 +224,9 @@ async function killOneMonster(page: Page): Promise<HookBattle> {
   await attackMonster(page, SCARECROW);
   await waitForBattle(page);
   const finished = await fightToTheEnd(page);
-  await page.getByRole('button', { name: 'Đóng' }).click();
+  // Chỉ bấm nút trong bảng kết trận: túi đồ cũng có nút đóng (aria-label "Đóng túi đồ") nên tìm
+  // theo tên chung sẽ khớp hai nút khi túi đang mở.
+  await page.locator('.result').getByRole('button', { name: 'Đóng' }).click();
   await expect.poll(async () => (await battle(page)) === null, { timeout: 10_000 }).toBe(true);
   return finished;
 }
@@ -271,7 +273,7 @@ test('đánh hạ quái: có lượt, có nhật ký, nhận thưởng và vật
   await expect(page.locator('.result')).toContainText('Kinh nghiệm');
   await expect(page.locator('.result')).toContainText('Bánh Bao Hấp');
 
-  await page.getByRole('button', { name: 'Đóng' }).click();
+  await page.locator('.result').getByRole('button', { name: 'Đóng' }).click();
   await expect.poll(async () => (await battle(page)) === null, { timeout: 10_000 }).toBe(true);
   await expect
     .poll(async () => (await monsters(page)).filter((monster) => !monster.alive).length, {

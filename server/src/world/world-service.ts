@@ -174,10 +174,12 @@ export class WorldService {
 
     session.send(Opcode.S2C_HELLO, this.helloPayload(character, room.map.id));
     this.sendEnterMap(session, room, player);
+    // Người đã ở trong map mới biết có người vừa vào — báo ngay trong cùng nhịp này, **trước** khi
+    // đọc database: chờ đọc xong mới báo thì người vào sau kịp nhận gói ADD của người vào trước
+    // (gói trễ, trùng với danh sách `entities` nó vừa nhận trong `S2C_ENTER_MAP`).
+    room.broadcast(Opcode.S2C_ENTITY_ADD, { entity: playerView(player) }, player.id);
     // Chỉ số và túi đồ gửi ngay sau bản đồ: HUD cần chúng trước khi người chơi kịp đánh con quái nào.
     await this.sendCharacterState(session, character.id);
-    // Người đã ở trong map mới biết có người vừa vào.
-    room.broadcast(Opcode.S2C_ENTITY_ADD, { entity: playerView(player) }, player.id);
   }
 
   /**
