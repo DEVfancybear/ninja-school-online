@@ -12,6 +12,7 @@ import { registerAccountRoutes } from './modules/account/routes.js';
 import { CharacterService } from './modules/character/service.js';
 import { registerCharacterRoutes } from './modules/character/routes.js';
 import { ChatService } from './modules/chat/service.js';
+import { InventoryService } from './modules/inventory/service.js';
 import { NpcService } from './modules/npc/service.js';
 import { RoomManager } from './core/room-manager.js';
 import { TickScheduler } from './core/tick.js';
@@ -54,7 +55,6 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
     tokens,
     signAccessToken: (payload) => app.jwt.sign(payload),
   });
-  const characterService = new CharacterService(db);
 
   app.get('/health', async () => {
     let database: 'up' | 'down' = 'up';
@@ -77,11 +77,12 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
   }));
 
   registerAccountRoutes(app, accountService);
-  registerCharacterRoutes(app, characterService);
 
   // --- Thế giới & realtime (M2). game-data được kiểm ngay ở đây: dữ liệu sai thì app không dựng
   // được, nên server sẽ không khởi động với nội dung hỏng.
   const gameData = await loadGameData(options.gameDataDir);
+  const inventoryService = new InventoryService(db, gameData);
+  const characterService = new CharacterService(db, inventoryService, gameData);
   const tick = new TickScheduler();
   const rooms = new RoomManager({
     gameData,
@@ -111,8 +112,13 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
     characters: characterService,
     chat: new ChatService(),
     npcs: new NpcService(),
+    inventory: inventoryService,
+    tick,
     verifyToken: verifyAccessToken,
   });
+  // Nhân vật cần game-data (đồ khởi đầu, chỉ số phái) nên route đăng ký sau khi nạp game-data.
+  registerCharacterRoutes(app, characterService);
+
   const gateway = new WebSocketGateway({ app, world, tick, ...options.websocket });
   gateway.attach();
   tick.start();
@@ -120,6 +126,7 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
   app.addHook('onClose', async () => {
     // Gateway đã tự đóng socket + gỡ listener trong hook `preClose` của nó (xem net/ws-server.ts);
     // ở đây chỉ còn dừng nhịp tick và xoá các room.
+    world.battle.dispose();
     rooms.dispose();
     tick.dispose();
   });

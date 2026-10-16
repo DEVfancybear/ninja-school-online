@@ -5,11 +5,17 @@ import {
   type CreateCharacterRequest,
 } from '@ninja/shared';
 import type { Db } from '../../db/client.js';
-import { characters } from '../../db/schema.js';
+import { characters, type CharacterRow } from '../../db/schema.js';
 import { conflictError } from '../../errors.js';
+import type { GameData } from '../../world/game-data.js';
 import { isUniqueViolation } from '../account/service.js';
+import type { InventoryService } from '../inventory/service.js';
+import type { CharacterRecord } from './stats.js';
 
-type CharacterRow = typeof characters.$inferSelect;
+/** Chuyển hàng trong DB thành dữ liệu kèm máu/nội lực, dùng cho chiến đấu (không gửi qua REST). */
+export function toCharacterRecord(row: CharacterRow): CharacterRecord {
+  return { ...toCharacterDto(row), hp: row.hp, mp: row.mp };
+}
 
 /** Chuyển hàng trong DB thành dữ liệu trả cho client. */
 export function toCharacterDto(row: CharacterRow): Character {
@@ -26,7 +32,11 @@ export function toCharacterDto(row: CharacterRow): Character {
 }
 
 export class CharacterService {
-  constructor(private readonly db: Db) {}
+  constructor(
+    private readonly db: Db,
+    private readonly inventory: InventoryService,
+    private readonly gameData: GameData,
+  ) {}
 
   /** Danh sách nhân vật của một tài khoản, mới tạo trước. */
   async list(accountId: string): Promise<Character[]> {
@@ -73,6 +83,8 @@ export class CharacterService {
     }
 
     try {
+      // Đồ và yên khởi đầu lấy từ `game-data/classes/`: đổi quà tân thủ không cần sửa mã nguồn.
+      const definition = this.gameData.classes.get(input.school);
       const inserted = await this.db
         .insert(characters)
         .values({
@@ -80,14 +92,49 @@ export class CharacterService {
           name: input.name,
           school: input.school,
           class: input.class,
+          yen: definition?.startingYen ?? 0,
         })
         .returning();
-      return toCharacterDto(inserted[0]!);
+
+      const character = toCharacterDto(inserted[0]!);
+      if (definition) {
+        await this.inventory.grantItems(character.id, definition.startingItems);
+      }
+      return character;
     } catch (error) {
       if (isUniqueViolation(error)) {
         throw conflictError('tên nhân vật này đã có người dùng, hãy chọn tên khác');
       }
       throw error;
     }
+  }
+
+  /** Nhân vật kèm máu/nội lực — dùng khi vào trận và khi hồi sinh. */
+  async findById(characterId: string): Promise<CharacterRecord | undefined> {
+    const [row] = await this.db
+      .select()
+      .from(characters)
+      .where(eq(characters.id, characterId))
+      .limit(1);
+    return row ? toCharacterRecord(row) : undefined;
+  }
+
+  /** Ghi máu/nội lực hiện tại sau trận đấu. Giá trị đã được kẹp trong khoảng hợp lệ ở tầng trận đấu. */
+  async updateVitals(characterId: string, hp: number, mp: number): Promise<void> {
+    await this.db
+      .update(characters)
+      .set({ hp, mp, updatedAt: sql`now()` })
+      .where(eq(characters.id, characterId));
+  }
+
+  /** Ghi cấp/kinh nghiệm/yên sau khi nhận thưởng trận đấu (hoặc mất yên khi thua). */
+  async updateProgress(
+    characterId: string,
+    values: { readonly level: number; readonly exp: number; readonly yen: number },
+  ): Promise<void> {
+    await this.db
+      .update(characters)
+      .set({ level: values.level, exp: values.exp, yen: values.yen, updatedAt: sql`now()` })
+      .where(eq(characters.id, characterId));
   }
 }

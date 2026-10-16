@@ -63,6 +63,13 @@ export const characters = pgTable(
     level: integer('level').notNull().default(1),
     exp: integer('exp').notNull().default(0),
     yen: integer('yen').notNull().default(0),
+    /**
+     * Máu và nội lực hiện tại. `null` nghĩa là **đang đầy**: nhân vật mới tạo, hoặc vừa hồi sinh
+     * được hồi đầy máu. Giá trị tối đa suy từ chỉ số phái trong `game-data/classes/` nên không lưu
+     * ở đây — đổi chỉ số phái không cần migration dữ liệu.
+     */
+    hp: integer('hp'),
+    mp: integer('mp'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -74,5 +81,33 @@ export const characters = pgTable(
     check('characters_level_positive', sql`${table.level} >= 1`),
     check('characters_exp_non_negative', sql`${table.exp} >= 0`),
     check('characters_yen_non_negative', sql`${table.yen} >= 0`),
+    check('characters_hp_non_negative', sql`${table.hp} is null or ${table.hp} >= 0`),
+    check('characters_mp_non_negative', sql`${table.mp} is null or ${table.mp} >= 0`),
   ],
 );
+
+/** Hàng trong database của một nhân vật, kèm máu/nội lực mà `Character` (gói tin REST) không có. */
+export type CharacterRow = typeof characters.$inferSelect;
+
+/**
+ * Túi đồ. Mỗi hàng là một loại vật phẩm (gộp số lượng), khớp cách hiển thị của túi: một dòng một
+ * vật phẩm kèm số lượng. Sức chứa đếm theo **số loại**, xem `INVENTORY_CAPACITY`.
+ */
+export const inventoryItems = pgTable(
+  'inventory_items',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    characterId: uuid('character_id')
+      .notNull()
+      .references(() => characters.id, { onDelete: 'cascade' }),
+    itemId: varchar('item_id', { length: 64 }).notNull(),
+    quantity: integer('quantity').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('inventory_items_character_item_unique').on(table.characterId, table.itemId),
+    index('inventory_items_character_idx').on(table.characterId),
+    check('inventory_items_quantity_positive', sql`${table.quantity} > 0`),
+  ],
+);
+

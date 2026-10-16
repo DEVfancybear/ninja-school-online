@@ -5,6 +5,8 @@ import {
   type ChatMessage,
   type Entity,
   type EntityMove,
+  type Monster,
+  type MonsterShape,
   type Npc,
   type ServerEnterMap,
 } from '@ninja/shared';
@@ -54,6 +56,37 @@ export interface RoomNpc {
   readonly data: Npc;
 }
 
+/**
+ * Một con quái đang ở trên bản đồ. Bản đồ đặt cùng một loại quái ở nhiều chỗ thì đây là **nhiều con
+ * độc lập**: mỗi con có máu và thời điểm sống lại riêng.
+ */
+export interface RoomMonster {
+  /** Id thực thể gửi cho client: `mob:<mapId>:<số thứ tự chỗ đặt>`. */
+  readonly id: string;
+  /** Id loại quái trong `game-data/monsters/`, ví dụ `mob-bui-nhon`. */
+  readonly monsterId: string;
+  readonly name: string;
+  readonly color: string;
+  readonly shape: MonsterShape;
+  readonly level: number;
+  readonly x: number;
+  readonly y: number;
+  readonly maxHp: number;
+  readonly attack: number;
+  readonly defense: number;
+  readonly speed: number;
+  readonly respawnMs: number;
+  hp: number;
+  alive: boolean;
+  /** Thời điểm sống lại; `undefined` khi đang sống hoặc loại quái này không hồi sinh. */
+  respawnAt: number | undefined;
+}
+
+/** Id thực thể của con quái thứ `index` trên bản đồ `mapId`. Ổn định giữa các lần vào game. */
+export function monsterEntityId(mapId: string, index: number): string {
+  return `mob:${mapId}:${index}`;
+}
+
 /** Tạo thực thể người chơi từ nhân vật trong database. */
 export function createPlayer(options: {
   character: Character;
@@ -97,18 +130,65 @@ export function npcView(npc: RoomNpc): Entity {
 }
 
 /**
+ * Dạng gửi cho client của một con quái. Gửi lại cùng id khi máu đổi hoặc khi sống lại: client thêm
+ * hoặc **thay thế** theo id (xem `upsertEntity` phía client), nên thanh máu trên bản đồ luôn đúng.
+ */
+export function monsterView(monster: RoomMonster): Entity {
+  return {
+    id: monster.id,
+    kind: 'monster',
+    name: monster.name,
+    color: monster.color,
+    x: monster.x,
+    y: monster.y,
+    level: monster.level,
+    hp: monster.hp,
+    maxHp: monster.maxHp,
+    shape: monster.shape,
+  };
+}
+
+/**
  * Room = một bản đồ (M2 chưa chia kênh). Giữ người chơi đang ở trong, NPC đặt sẵn, lịch sử chat
  * gần nhất và đẩy người chơi đi theo từng nhịp tick.
  */
 export class Room {
   private readonly playersById = new Map<string, RoomPlayer>();
   private readonly npcsById = new Map<string, RoomNpc>();
+  private readonly monstersById = new Map<string, RoomMonster>();
   private readonly backlog: ServerEnterMap['chatBacklog'] = [];
 
   constructor(
     readonly map: MapInstance,
     npcs: ReadonlyMap<string, Npc>,
+    monsters: ReadonlyMap<string, Monster>,
   ) {
+    for (const [index, placement] of (map.data.monsters ?? []).entries()) {
+      const data = monsters.get(placement.id);
+      if (!data) {
+        // Không thể xảy ra: `checkGameData` kiểm quái đặt trên map phải có file dữ liệu.
+        continue;
+      }
+      const position = map.tileCenter(placement.x, placement.y);
+      this.monstersById.set(monsterEntityId(map.id, index), {
+        id: monsterEntityId(map.id, index),
+        monsterId: data.id,
+        name: data.name,
+        color: data.color,
+        shape: data.shape,
+        level: data.level,
+        x: position.x,
+        y: position.y,
+        maxHp: data.maxHp,
+        attack: data.attack,
+        defense: data.defense,
+        speed: data.speed,
+        respawnMs: data.respawnMs,
+        hp: data.maxHp,
+        alive: true,
+        respawnAt: undefined,
+      });
+    }
     for (const placement of map.data.npcs) {
       const data = npcs.get(placement.id);
       if (!data) {
@@ -143,6 +223,28 @@ export class Room {
     return this.npcsById.get(id);
   }
 
+  /** Mọi con quái của bản đồ, kể cả con đang chết chờ sống lại. */
+  monsters(): RoomMonster[] {
+    return [...this.monstersById.values()];
+  }
+
+  /**
+   * Cập nhật máu của một con quái (trận đấu gọi khi đánh trúng). Về 0 thì con quái chết và hẹn giờ
+   * sống lại; mọi thay đổi đều phát lại thực thể để client vẽ đúng thanh máu trên bản đồ.
+   */
+  setMonsterHp(id: string, hp: number, now: number): void {
+    const monster = this.monstersById.get(id);
+    if (!monster) {
+      return;
+    }
+    monster.hp = Math.max(0, Math.min(monster.maxHp, Math.round(hp)));
+    if (monster.hp === 0 && monster.alive) {
+      monster.alive = false;
+      monster.respawnAt = monster.respawnMs > 0 ? now + monster.respawnMs : undefined;
+    }
+    this.broadcast(Opcode.S2C_ENTITY_ADD, { entity: monsterView(monster) });
+  }
+
   addPlayer(player: RoomPlayer): void {
     this.playersById.set(player.id, player);
   }
@@ -165,6 +267,9 @@ export class Room {
     }
     for (const npc of this.npcsById.values()) {
       views.push(npcView(npc));
+    }
+    for (const monster of this.monstersById.values()) {
+      views.push(monsterView(monster));
     }
     return views;
   }
@@ -206,9 +311,10 @@ export class Room {
    * (nó không biết các room khác) và cũng không tự xoá người chơi: `RoomManager` nhận danh sách
    * này rồi nhờ `WorldService` đổi room, đúng một đường chuyển map duy nhất.
    */
-  tick(): PortalCrossing[] {
+  tick(now: number): PortalCrossing[] {
     const moves: EntityMove['moves'] = [];
     const crossings: PortalCrossing[] = [];
+    this.respawnMonsters(now);
     for (const player of this.playersById.values()) {
       const target = player.target;
       if (!target) {
@@ -250,5 +356,18 @@ export class Room {
 
     // Chuyển map sau khi đã phát gói di chuyển: người đi vẫn nhận được vị trí cuối ở map cũ.
     return crossings;
+  }
+
+  /** Quái hết thời gian chờ thì sống lại đầy máu và hiện ra với mọi người trong bản đồ. */
+  private respawnMonsters(now: number): void {
+    for (const monster of this.monstersById.values()) {
+      if (monster.alive || monster.respawnAt === undefined || now < monster.respawnAt) {
+        continue;
+      }
+      monster.alive = true;
+      monster.respawnAt = undefined;
+      monster.hp = monster.maxHp;
+      this.broadcast(Opcode.S2C_ENTITY_ADD, { entity: monsterView(monster) });
+    }
   }
 }

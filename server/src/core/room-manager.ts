@@ -6,6 +6,8 @@ import type { TickScheduler } from './tick.js';
 export interface RoomManagerOptions {
   gameData: GameData;
   tick: TickScheduler;
+  /** Đồng hồ dùng để hẹn giờ quái sống lại; kiểm thử truyền đồng hồ giả. */
+  now?: () => number;
   /** Báo lỗi khi một room hỏng trong nhịp tick — một room lỗi không được làm chết cả server. */
   onError?: (error: unknown, mapId: string) => void;
   /**
@@ -48,7 +50,7 @@ export class RoomManager {
     if (!map) {
       return undefined;
     }
-    const room = new Room(map, this.options.gameData.npcs);
+    const room = new Room(map, this.options.gameData.npcs, this.options.gameData.monsters);
     this.rooms.set(mapId, room);
     return room;
   }
@@ -84,7 +86,7 @@ export class RoomManager {
       try {
         // Một room có thể bị xoá trong lúc xử lý cổng (người cuối cùng vừa đi khỏi), nên duyệt
         // trên bản sao danh sách room.
-        for (const crossing of room.tick()) {
+        for (const crossing of room.tick((this.options.now ?? Date.now)())) {
           this.options.onPortal?.(room, crossing.player, crossing.portal);
         }
       } catch (error) {

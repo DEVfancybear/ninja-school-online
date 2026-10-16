@@ -160,6 +160,36 @@ export class TestGameClient {
     return this.received.slice(mark).filter((packet) => op === undefined || packet.op === op);
   }
 
+  /**
+   * Chờ gói tin **kế tiếp** thuộc một trong các mã, tính từ vị trí `from`, và trả về luôn vị trí
+   * của gói sau nó.
+   *
+   * `waitFor` chỉ chờ được một mã, còn một trận đấu thì gói tới là "một trong ba" (`BATTLE_TURN`,
+   * `BATTLE_RESULT`, `BATTLE_END`) tuỳ diễn biến. Hàm này duyệt tuần tự nên không bỏ sót gói nào và
+   * không để lại người chờ (waiter) mồ côi như khi dùng `Promise.race` với `waitFor`.
+   */
+  async nextPacket(
+    ops: readonly number[],
+    from: number,
+    timeoutMs = 5000,
+  ): Promise<{ packet: ReceivedPacket; next: number } | undefined> {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const pending = this.received
+        .slice(from)
+        .map((packet, offset) => ({ packet, index: from + offset }))
+        .filter((entry) => ops.includes(entry.packet.op));
+      const first = pending[0];
+      if (first) {
+        return { packet: first.packet, next: first.index + 1 };
+      }
+      if (Date.now() >= deadline) {
+        return undefined;
+      }
+      await delay(20);
+    }
+  }
+
   /** Đóng kết nối phía client và chờ tới khi đóng xong. */
   async close(): Promise<void> {
     if (this.socket.readyState === WebSocket.OPEN) {

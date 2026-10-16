@@ -1,74 +1,20 @@
-import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createApp } from '../app.js';
 import { loadEnv } from '../config/env.js';
 import { closeTestDb, getTestDb, TEST_DATABASE_URL } from '../test/database.js';
-import { DEFAULT_GAME_DATA_DIR, GameDataError, loadGameData } from './game-data.js';
-
-const temporaryDirs: string[] = [];
-
-/** Các thư mục con của game-data; bản sao dùng cho test phải có **đủ cả sáu**. */
-const COLLECTION_DIRS = ['maps', 'npcs', 'monsters', 'skills', 'items', 'classes'] as const;
-
-type CollectionDir = (typeof COLLECTION_DIRS)[number];
-
-/** Nội dung một bộ game-data, khoá theo đường dẫn tương đối (`maps/lang-khoi-nguon.json`). */
-type GameDataFiles = Record<CollectionDir, Record<string, Record<string, unknown>>>;
-
-/** Tạo một thư mục game-data tạm từ các file cho trước (đường dẫn tương đối → nội dung JSON). */
-async function makeGameDataDir(files: Record<string, unknown>): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'ninja-game-data-'));
-  temporaryDirs.push(dir);
-  for (const [relativePath, content] of Object.entries(files)) {
-    if (content === undefined) {
-      // `undefined` = cố ý không tạo file này (dùng để thử dữ liệu thiếu).
-      continue;
-    }
-    const fullPath = join(dir, relativePath);
-    await mkdir(dirname(fullPath), { recursive: true });
-    await writeFile(fullPath, JSON.stringify(content, null, 2), 'utf8');
-  }
-  return dir;
-}
-
-async function readGameDataFile(relativePath: string): Promise<Record<string, unknown>> {
-  const raw = await readFile(join(DEFAULT_GAME_DATA_DIR, relativePath), 'utf8');
-  return JSON.parse(raw) as Record<string, unknown>;
-}
-
-/**
- * Bản sao **đầy đủ** dữ liệu thật (mọi thư mục con), sửa bằng `mutate` để tạo ca sai có kiểm soát.
- * Bản sao thiếu thư mục sẽ tự báo lỗi "quái trên bản đồ chưa có file", không phải điều cần thử ở đây.
- */
-async function copyGameDataDir(mutate: (files: GameDataFiles) => void): Promise<string> {
-  const files = {
-    maps: {},
-    npcs: {},
-    monsters: {},
-    skills: {},
-    items: {},
-    classes: {},
-  } as GameDataFiles;
-  for (const dir of COLLECTION_DIRS) {
-    for (const name of (await readdir(join(DEFAULT_GAME_DATA_DIR, dir))).sort()) {
-      if (name.endsWith('.json')) {
-        files[dir][`${dir}/${name}`] = await readGameDataFile(`${dir}/${name}`);
-      }
-    }
-  }
-  mutate(files);
-  return makeGameDataDir(Object.assign({}, ...COLLECTION_DIRS.map((dir) => files[dir])));
-}
+import {
+  copyGameDataDir,
+  makeGameDataDir,
+  removeTemporaryGameDataDirs,
+  type GameDataFiles,
+} from '../test/game-data-dir.js';
+import { GameDataError, loadGameData } from './game-data.js';
 
 const VILLAGE = 'maps/lang-khoi-nguon.json';
 const TRAINING = 'maps/bai-luyen-tap.json';
 
 afterAll(async () => {
-  for (const dir of temporaryDirs) {
-    await rm(dir, { recursive: true, force: true });
-  }
+  await removeTemporaryGameDataDirs();
   await closeTestDb();
 });
 

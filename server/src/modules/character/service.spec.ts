@@ -3,6 +3,8 @@ import { MAX_CHARACTERS_PER_ACCOUNT } from '@ninja/shared';
 import { closeTestDb, getTestDb, resetDatabase } from '../../test/database.js';
 import { AppError } from '../../errors.js';
 import { accounts } from '../../db/schema.js';
+import { DEFAULT_GAME_DATA_DIR, loadGameData } from '../../world/game-data.js';
+import { InventoryService } from '../inventory/service.js';
 import { CharacterService } from './service.js';
 
 let service: CharacterService;
@@ -11,7 +13,8 @@ let accountId: string;
 beforeEach(async () => {
   await resetDatabase();
   const db = await getTestDb();
-  service = new CharacterService(db);
+  const gameData = await loadGameData(DEFAULT_GAME_DATA_DIR);
+  service = new CharacterService(db, new InventoryService(db, gameData), gameData);
   const [account] = await db
     .insert(accounts)
     .values({ username: 'ninja_01', passwordHash: '$argon2id$fake' })

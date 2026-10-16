@@ -10,12 +10,15 @@ import {
   Opcode,
   decodeClientPacket,
   decodeEnvelope,
+  type AttackMob,
+  type BattleAction,
   type ChatSend,
   type ClientHello,
   type EnterMap,
   type Move,
   type NpcTalk,
   type Ping,
+  type UseItem,
 } from '@ninja/shared';
 import type { FastifyInstance } from 'fastify';
 import { WebSocket, WebSocketServer, type RawData } from 'ws';
@@ -356,6 +359,27 @@ export class WebSocketGateway {
         const talk = this.decode<NpcTalk>(session, op, payload);
         if (talk) {
           world.talkToNpc(session, talk);
+        }
+        return;
+      }
+      case Opcode.C2S_ATTACK_MOB: {
+        const attack = this.decode<AttackMob>(session, op, payload);
+        if (attack) {
+          world.attackMonster(session, attack);
+        }
+        return;
+      }
+      case Opcode.C2S_BATTLE_ACTION: {
+        const action = this.decode<BattleAction>(session, op, payload);
+        if (action) {
+          world.battleAction(session, action);
+        }
+        return;
+      }
+      case Opcode.C2S_USE_ITEM: {
+        const use = this.decode<UseItem>(session, op, payload);
+        if (use) {
+          world.useItem(session, use);
         }
         return;
       }

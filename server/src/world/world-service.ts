@@ -4,6 +4,8 @@ import {
   Opcode,
   PROTOCOL_VERSION,
   TICK_RATE_MS,
+  type AttackMob,
+  type BattleAction,
   type Character,
   type ChatSend,
   type ClientHello,
@@ -13,10 +15,15 @@ import {
   type Ping,
   type ServerEnterMap,
   type ServerHello,
+  type UseItem,
 } from '@ninja/shared';
+import { BattleService } from '../battle/service.js';
 import type { RoomManager } from '../core/room-manager.js';
+import type { TickScheduler } from '../core/tick.js';
 import type { ChatService } from '../modules/chat/service.js';
 import type { CharacterService } from '../modules/character/service.js';
+import { characterStatsPayload } from '../modules/character/stats.js';
+import type { InventoryService } from '../modules/inventory/service.js';
 import type { NpcService } from '../modules/npc/service.js';
 import type { GameSession } from '../net/session.js';
 import type { SessionRegistry } from '../net/session-registry.js';
@@ -40,6 +47,9 @@ export interface WorldServiceOptions {
   characters: CharacterService;
   chat: ChatService;
   npcs: NpcService;
+  inventory: InventoryService;
+  /** Nhịp dùng chung: trận đấu đếm lượt và hết giờ trên cùng nhịp với phần còn lại của server. */
+  tick: TickScheduler;
   /** Xác thực access token (dùng `app.jwt`); trả `undefined` nếu token sai hoặc hết hạn. */
   verifyToken: (token: string) => AccountToken | undefined;
   now?: () => number;
@@ -56,9 +66,26 @@ export interface AccountToken {
  */
 export class WorldService {
   private readonly now: () => number;
+  /**
+   * Trận đấu PvE (M3). Thế giới **sở hữu** nó (chứ không nhận từ ngoài) vì trận đấu cần room, phiên
+   * kết nối, dữ liệu nhân vật, túi đồ — và cần gọi lại thế giới khi người chơi thua (hồi sinh về làng).
+   */
+  readonly battle: BattleService;
 
   constructor(private readonly options: WorldServiceOptions) {
     this.now = options.now ?? (() => Date.now());
+    this.battle = new BattleService({
+      gameData: options.gameData,
+      rooms: options.rooms,
+      sessions: options.sessions,
+      characters: options.characters,
+      inventory: options.inventory,
+      tick: options.tick,
+      onDefeat: (characterId) => {
+        this.respawnAtStart(characterId);
+      },
+      now: this.now,
+    });
 
     if (!options.gameData.maps.has(START_MAP_ID)) {
       throw new GameDataError([
@@ -128,6 +155,8 @@ export class WorldService {
 
     session.send(Opcode.S2C_HELLO, this.helloPayload(character, room.map.id));
     this.sendEnterMap(session, room, player);
+    // Chỉ số và túi đồ gửi ngay sau bản đồ: HUD cần chúng trước khi người chơi kịp đánh con quái nào.
+    await this.sendCharacterState(session, character.id);
     // Người đã ở trong map mới biết có người vừa vào.
     room.broadcast(Opcode.S2C_ENTITY_ADD, { entity: playerView(player) }, player.id);
   }
@@ -143,6 +172,12 @@ export class WorldService {
       return;
     }
     const { room, player } = located;
+
+    if (this.battle.isBusy(player.id)) {
+      // Trong trận thì đứng yên: đánh nhau mà chạy lung tung sẽ phá vỡ luật khoảng cách của trận.
+      session.sendError(ErrorCode.IN_BATTLE, 'đang trong trận đấu, không di chuyển được');
+      return;
+    }
 
     const rejection = checkMove(room.map, { x: player.x, y: player.y }, move);
     if (rejection) {
@@ -230,6 +265,61 @@ export class WorldService {
     session.send(Opcode.S2C_NPC_DIALOG, this.options.npcs.dialog(npc));
   }
 
+  /** `C2S_ATTACK_MOB`: chạm vào quái trong tầm để vào trận (hoặc vào chung trận đang có). */
+  attackMonster(session: GameSession, request: AttackMob): void {
+    const located = this.locate(session);
+    if (!located) {
+      this.rejectNotInWorld(session);
+      return;
+    }
+    void this.battle.engage({
+      session,
+      room: located.room,
+      player: located.player,
+      targetId: request.targetId,
+    });
+  }
+
+  /** `C2S_BATTLE_ACTION`: hành động trong lượt của người chơi. */
+  battleAction(session: GameSession, request: BattleAction): void {
+    void this.battle.action(session, request);
+  }
+
+  /** `C2S_USE_ITEM`: dùng vật phẩm hồi phục khi đang rảnh (trong trận phải đi qua lượt). */
+  useItem(session: GameSession, request: UseItem): void {
+    void this.battle.useItem(session, request);
+  }
+
+  /**
+   * Đưa một nhân vật về điểm hồi sinh của làng khởi đầu (sau khi thua trận). Máu/nội lực đã được ghi
+   * xuống database trước khi hàm này chạy; ở đây chỉ đổi bản đồ và gửi lại dữ liệu bản đồ.
+   */
+  respawnAtStart(characterId: string): void {
+    const session = this.options.sessions.get(characterId);
+    const from = session?.mapId ? this.options.rooms.get(session.mapId) : undefined;
+    const player = from?.getPlayer(characterId);
+    const target = this.options.rooms.getOrCreate(START_MAP_ID);
+    const spawn = target?.map.spawnPosition(START_SPAWN_ID) ?? target?.map.defaultSpawn();
+    if (!session || !from || !player || !target || !spawn) {
+      return;
+    }
+
+    from.removePlayer(player.id);
+    from.broadcast(Opcode.S2C_ENTITY_REMOVE, { id: player.id });
+    this.options.rooms.dropIfEmpty(from);
+
+    player.x = spawn.x;
+    player.y = spawn.y;
+    player.target = undefined;
+    player.facing = 'none';
+    target.addPlayer(player);
+    session.mapId = target.map.id;
+
+    this.sendEnterMap(session, target, player);
+    target.broadcast(Opcode.S2C_ENTITY_ADD, { entity: playerView(player) }, player.id);
+    void this.sendCharacterState(session, characterId);
+  }
+
   /** `C2S_PING` → `S2C_PONG` (trả lại `clientTime` để client đo độ trễ). */
   ping(session: GameSession, ping: Ping): void {
     session.send(Opcode.S2C_PONG, { clientTime: ping.clientTime, serverTime: this.now() });
@@ -249,6 +339,8 @@ export class WorldService {
     }
 
     this.options.chat.forget(characterId);
+    // Rời trận trước khi rời bản đồ: người chơi biến khỏi trận, quái còn sống thì hồi đầy máu.
+    this.battle.leave(characterId);
     this.options.sessions.release(characterId, session);
 
     if (!mapId) {
@@ -260,6 +352,19 @@ export class WorldService {
       room.broadcast(Opcode.S2C_ENTITY_REMOVE, { id: player.id });
       this.options.rooms.dropIfEmpty(room);
     }
+  }
+
+  /** `S2C_CHARACTER` + túi đồ: trạng thái nhân vật mà HUD và trận đấu cần. */
+  private async sendCharacterState(session: GameSession, characterId: string): Promise<void> {
+    const record = await this.options.characters.findById(characterId);
+    if (!record || session.closed) {
+      return;
+    }
+    session.send(
+      Opcode.S2C_CHARACTER,
+      characterStatsPayload({ record, data: this.options.gameData }),
+    );
+    session.send(Opcode.S2C_INVENTORY_UPDATE, await this.options.inventory.toPacket(characterId));
   }
 
   private helloPayload(character: Character, mapId: string): ServerHello {
@@ -334,3 +439,4 @@ export class WorldService {
     session.sendError(ErrorCode.INTERNAL, 'bạn chưa vào bản đồ nào, hãy bắt tay lại');
   }
 }
+
