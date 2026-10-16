@@ -192,13 +192,13 @@ Nội dung: chạm quái để vào trận, trận theo lượt có đồng hồ
 
 | Lệnh | Kết quả |
 |---|---|
-| `pnpm test` | ✅ **422 bài xanh** — shared 72 (5 file), server 162 (14 file), client 178 (20 file), data-validator 10 |
+| `pnpm test` | ✅ **423 bài xanh** — shared 72 (5 file), server 162 (14 file), client 179 (20 file), data-validator 10 |
 | `pnpm e2e` (Playwright, `NINJA_E2E_CLIENT_PORT=4300`) | ✅ **21/21** — 17 bài M1–M3 + 4 bài M4 (mua–mặc–tải lại, bán–đánh quái lấy đá–cường hóa, thiếu yên, mua lại món đã có) |
 | `pnpm validate:data` | ✅ 26 file game-data hợp lệ |
 | `pnpm lint` / `pnpm typecheck` / `pnpm build` / `pnpm format:check` | ✅ exit 0 |
 | Bundle client | khởi tạo **726,35 kB**, chunk `play` lazy 1,47 MB |
 
-Riêng M4: server **44 bài** (equipment 10, shop 13, upgrade 9, WebSocket thật 12), client **+19 bài** (178 so với 159 của M3).
+Riêng M4: server **44 bài** (equipment 10, shop 13, upgrade 9, WebSocket thật 12), client **+20 bài** (179 so với 159 của M3).
 
 **Quyết định thiết kế đã chốt ở M4:**
 1. **Túi = hàng `equipped_slot is null`** — mặc/tháo chỉ đổi cột trên đúng hàng cũ, không sinh hàng thứ hai nên túi đầy 40 loại vẫn mặc được (đã test).
@@ -208,7 +208,12 @@ Riêng M4: server **44 bài** (equipment 10, shop 13, upgrade 9, WebSocket thậ
 5. **Trần cường hóa theo món** qua `upgradeMaxLevelOf()` (món có thể khai trần riêng, không vượt trần chung 5).
 6. **Bảng túi đồ nằm dưới thanh HUD** — trước đây nó che nút "Trang bị" trên HUD nên bấm không được.
 
-**Ghi chú vận hành (máy dev):** sau khi sửa `shared/`, xoá `client/.angular/cache` trước khi chạy lại dev/e2e — Vite giữ bản `@ninja/shared` cũ trong cache nên trang chơi vỡ (`does not provide an export named 'EQUIP_SLOTS'`) và 13 bài e2e đỏ dù mã đúng.
+**Ghi chú vận hành (máy dev):** sau khi sửa `shared/`, xoá `client/.angular/cache` trước khi chạy lại dev/e2e — Vite giữ bản `@ninja/shared` cũ trong cache nên trang chơi vỡ (`does not provide an export named 'EQUIP_SLOTS'`) và 13 bài e2e đỏ dù mã đúng. Chạy nhiều bộ test nặng **song song** có thể làm `pnpm test` đứng ở `server/src/battle/combat.spec.ts` (timeout của vitest không cắt được); chạy một mình thì cả bộ xanh (~143 s cho server).
+
+**Sửa sau vòng kiểm chứng độc lập (2026-10-16):** verifier vòng 1 trả **FAIL** — CI đỏ ở `e1d05cb` (một bài `ws.spec.ts` chập chờn) và bài e2e cường hóa chập chờn (2/3 lần). Ba lỗi thật đã sửa, kèm hai chỗ tài liệu lệch mã (thiếu `already_owned`/`item_equipped` trong danh sách mã lỗi; câu về sổ giao dịch):
+1. **`S2C_ENTITY_ADD` báo trễ** — gói báo người vừa vào map bị đẩy ra sau các lượt đọc database lúc bắt tay, nên người vào sau kịp nhận gói ADD của người vào trước; nay báo ngay trong cùng nhịp.
+2. **`waitFor` khớp gói cũ** — bài "đi bộ vào vùng cổng" khớp nhầm gói ADD còn nằm trong bộ đệm rồi kiểm tra trước khi gói thật tới; thêm `TestGameClient.waitForSince(mark, ...)` chỉ tìm gói đến sau mốc.
+3. **Bấm quái xa hơn một lệnh `C2S_MOVE` (600 px)** — client gửi đúng một lệnh nên server từ chối `too_far` và nhân vật đứng im (bài e2e farm đá vụn gặp cảnh này khi con gần nhất đã gục); nay client nối nhiều chặng ≤ 600 px cho tới khi vào tầm đánh.
 
 ### M5 — Nhiệm vụ chính tuyến chương 1 (~2 tuần)
 Nội dung: hệ nhiệm vụ tổng quát (nhận/tiến độ/trả), 10–15 nhiệm vụ đầu (chào làng → bài học đầu tiên → bái sư), hội thoại NPC theo cây, thưởng EXP/Yên/vật phẩm, mở khóa tính năng theo mốc.

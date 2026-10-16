@@ -537,6 +537,66 @@ describe('Play', () => {
     expect(payloadOf(attack!)).toEqual({ targetId: 'mob:lang-khoi-nguon:1' });
   });
 
+  it('bấm vào quái xa hơn một lệnh di chuyển thì đi từng chặng, không đứng im', async () => {
+    fixture = await setup();
+    const webSocket = await joinWorld(fixture, { map: false });
+    webSocket.deliver(enterMapWithMonstersFrame());
+    await render(fixture);
+    // Đẩy con chuột ra xa 668 px — hơn giới hạn một lệnh `C2S_MOVE` (600 px).
+    webSocket.deliver(
+      encodePacket(
+        Opcode.S2C_ENTITY_MOVE,
+        { moves: [{ id: 'mob:lang-khoi-nguon:1', x: 700, y: 32, facing: 'none' }] },
+        6,
+      ),
+    );
+    await render(fixture);
+
+    window.__ninjaWorld?.attackMonster('Chuột Đồng');
+    await sleep(140);
+    await render(fixture);
+
+    // Chặng đầu dừng đúng ở giới hạn 600 px, vẫn nằm trên đường tới con quái.
+    const firstLeg = webSocket
+      .packets()
+      .filter((packet) => packet.op === Opcode.C2S_MOVE)
+      .at(-1);
+    expect(payloadOf(firstLeg!)).toEqual({ x: 632, y: 32 });
+    expect(webSocket.packets().some((packet) => packet.op === Opcode.C2S_ATTACK_MOB)).toBe(false);
+
+    // Nhân vật nhích được một quãng: client gửi chặng mới, lần này nhắm thẳng con quái.
+    webSocket.deliver(
+      encodePacket(
+        Opcode.S2C_ENTITY_MOVE,
+        { moves: [{ id: 'p1', x: 100, y: 32, facing: 'e' }] },
+        7,
+      ),
+    );
+    await sleep(140);
+    await render(fixture);
+    const secondLeg = webSocket
+      .packets()
+      .filter((packet) => packet.op === Opcode.C2S_MOVE)
+      .at(-1);
+    expect(payloadOf(secondLeg!)).toEqual({ x: 700, y: 32 });
+
+    // Tới đủ tầm thì tự xin vào trận, không cần bấm lại.
+    webSocket.deliver(
+      encodePacket(
+        Opcode.S2C_ENTITY_MOVE,
+        { moves: [{ id: 'p1', x: 650, y: 32, facing: 'e' }] },
+        8,
+      ),
+    );
+    await sleep(140);
+    await render(fixture);
+    const attack = webSocket
+      .packets()
+      .filter((packet) => packet.op === Opcode.C2S_ATTACK_MOB)
+      .at(-1);
+    expect(payloadOf(attack!)).toEqual({ targetId: 'mob:lang-khoi-nguon:1' });
+  });
+
   it('bảng trận đấu hiện ra khi server mở trận và nút Đánh thường gửi hành động', async () => {
     fixture = await setup();
     const webSocket = await joinWorld(fixture, { map: false });

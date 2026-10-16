@@ -16,6 +16,7 @@ import {
   CHAT_MAX_LENGTH,
   ErrorCode,
   MAX_CHARACTERS_PER_ACCOUNT,
+  MAX_MOVE_DISTANCE_PX,
   MONSTER_ENGAGE_RANGE_PX,
   Opcode,
   TICK_RATE_MS,
@@ -48,6 +49,12 @@ import { ShopPanel } from '../../ui/shop-panel/shop-panel';
 
 /** Thời gian thanh thông báo tự ẩn. */
 export const NOTICE_HIDE_MS = 4000;
+
+/**
+ * Đuổi theo quái ở xa: đi được quãng này kể từ lệnh trước thì gửi chặng mới — đủ thưa để không
+ * thành một tràng lệnh, mà vẫn bám sát đường đi.
+ */
+export const APPROACH_REISSUE_PX = 48;
 
 /**
  * Sau khi bắt tay xong, chờ ngần này mili giây cho `S2C_ENTER_MAP`.
@@ -196,6 +203,9 @@ export class Play implements OnInit, OnDestroy {
    */
   private pendingAttackId: string | null = null;
 
+  /** Chặng đang đi khi đuổi theo con quái ở xa; `null` khi không đuổi theo con nào. */
+  private approachLeg: { from: Point; to: Point } | null = null;
+
   constructor() {
     // Rời khỏi `ready` (mất mạng, chưa nối được) là bỏ ngay dữ liệu thế giới cũ. Xoá ở đây,
     // lúc trạng thái đổi, chứ không xoá lúc bắt tay xong — làm vậy sẽ xoá nhầm bản đồ vừa nhận.
@@ -211,6 +221,7 @@ export class Play implements OnInit, OnDestroy {
         this.localFacing.set(null);
         this.snapshotEpoch = 0;
         this.pendingAttackId = null;
+        this.approachLeg = null;
         this.bagOpen.set(false);
         this.equipmentOpen.set(false);
         this.clearSnapshotTimer();
@@ -347,6 +358,7 @@ export class Play implements OnInit, OnDestroy {
       return;
     }
     this.pendingAttackId = null;
+    this.approachLeg = null;
     this.movement.requestDestination(destination);
   }
 
@@ -366,12 +378,14 @@ export class Play implements OnInit, OnDestroy {
     }
     if (distance(self, monster) <= MONSTER_ENGAGE_RANGE_PX) {
       this.pendingAttackId = null;
+      this.approachLeg = null;
       this.movement.reset();
       this.socket.send(Opcode.C2S_ATTACK_MOB, { targetId: monster.id });
       return;
     }
     this.pendingAttackId = monsterId;
-    this.movement.requestDestination({ x: monster.x, y: monster.y });
+    this.approachLeg = null;
+    this.approachPendingMonster(monster);
   }
 
   /** Người chơi chọn một hành động trong trận (từ bảng trận đấu). */
@@ -535,6 +549,7 @@ export class Play implements OnInit, OnDestroy {
     this.localFacing.set(null);
     this.chatNotice.set(null);
     this.pendingAttackId = null;
+    this.approachLeg = null;
     this.battleState.reset();
     if (this.snapshotEpoch === epoch) {
       this.clearSnapshotTimer();
@@ -621,18 +636,55 @@ export class Play implements OnInit, OnDestroy {
     }
     if (this.inBattle()) {
       this.pendingAttackId = null;
+      this.approachLeg = null;
       return;
     }
     const self = this.world.self();
     const monster = this.world.entities().find((entity) => entity.id === pending);
     if (!self || !monster || (monster.hp ?? 1) <= 0) {
       this.pendingAttackId = null;
+      this.approachLeg = null;
       return;
     }
     if (distance(self, monster) <= MONSTER_ENGAGE_RANGE_PX) {
       this.pendingAttackId = null;
+      this.approachLeg = null;
       this.socket.send(Opcode.C2S_ATTACK_MOB, { targetId: monster.id });
+      return;
     }
+    this.approachPendingMonster(monster);
+  }
+
+  /**
+   * Đi từng chặng tới con quái đang nhắm: một lệnh `C2S_MOVE` chỉ được xa tối đa
+   * `MAX_MOVE_DISTANCE_PX`, nên quái ở xa hơn phải nối nhiều chặng mới tới nơi. Chặng mới chỉ gửi
+   * khi nhân vật đã nhích được một quãng hoặc đã tới đầu chặng cũ — nhờ vậy điểm đến bị chặn (hoặc
+   * lệnh bị server từ chối) không thành một tràng lệnh lặp lại mỗi khung hình.
+   */
+  private approachPendingMonster(monster: Point): void {
+    const self = this.world.self();
+    if (!self) {
+      return;
+    }
+    const dx = monster.x - self.x;
+    const dy = monster.y - self.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist === 0) {
+      return;
+    }
+    const legLength = Math.min(dist, MAX_MOVE_DISTANCE_PX);
+    const destination = {
+      x: self.x + (dx / dist) * legLength,
+      y: self.y + (dy / dist) * legLength,
+    };
+    const leg = this.approachLeg;
+    const reachedLeg = leg !== null && distance(leg.to, self) <= APPROACH_REISSUE_PX;
+    const movedOn = leg !== null && distance(leg.from, self) >= APPROACH_REISSUE_PX;
+    if (leg !== null && !reachedLeg && !movedOn) {
+      return;
+    }
+    this.approachLeg = { from: { x: self.x, y: self.y }, to: destination };
+    this.movement.requestDestination(destination);
   }
 
   /** Dùng chung cho cú bấm thật ngoài canvas và hàm hook của kiểm thử đầu-cuối. */
