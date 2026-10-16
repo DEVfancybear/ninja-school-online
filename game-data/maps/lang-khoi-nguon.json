@@ -2612,6 +2612,11 @@
    "id": "npc-thay-hieu-truong",
    "x": 20,
    "y": 10
+  },
+  {
+   "id": "npc-thay-do",
+   "x": 18,
+   "y": 14
   }
  ],
  "monsters": [

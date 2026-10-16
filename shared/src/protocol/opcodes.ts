@@ -47,6 +47,20 @@ export const Opcode = {
   C2S_USE_ITEM: 0x0401,
   /** Toàn bộ túi đồ sau khi có thay đổi. */
   S2C_INVENTORY_UPDATE: 0x0402,
+  /** Mặc một món trang bị đang có trong túi vào ô của nó. */
+  C2S_EQUIP: 0x0403,
+  /** Tháo món đang mặc ở một ô ra túi. */
+  C2S_UNEQUIP: 0x0404,
+  /** Toàn bộ trang bị đang mặc, gửi lại mỗi khi trang bị đổi. */
+  S2C_EQUIPMENT: 0x0405,
+  /** Mua một món ở shop của NPC đang nói chuyện. */
+  C2S_SHOP_BUY: 0x0406,
+  /** Bán một món trong túi cho shop. */
+  C2S_SHOP_SELL: 0x0407,
+  /** Thử cường hóa một món trang bị (tốn yên và đá). */
+  C2S_UPGRADE: 0x0408,
+  /** Kết quả một lần cường hóa: thành công hay thất bại, cấp mới, chi phí đã mất. */
+  S2C_UPGRADE_RESULT: 0x0409,
 
   /** Client "chạm" vào một con quái để vào trận. */
   C2S_ATTACK_MOB: 0x0501,

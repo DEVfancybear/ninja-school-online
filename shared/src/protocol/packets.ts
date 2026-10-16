@@ -1,9 +1,11 @@
 import { z } from 'zod';
 import { CLASSES, SCHOOLS } from '../constants/game.js';
 import { INVENTORY_CAPACITY } from '../constants/character.js';
+import { EQUIP_SLOTS, SELL_PRICE_RATIO } from '../constants/equipment.js';
 import { CHAT_MAX_LENGTH, MAX_MOVE_DISTANCE_PX } from '../constants/world.js';
 import { ITEM_KINDS } from '../schemas/item.js';
 import { MONSTER_SHAPES } from '../schemas/monster.js';
+import { StatBlockSchema } from '../schemas/school.js';
 import { CHAT_CHANNELS, Opcode } from './opcodes.js';
 
 /** Toạ độ trong thế giới, tính bằng pixel. */
@@ -35,6 +37,34 @@ export const EntitySchema = z.object({
 });
 
 export type Entity = z.infer<typeof EntitySchema>;
+
+// ----------------------------------------------------------- shop (M4)
+
+/** Một món shop đang bán: đủ để client hiện bảng hàng mà không cần đọc `game-data`. */
+export const ShopEntrySchema = z.object({
+  itemId: z.string().min(1),
+  name: z.string().min(1),
+  kind: z.enum(ITEM_KINDS),
+  price: z.number().int().min(0),
+  /** Giá shop mua lại món này (`sellPrice()` trong `shared/src/constants/equipment.ts`). */
+  sellPrice: z.number().int().min(0),
+  levelRequired: z.number().int().min(1),
+  description: z.string().default(''),
+  slot: z.enum(EQUIP_SLOTS).nullable().default(null),
+  stats: StatBlockSchema.default({ strength: 0, agility: 0, spirit: 0, hp: 0, mp: 0 }),
+  upgradeMaxLevel: z.number().int().min(0).default(0),
+  healHp: z.number().int().min(0).optional(),
+  healMp: z.number().int().min(0).optional(),
+});
+export type ShopEntry = z.infer<typeof ShopEntrySchema>;
+
+/** Quầy hàng của một NPC, gửi kèm hội thoại khi bấm vào NPC bán hàng. */
+export const ShopSchema = z.object({
+  /** Tỉ lệ shop mua lại, để client hiện giá bán mà không phải biết luật ở phía server. */
+  sellRatio: z.number().min(0).max(1).default(SELL_PRICE_RATIO),
+  entries: z.array(ShopEntrySchema),
+});
+export type Shop = z.infer<typeof ShopSchema>;
 
 // ---------------------------------------------------------------- hệ thống
 
@@ -93,6 +123,17 @@ export const ErrorCode = {
   ITEM_NOT_USABLE: 'item_not_usable',
   ITEM_NO_EFFECT: 'item_no_effect',
   INVALID_TARGET: 'invalid_target',
+
+  // Trang bị, shop và cường hóa (M4): mỗi lý do từ chối một mã riêng để client nói đúng lý do.
+  NOT_EQUIPPABLE: 'not_equippable',
+  LEVEL_TOO_LOW: 'level_too_low',
+  ALREADY_OWNED: 'already_owned',
+  NOT_ENOUGH_YEN: 'not_enough_yen',
+  NOT_FOR_SALE: 'not_for_sale',
+  ITEM_EQUIPPED: 'item_equipped',
+  NOT_UPGRADABLE: 'not_upgradable',
+  UPGRADE_MAXED: 'upgrade_maxed',
+  NOT_ENOUGH_MATERIAL: 'not_enough_material',
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 
@@ -200,6 +241,8 @@ export const NpcDialogSchema = z.object({
   npcId: z.string().min(1),
   npcName: z.string().min(1),
   lines: z.array(z.object({ speaker: z.string().min(1), text: z.string().min(1) })),
+  /** Quầy hàng của NPC này; `null` là NPC thường, chỉ nói chuyện. */
+  shop: ShopSchema.nullable().default(null),
 });
 export type NpcDialog = z.infer<typeof NpcDialogSchema>;
 
@@ -258,11 +301,23 @@ export const InventoryItemSchema = z.object({
   name: z.string().min(1),
   kind: z.enum(ITEM_KINDS),
   quantity: z.number().int().min(1),
-  /** Dùng được ngay trong túi (vật phẩm hồi phục) hay chỉ để đó cho M4. */
+  /** Dùng được ngay trong túi (vật phẩm hồi phục) hay không. */
   usable: z.boolean(),
   description: z.string().default(''),
   healHp: z.number().int().min(0).optional(),
   healMp: z.number().int().min(0).optional(),
+  /** Ô mặc của món; `null` với vật phẩm không mặc được. */
+  slot: z.enum(EQUIP_SLOTS).nullable().default(null),
+  /** Cấp cường hóa hiện tại; `0` là món chưa cường hóa. */
+  upgradeLevel: z.number().int().min(0).default(0),
+  /** Chỉ số món này cộng thêm **ở cấp hiện tại** (đã tính cường hóa). */
+  stats: StatBlockSchema.default({ strength: 0, agility: 0, spirit: 0, hp: 0, mp: 0 }),
+  levelRequired: z.number().int().min(1).default(1),
+  price: z.number().int().min(0).default(0),
+  /** Giá shop mua lại món này. */
+  sellPrice: z.number().int().min(0).default(0),
+  /** Cấp cường hóa tối đa của món; `0` là không cường hóa được. */
+  upgradeMaxLevel: z.number().int().min(0).default(0),
 });
 export type InventoryItem = z.infer<typeof InventoryItemSchema>;
 
@@ -276,6 +331,60 @@ export type InventoryUpdate = z.infer<typeof InventoryUpdateSchema>;
 
 export const UseItemSchema = z.object({ itemId: z.string().min(1) });
 export type UseItem = z.infer<typeof UseItemSchema>;
+
+// ------------------------------------------- trang bị, shop, cường hóa (M4)
+
+export const EquipSchema = z.object({ itemId: z.string().min(1) });
+export type Equip = z.infer<typeof EquipSchema>;
+
+export const UnequipSchema = z.object({ slot: z.enum(EQUIP_SLOTS) });
+export type Unequip = z.infer<typeof UnequipSchema>;
+
+/** Một ô trang bị: món đang mặc, hoặc `null` khi ô trống. */
+export const EquipmentSlotSchema = z.object({
+  slot: z.enum(EQUIP_SLOTS),
+  item: InventoryItemSchema.nullable(),
+});
+export type EquipmentSlot = z.infer<typeof EquipmentSlotSchema>;
+
+/** Toàn bộ trang bị đang mặc — gửi lại mỗi khi trang bị đổi, cùng cách với túi đồ. */
+export const EquipmentUpdateSchema = z.object({
+  slots: z.array(EquipmentSlotSchema),
+});
+export type EquipmentUpdate = z.infer<typeof EquipmentUpdateSchema>;
+
+export const ShopBuySchema = z.object({
+  itemId: z.string().min(1),
+  quantity: z.number().int().min(1).max(99).default(1),
+});
+export type ShopBuy = z.infer<typeof ShopBuySchema>;
+
+export const ShopSellSchema = z.object({
+  itemId: z.string().min(1),
+  quantity: z.number().int().min(1).max(99).default(1),
+});
+export type ShopSell = z.infer<typeof ShopSellSchema>;
+
+export const UpgradeSchema = z.object({ itemId: z.string().min(1) });
+export type Upgrade = z.infer<typeof UpgradeSchema>;
+
+/** Kết quả một lần cường hóa — gửi về cả khi thành công lẫn khi thất bại. */
+export const UpgradeResultSchema = z.object({
+  itemId: z.string().min(1),
+  name: z.string().min(1),
+  success: z.boolean(),
+  /** Cấp sau lần thử: tăng 1 nếu thành công, giữ nguyên nếu thất bại. */
+  upgradeLevel: z.number().int().min(0),
+  /** Cấp trước lần thử. */
+  previousLevel: z.number().int().min(0),
+  /** Tỉ lệ thành công của chính lần thử này, để client nhắc lại cho người chơi. */
+  successRate: z.number().min(0).max(1),
+  yenCost: z.number().int().min(0),
+  materialQty: z.number().int().min(0),
+  /** Câu tiếng Việt client hiện thẳng trên thanh thông báo. */
+  message: z.string().min(1),
+});
+export type UpgradeResult = z.infer<typeof UpgradeResultSchema>;
 
 // -------------------------------------------------------------- chiến đấu
 
@@ -428,6 +537,11 @@ export const CLIENT_PACKETS: PacketSchemaTable = {
   [Opcode.C2S_CHAT]: ChatSendSchema,
   [Opcode.C2S_NPC_TALK]: NpcTalkSchema,
   [Opcode.C2S_USE_ITEM]: UseItemSchema,
+  [Opcode.C2S_EQUIP]: EquipSchema,
+  [Opcode.C2S_UNEQUIP]: UnequipSchema,
+  [Opcode.C2S_SHOP_BUY]: ShopBuySchema,
+  [Opcode.C2S_SHOP_SELL]: ShopSellSchema,
+  [Opcode.C2S_UPGRADE]: UpgradeSchema,
   [Opcode.C2S_ATTACK_MOB]: AttackMobSchema,
   [Opcode.C2S_BATTLE_ACTION]: BattleActionSchema,
 } as const;
@@ -447,6 +561,8 @@ export const SERVER_PACKETS: PacketSchemaTable = {
   [Opcode.S2C_CHARACTER]: CharacterStatsSchema,
   [Opcode.S2C_LEVEL_UP]: LevelUpSchema,
   [Opcode.S2C_INVENTORY_UPDATE]: InventoryUpdateSchema,
+  [Opcode.S2C_EQUIPMENT]: EquipmentUpdateSchema,
+  [Opcode.S2C_UPGRADE_RESULT]: UpgradeResultSchema,
   [Opcode.S2C_BATTLE_START]: BattleStartSchema,
   [Opcode.S2C_BATTLE_TURN]: BattleTurnSchema,
   [Opcode.S2C_BATTLE_RESULT]: BattleResultSchema,

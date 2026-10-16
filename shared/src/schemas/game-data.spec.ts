@@ -39,11 +39,37 @@ describe('ItemSchema', () => {
       id: 'item-kiem-go',
       name: 'Kiếm Gỗ',
       kind: 'weapon',
+      slot: 'weapon',
       levelRequired: 1,
       price: 100,
     });
-    expect(item.slot).toBeNull();
     expect(item.stats.hp).toBe(0);
+    expect(item.upgradeMaxLevel).toBe(0);
+  });
+
+  it('từ chối trang bị không có ô mặc', () => {
+    expect(() =>
+      ItemSchema.parse({
+        id: 'item-kiem-go',
+        name: 'Kiếm Gỗ',
+        kind: 'weapon',
+        levelRequired: 1,
+        price: 100,
+      }),
+    ).toThrow();
+  });
+
+  it('từ chối vật phẩm không mặc được nhưng lại có ô mặc', () => {
+    expect(() =>
+      ItemSchema.parse({
+        id: 'item-da-vun',
+        name: 'Đá Vụn',
+        kind: 'material',
+        slot: 'weapon',
+        levelRequired: 1,
+        price: 5,
+      }),
+    ).toThrow();
   });
 
   it('từ chối giá âm', () => {
@@ -52,6 +78,7 @@ describe('ItemSchema', () => {
         id: 'item-kiem-go',
         name: 'Kiếm Gỗ',
         kind: 'weapon',
+        slot: 'weapon',
         levelRequired: 1,
         price: -5,
       }),

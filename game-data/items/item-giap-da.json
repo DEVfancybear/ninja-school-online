@@ -1,0 +1,17 @@
+{
+  "id": "item-giap-da",
+  "name": "Giáp Da",
+  "kind": "armor",
+  "slot": "body",
+  "levelRequired": 5,
+  "price": 600,
+  "stats": {
+    "strength": 0,
+    "agility": 2,
+    "spirit": 0,
+    "hp": 40,
+    "mp": 0
+  },
+  "upgradeMaxLevel": 5,
+  "description": "Giáp da thú dày và ấm, phải đủ cấp 5 mới mặc vừa."
+}

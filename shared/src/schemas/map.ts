@@ -171,6 +171,11 @@ export const NpcSchema = z.object({
   name: z.string().min(1),
   color: z.string().regex(/^#[0-9a-f]{6}$/i, 'màu phải ở dạng #rrggbb'),
   lines: z.array(NpcLineSchema).min(1),
+  /**
+   * Vật phẩm NPC này bán, theo `itemId` trong `game-data/items/`. Rỗng là NPC thường, bấm vào chỉ
+   * có hội thoại. `checkGameData` kiểm từng món phải có thật và có giá.
+   */
+  shop: z.array(z.string().regex(/^item-[a-z0-9-]+$/)).default([]),
 });
 
 export type NpcLine = z.infer<typeof NpcLineSchema>;

@@ -1,0 +1,17 @@
+{
+  "id": "item-bua-binh-an",
+  "name": "Bùa Bình An",
+  "kind": "accessory",
+  "slot": "accessory",
+  "levelRequired": 1,
+  "price": 200,
+  "stats": {
+    "strength": 0,
+    "agility": 0,
+    "spirit": 2,
+    "hp": 5,
+    "mp": 0
+  },
+  "upgradeMaxLevel": 5,
+  "description": "Lá bùa người làng tặng, đeo bên người cho an tâm."
+}

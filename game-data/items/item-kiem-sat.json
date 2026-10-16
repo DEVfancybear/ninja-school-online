@@ -1,0 +1,17 @@
+{
+  "id": "item-kiem-sat",
+  "name": "Kiếm Sắt",
+  "kind": "weapon",
+  "slot": "weapon",
+  "levelRequired": 5,
+  "price": 500,
+  "stats": {
+    "strength": 5,
+    "agility": 0,
+    "spirit": 0,
+    "hp": 0,
+    "mp": 0
+  },
+  "upgradeMaxLevel": 5,
+  "description": "Kiếm sắt nặng hơn kiếm gỗ, phải đủ cấp 5 mới vung nổi."
+}

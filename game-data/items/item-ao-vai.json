@@ -1,0 +1,17 @@
+{
+  "id": "item-ao-vai",
+  "name": "Áo Vải",
+  "kind": "armor",
+  "slot": "body",
+  "levelRequired": 1,
+  "price": 150,
+  "stats": {
+    "strength": 0,
+    "agility": 1,
+    "spirit": 0,
+    "hp": 20,
+    "mp": 0
+  },
+  "upgradeMaxLevel": 5,
+  "description": "Áo vải thô của học viên, mặc vào thấy chắc người hơn."
+}

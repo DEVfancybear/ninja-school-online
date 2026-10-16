@@ -154,6 +154,43 @@ function checkItemReferences(
 }
 
 /**
+ * Shop của NPC: món bán ra phải có file dữ liệu và phải có giá — bán 0 yên thì shop vô nghĩa.
+ * Mỗi món chỉ được bán một lần trong cùng một quầy.
+ */
+function checkShops(npcs: readonly Npc[], items: ReadonlyMap<string, Item>): GameDataIssue[] {
+  const issues: GameDataIssue[] = [];
+  for (const npc of npcs) {
+    const file = `npcs/${npc.id}.json`;
+    const seen = new Set<string>();
+    for (const [index, itemId] of npc.shop.entries()) {
+      if (seen.has(itemId)) {
+        issues.push({ file, path: `shop.${index}`, message: `shop bán "${itemId}" hai lần` });
+        continue;
+      }
+      seen.add(itemId);
+
+      const item = items.get(itemId);
+      if (!item) {
+        issues.push({
+          file,
+          path: `shop.${index}`,
+          message: `shop bán vật phẩm "${itemId}" nhưng không có file trong game-data/items/`,
+        });
+        continue;
+      }
+      if (item.price <= 0) {
+        issues.push({
+          file,
+          path: `shop.${index}`,
+          message: `shop bán "${itemId}" nhưng món này không có giá (price = 0)`,
+        });
+      }
+    }
+  }
+  return issues;
+}
+
+/**
  * Chiêu phải thuộc đúng trường của phái mình, và chỉ dùng những gì hệ thống chiến đấu M3 đã làm
  * được: một mục tiêu, không hiệu ứng phụ. Dữ liệu không được hứa thứ mã nguồn chưa làm.
  */
@@ -232,7 +269,7 @@ function checkClassCoverage(data: GameDataSet): GameDataIssue[] {
 
 /**
  * Kiểm tra liên-file của game-data: id trùng, cổng và chỗ đặt NPC/quái, vật phẩm được nhắc tới,
- * chiêu thức và độ phủ nội dung của từng phái.
+ * shop của NPC, chiêu thức và độ phủ nội dung của từng phái.
  *
  * Hàm thuần (không đọc file) nên cả `tools/data-validator` và server dùng chung đúng một bộ luật;
  * hai nơi chỉ khác nhau ở cách đọc file và cách báo lỗi.
@@ -248,11 +285,13 @@ export function checkGameData(data: GameDataSet): GameDataIssue[] {
   const npcs = new Set(data.npcs.map((npc) => npc.id));
   const monsters = new Set(data.monsters.map((monster) => monster.id));
   const items = new Set(data.items.map((item) => item.id));
+  const itemsById = new Map(data.items.map((item) => [item.id, item]));
 
   return [
     ...checkPortals(maps),
     ...checkPlacements(maps, npcs, monsters),
     ...checkItemReferences(data.monsters, data.classes, items),
+    ...checkShops(data.npcs, itemsById),
     ...checkSkills(data.skills),
     ...checkClassCoverage(data),
   ];

@@ -1,0 +1,29 @@
+{
+  "id": "npc-thay-do",
+  "name": "Thầy Đồ",
+  "color": "#c98a2b",
+  "lines": [
+    {
+      "speaker": "Thầy Đồ",
+      "text": "Học viên mới à? Ghé xem hàng của thầy đi, đồ ở đây rẻ mà bền."
+    },
+    {
+      "speaker": "Thầy Đồ",
+      "text": "Mua về rồi mặc vào, chỉ số tăng ngay, đi đánh quái đỡ vất vả."
+    },
+    {
+      "speaker": "Thầy Đồ",
+      "text": "Món nào muốn mạnh thêm thì mang yên và đá vụn tới, thầy cường hóa cho."
+    }
+  ],
+  "shop": [
+    "item-kiem-go",
+    "item-ao-vai",
+    "item-bang-do",
+    "item-bua-binh-an",
+    "item-kiem-sat",
+    "item-giap-da",
+    "item-banh-bao",
+    "item-tra-rung"
+  ]
+}

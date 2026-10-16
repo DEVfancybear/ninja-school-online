@@ -4,3 +4,4 @@ export * from './character.js';
 export * from './world.js';
 export * from './battle.js';
 export * from './stats.js';
+export * from './equipment.js';

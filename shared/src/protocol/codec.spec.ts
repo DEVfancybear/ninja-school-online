@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { SELL_PRICE_RATIO } from '../constants/equipment.js';
 import { decodeClientPacket, decodeEnvelope, decodeServerPacket, encodePacket } from './codec.js';
 import { Opcode } from './opcodes.js';
+import { NpcDialogSchema, UpgradeResultSchema } from './packets.js';
 import { PROTOCOL_VERSION } from './version.js';
 
 describe('encodePacket / decodeEnvelope', () => {
@@ -193,7 +195,79 @@ function combatant(id: string, kind: 'player' | 'monster') {
 }
 
 describe('PROTOCOL_VERSION', () => {
-  it('là 3 ở cột mốc M3 (đã thêm chiến đấu theo lượt, quái và túi đồ)', () => {
-    expect(PROTOCOL_VERSION).toBe(3);
+  it('là 4 ở cột mốc M4 (đã thêm trang bị theo ô, shop và cường hóa)', () => {
+    expect(PROTOCOL_VERSION).toBe(4);
+  });
+});
+
+describe('gói tin M4 (trang bị, shop, cường hóa)', () => {
+  it('chấp nhận lệnh mặc trang bị theo itemId', () => {
+    expect(decodeClientPacket(Opcode.C2S_EQUIP, { itemId: 'item-kiem-go' }).ok).toBe(true);
+  });
+
+  it('từ chối lệnh tháo khi ô không hợp lệ', () => {
+    expect(decodeClientPacket(Opcode.C2S_UNEQUIP, { slot: 'chan' }).ok).toBe(false);
+  });
+
+  it('chấp nhận lệnh mua không kèm số lượng và điền mặc định 1', () => {
+    const result = decodeClientPacket(Opcode.C2S_SHOP_BUY, { itemId: 'item-banh-bao' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toEqual({ itemId: 'item-banh-bao', quantity: 1 });
+    }
+  });
+
+  it('từ chối số lượng mua bằng 0', () => {
+    expect(
+      decodeClientPacket(Opcode.C2S_SHOP_BUY, { itemId: 'item-banh-bao', quantity: 0 }).ok,
+    ).toBe(false);
+  });
+
+  it('điền mặc định cho quầy hàng và món thiếu trường trong hội thoại NPC', () => {
+    const dialog = NpcDialogSchema.parse({
+      npcId: 'npc-thay-do',
+      npcName: 'Thầy Đồ',
+      lines: [{ speaker: 'Thầy Đồ', text: 'chào' }],
+      shop: {
+        entries: [
+          {
+            itemId: 'item-ao-vai',
+            name: 'Áo Vải',
+            kind: 'armor',
+            price: 150,
+            sellPrice: 60,
+            levelRequired: 1,
+          },
+        ],
+      },
+    });
+
+    expect(dialog.shop?.sellRatio).toBe(SELL_PRICE_RATIO);
+    expect(dialog.shop?.entries[0]?.slot).toBeNull();
+    expect(dialog.shop?.entries[0]?.stats.hp).toBe(0);
+  });
+
+  it('NPC thường có shop là null', () => {
+    const dialog = NpcDialogSchema.parse({
+      npcId: 'npc-thay-hieu-truong',
+      npcName: 'Thầy Hiệu Trưởng',
+      lines: [{ speaker: 'Thầy Hiệu Trưởng', text: 'chào' }],
+    });
+    expect(dialog.shop).toBeNull();
+  });
+
+  it('chấp nhận kết quả cường hóa thất bại (giữ nguyên cấp)', () => {
+    const result = UpgradeResultSchema.parse({
+      itemId: 'item-kiem-go',
+      name: 'Kiếm Gỗ',
+      success: false,
+      upgradeLevel: 2,
+      previousLevel: 2,
+      successRate: 0.75,
+      yenCost: 260,
+      materialQty: 1,
+      message: 'cường hóa thất bại, món vẫn ở +2',
+    });
+    expect(result.upgradeLevel).toBe(result.previousLevel);
   });
 });

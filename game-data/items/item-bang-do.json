@@ -1,0 +1,17 @@
+{
+  "id": "item-bang-do",
+  "name": "Băng Đô",
+  "kind": "armor",
+  "slot": "head",
+  "levelRequired": 1,
+  "price": 120,
+  "stats": {
+    "strength": 0,
+    "agility": 0,
+    "spirit": 1,
+    "hp": 0,
+    "mp": 10
+  },
+  "upgradeMaxLevel": 5,
+  "description": "Băng đô buộc trán, giữ đầu lạnh để tập trung nội lực."
+}
