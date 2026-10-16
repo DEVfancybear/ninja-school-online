@@ -1,0 +1,61 @@
+<aside class="shop">
+  <header class="shop__head">
+    <h2 class="shop__title">Cửa hàng{{ npcName() ? ' — ' + npcName() : '' }}</h2>
+    <button type="button" class="shop__close" (click)="closed.emit()" aria-label="Đóng cửa hàng">
+      Đóng
+    </button>
+  </header>
+
+  <section class="shop__section">
+    <h3 class="shop__heading">Mua</h3>
+    <ul class="shop__list">
+      @for (row of rows(); track row.itemId) {
+        <li class="shop__row">
+          <span class="shop__info">
+            <span class="shop__name">{{ row.name }}</span>
+            @if (row.note) {
+              <span class="shop__note">{{ row.note }}</span>
+            }
+            <span class="shop__req">cần cấp {{ row.levelRequired }}</span>
+          </span>
+          <span class="shop__price">{{ row.price }} yên</span>
+          <button
+            type="button"
+            class="shop__buy"
+            [title]="'Mua ' + row.name + ' với ' + row.price + ' yên'"
+            (click)="buy.emit(row.itemId)"
+          >
+            Mua
+          </button>
+        </li>
+      }
+    </ul>
+  </section>
+
+  <section class="shop__section">
+    <h3 class="shop__heading">Bán</h3>
+    @if (items().length === 0) {
+      <p class="shop__empty">Túi đang trống, chưa có gì để bán.</p>
+    }
+    <ul class="shop__list">
+      @for (item of items(); track item.itemId) {
+        <li class="shop__row">
+          <span class="shop__info">
+            <span class="shop__name"
+              >{{ item.name }}<span class="shop__qty">×{{ item.quantity }}</span></span
+            >
+          </span>
+          <span class="shop__price">{{ item.sellPrice }} yên</span>
+          <button
+            type="button"
+            class="shop__sell"
+            [title]="'Bán ' + item.name + ' lấy ' + item.sellPrice + ' yên'"
+            (click)="sell.emit(item.itemId)"
+          >
+            Bán
+          </button>
+        </li>
+      }
+    </ul>
+  </section>
+</aside>

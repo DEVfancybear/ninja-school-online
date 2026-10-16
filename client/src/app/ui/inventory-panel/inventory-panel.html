@@ -12,40 +12,82 @@
   }
 
   <ul class="bag__list">
-    @for (item of items(); track item.itemId) {
+    @for (row of rows(); track row.item.itemId) {
       <li class="bag__row">
         <div class="bag__info">
           <span class="bag__name"
-            >{{ item.name }}<span class="bag__qty">×{{ item.quantity }}</span></span
+            >{{ row.item.name }}
+            @if (row.plus) {
+              <span class="bag__level">{{ row.plus }}</span>
+            }
+            <span class="bag__qty">×{{ row.item.quantity }}</span></span
           >
-          <span class="bag__desc">{{ item.description }}</span>
-          @if (item.healHp || item.healMp) {
+          <span class="bag__desc">{{ row.item.description }}</span>
+          @if (row.stats) {
+            <span class="bag__stats">{{ row.stats }}</span>
+          }
+          @if (row.item.healHp || row.item.healMp) {
             <span class="bag__effect">
-              @if (item.healHp) {
-                hồi {{ item.healHp }} máu
+              @if (row.item.healHp) {
+                hồi {{ row.item.healHp }} máu
               }
-              @if (item.healHp && item.healMp) {
+              @if (row.item.healHp && row.item.healMp) {
                 ·
               }
-              @if (item.healMp) {
-                hồi {{ item.healMp }} nội lực
+              @if (row.item.healMp) {
+                hồi {{ row.item.healMp }} nội lực
               }
             </span>
           }
         </div>
-        @if (item.usable) {
-          <button
-            type="button"
-            class="bag__use"
-            [disabled]="locked()"
-            [title]="
-              locked() ? 'Trong trận, dùng vật phẩm là một lượt của bạn' : 'Dùng ' + item.name
-            "
-            (click)="use.emit(item.itemId)"
-          >
-            Dùng
-          </button>
-        }
+        <div class="bag__actions">
+          @if (row.item.usable) {
+            <button
+              type="button"
+              class="bag__use"
+              [disabled]="locked()"
+              [title]="
+                locked() ? 'Trong trận, dùng vật phẩm là một lượt của bạn' : 'Dùng ' + row.item.name
+              "
+              (click)="use.emit(row.item.itemId)"
+            >
+              Dùng
+            </button>
+          }
+          @if (row.item.slot) {
+            <button
+              type="button"
+              class="bag__equip"
+              [title]="'Mặc ' + row.item.name + ' vào ô ' + row.slotLabel"
+              (click)="equip.emit(row.item.itemId)"
+            >
+              Mặc
+            </button>
+          }
+          @if (row.upgrade; as info) {
+            <button
+              type="button"
+              class="bag__upgrade"
+              [disabled]="info.maxed"
+              [title]="
+                info.maxed
+                  ? 'Món đã ở cấp cường hóa tối đa'
+                  : 'Mất ' +
+                    info.yen +
+                    ' yên, tỉ lệ thành công ' +
+                    info.ratePercent +
+                    '%. Thất bại thì món giữ nguyên cấp.'
+              "
+              (click)="upgrade.emit(row.item.itemId)"
+            >
+              @if (info.maxed) {
+                Đã tối đa
+              } @else {
+                Cường hóa · {{ info.yen }} yên · {{ info.ratePercent }}%
+              }
+            </button>
+          }
+        </div>
       </li>
     }
   </ul>

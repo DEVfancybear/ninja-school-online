@@ -51,8 +51,10 @@
         [character]="stats()"
         [bagCount]="inventory().length"
         [bagOpen]="bagOpen()"
+        [equipmentOpen]="equipmentOpen()"
         (toggleChat)="toggleChat()"
         (toggleInventory)="toggleInventory()"
+        (toggleEquipment)="toggleEquipment()"
       />
 
       @if (chatVisible()) {
@@ -71,12 +73,33 @@
           [capacity]="bagCapacity()"
           [locked]="inBattle()"
           (use)="onUseItem($event)"
+          (equip)="onEquip($event)"
+          (upgrade)="onUpgrade($event)"
           (closed)="setInventoryOpen(false)"
+        />
+      }
+
+      @if (equipmentOpen()) {
+        <app-equipment-panel
+          [equipment]="equipment()"
+          (unequip)="onUnequip($event)"
+          (closed)="setEquipmentOpen(false)"
         />
       }
 
       @if (dialog(); as npcDialog) {
         <app-npc-dialog [dialog]="npcDialog" (closed)="closeDialog()" />
+      }
+
+      @if (shopCounter(); as counter) {
+        <app-shop-panel
+          [shop]="counter.shop"
+          [npcName]="counter.npcName"
+          [items]="inventory()"
+          (buy)="onShopBuy($event)"
+          (sell)="onShopSell($event)"
+          (closed)="closeDialog()"
+        />
       }
 
       @if (battle(); as battleState) {
