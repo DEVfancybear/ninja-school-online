@@ -9,6 +9,8 @@ import {
   PROTOCOL_VERSION,
   TICK_RATE_MS,
   encodePacket,
+  upgradeSuccessRate,
+  upgradeYenCost,
 } from '@ninja/shared';
 import { vi } from 'vitest';
 
@@ -190,11 +192,120 @@ function inventoryFrame(): string {
           usable: true,
           description: 'Hồi máu',
           healHp: 40,
+          price: 30,
+          sellPrice: 12,
         },
       ],
       capacity: 40,
     },
     4,
+  );
+}
+
+/** Kiếm Gỗ +2 như server gửi: chỉ số đã tính cả cường hóa, giá và trần cường hóa đều có sẵn. */
+const SWORD = {
+  itemId: 'item-kiem-go',
+  name: 'Kiếm Gỗ',
+  kind: 'weapon',
+  quantity: 1,
+  usable: false,
+  description: 'Vũ khí tập luyện',
+  slot: 'weapon',
+  upgradeLevel: 2,
+  stats: { strength: 2, agility: 1, spirit: 0, hp: 8, mp: 0 },
+  levelRequired: 1,
+  price: 80,
+  sellPrice: 32,
+  upgradeMaxLevel: 5,
+};
+
+/** Túi có một món ăn (để bán) và một món mặc được kiêm cường hóa được. */
+function gearInventoryFrame(seq: number): string {
+  return encodePacket(
+    Opcode.S2C_INVENTORY_UPDATE,
+    {
+      items: [
+        {
+          itemId: 'item-banh-bao',
+          name: 'Bánh Bao Hấp',
+          kind: 'consumable',
+          quantity: 2,
+          usable: true,
+          description: 'Hồi máu',
+          healHp: 40,
+          price: 30,
+          sellPrice: 12,
+        },
+        SWORD,
+      ],
+      capacity: 40,
+    },
+    seq,
+  );
+}
+
+/** Trang bị đang mặc: chỉ ô vũ khí có món, để thấy cả ô đầy lẫn ô trống. */
+function equipmentFrame(seq: number): string {
+  return encodePacket(
+    Opcode.S2C_EQUIPMENT,
+    {
+      slots: [
+        { slot: 'weapon', item: SWORD },
+        { slot: 'body', item: null },
+        { slot: 'head', item: null },
+        { slot: 'accessory', item: null },
+      ],
+    },
+    seq,
+  );
+}
+
+/** Hội thoại của NPC bán hàng: có `shop` nên trang phải mở bảng shop. */
+function npcShopDialogFrame(seq: number): string {
+  return encodePacket(
+    Opcode.S2C_NPC_DIALOG,
+    {
+      npcId: 'npc1',
+      npcName: 'Thầy Hiệu Trưởng',
+      lines: [{ speaker: 'Thầy Hiệu Trưởng', text: 'Ta có đồ cho ngươi chọn.' }],
+      shop: {
+        sellRatio: 0.4,
+        entries: [
+          {
+            itemId: SWORD.itemId,
+            name: SWORD.name,
+            kind: SWORD.kind,
+            price: SWORD.price,
+            sellPrice: SWORD.sellPrice,
+            levelRequired: SWORD.levelRequired,
+            description: SWORD.description,
+            slot: SWORD.slot,
+            stats: SWORD.stats,
+            upgradeMaxLevel: SWORD.upgradeMaxLevel,
+          },
+        ],
+      },
+    },
+    seq,
+  );
+}
+
+/** Kết quả một lần cường hóa thất bại; server đã soạn sẵn câu tiếng Việt trong `message`. */
+function upgradeResultFrame(seq: number): string {
+  return encodePacket(
+    Opcode.S2C_UPGRADE_RESULT,
+    {
+      itemId: SWORD.itemId,
+      name: SWORD.name,
+      success: false,
+      upgradeLevel: 2,
+      previousLevel: 2,
+      successRate: 0.75,
+      yenCost: 260,
+      materialQty: 1,
+      message: 'Cường hóa thất bại, Kiếm Gỗ giữ nguyên +2.',
+    },
+    seq,
   );
 }
 
@@ -464,7 +575,15 @@ describe('Play', () => {
     await render(fixture);
 
     expect(window.__ninjaWorld?.inventory()).toEqual([
-      { itemId: 'item-banh-bao', name: 'Bánh Bao Hấp', quantity: 2, usable: true },
+      {
+        itemId: 'item-banh-bao',
+        name: 'Bánh Bao Hấp',
+        quantity: 2,
+        usable: true,
+        slot: null,
+        upgradeLevel: 0,
+        sellPrice: 12,
+      },
     ]);
 
     window.__ninjaWorld?.toggleInventory(true);
@@ -483,6 +602,220 @@ describe('Play', () => {
       .filter((packet) => packet.op === Opcode.C2S_USE_ITEM)
       .at(-1);
     expect(payloadOf(use!)).toEqual({ itemId: 'item-banh-bao' });
+  });
+
+  it('mở bảng trang bị từ HUD: thấy món đang mặc và nút Tháo gửi C2S_UNEQUIP', async () => {
+    fixture = await setup();
+    const webSocket = await joinWorld(fixture, { map: false });
+    webSocket.deliver(enterMapWithMonstersFrame());
+    webSocket.deliver(equipmentFrame(7));
+    await render(fixture);
+
+    const gearButton = element(fixture).querySelector('.hud__gear');
+    expect(gearButton).not.toBeNull();
+    (gearButton as HTMLElement).click();
+    await render(fixture);
+
+    expect(window.__ninjaWorld?.equipmentOpen()).toBe(true);
+    const rows = [...element(fixture).querySelectorAll('.gear__row')];
+    expect(rows).toHaveLength(4);
+    expect(rows[0]?.textContent).toContain('Vũ khí');
+    expect(rows[0]?.textContent).toContain('Kiếm Gỗ');
+    expect(rows[0]?.textContent).toContain('+2');
+    expect(rows[0]?.textContent).toContain('Sức mạnh +2');
+    // Ba ô còn lại chưa có món nào: hiện tên ô và chữ "Trống", không có nút Tháo.
+    expect(rows[1]?.textContent).toContain('Áo');
+    expect(rows[1]?.textContent).toContain('Trống');
+    expect(rows[1]?.querySelector('.gear__unequip')).toBeNull();
+
+    (rows[0]?.querySelector('.gear__unequip') as HTMLElement).click();
+    await render(fixture);
+
+    const unequip = webSocket
+      .packets()
+      .filter((packet) => packet.op === Opcode.C2S_UNEQUIP)
+      .at(-1);
+    expect(payloadOf(unequip!)).toEqual({ slot: 'weapon' });
+    // Tháo xong bảng vẫn mở để còn tháo món khác.
+    expect(window.__ninjaWorld?.equipmentOpen()).toBe(true);
+
+    (element(fixture).querySelector('.gear__close') as HTMLElement).click();
+    await render(fixture);
+    expect(window.__ninjaWorld?.equipmentOpen()).toBe(false);
+    expect(element(fixture).querySelector('.gear')).toBeNull();
+  });
+
+  it('nút Mặc và nút Cường hóa trong túi gửi gói tin, kết quả hiện lên thanh thông báo', async () => {
+    fixture = await setup();
+    const webSocket = await joinWorld(fixture, { map: false });
+    webSocket.deliver(enterMapWithMonstersFrame());
+    webSocket.deliver(gearInventoryFrame(8));
+    await render(fixture);
+
+    window.__ninjaWorld?.toggleInventory(true);
+    await render(fixture);
+
+    const row = [...element(fixture).querySelectorAll('.bag__row')].find((candidate) =>
+      candidate.textContent?.includes('Kiếm Gỗ'),
+    );
+    expect(row?.querySelector('.bag__level')?.textContent?.trim()).toBe('+2');
+    expect(row?.querySelector('.bag__stats')?.textContent).toContain('Sức mạnh +2');
+    // Số yên và tỉ lệ phải là của cấp hiện tại (2), không phải của cấp 0.
+    const upgradeLabel = row?.querySelector('.bag__upgrade')?.textContent ?? '';
+    expect(upgradeLabel).toContain('Cường hóa');
+    expect(upgradeLabel).toContain(`${upgradeYenCost(2)} yên`);
+    expect(upgradeLabel).toContain(`${Math.round(upgradeSuccessRate(2) * 100)}%`);
+    // Món ăn không mặc được và không cường hóa được: chỉ có nút Dùng.
+    const foodRow = [...element(fixture).querySelectorAll('.bag__row')].find((candidate) =>
+      candidate.textContent?.includes('Bánh Bao Hấp'),
+    );
+    expect(foodRow?.querySelector('.bag__equip')).toBeNull();
+    expect(foodRow?.querySelector('.bag__upgrade')).toBeNull();
+
+    (row?.querySelector('.bag__equip') as HTMLElement).click();
+    (row?.querySelector('.bag__upgrade') as HTMLElement).click();
+    await render(fixture);
+
+    const equip = webSocket
+      .packets()
+      .filter((packet) => packet.op === Opcode.C2S_EQUIP)
+      .at(-1);
+    expect(payloadOf(equip!)).toEqual({ itemId: 'item-kiem-go' });
+    const upgrade = webSocket
+      .packets()
+      .filter((packet) => packet.op === Opcode.C2S_UPGRADE)
+      .at(-1);
+    expect(payloadOf(upgrade!)).toEqual({ itemId: 'item-kiem-go' });
+
+    webSocket.deliver(upgradeResultFrame(9));
+    await render(fixture);
+
+    // Câu của server hiện nguyên văn trên thanh thông báo, kèm tỉ lệ của chính lần thử đó.
+    const notice = element(fixture).querySelector('.notice-bar')?.textContent ?? '';
+    expect(notice).toContain('Cường hóa thất bại, Kiếm Gỗ giữ nguyên +2.');
+    expect(notice).toContain('(tỉ lệ 75%)');
+  });
+
+  it('bảng shop hiện khi NPC có hàng: Mua/Bán gửi gói tin, bấm xong bảng vẫn mở', async () => {
+    fixture = await setup();
+    const webSocket = await joinWorld(fixture, { map: false });
+    webSocket.deliver(enterMapWithMonstersFrame());
+    webSocket.deliver(gearInventoryFrame(8));
+    webSocket.deliver(npcShopDialogFrame(10));
+    await render(fixture);
+
+    expect(window.__ninjaWorld?.shop()?.npcName).toBe('Thầy Hiệu Trưởng');
+    expect(window.__ninjaWorld?.shop()?.entries).toEqual([
+      { name: 'Kiếm Gỗ', price: 80, sellPrice: 32 },
+    ]);
+
+    const rows = [...element(fixture).querySelectorAll('.shop__row')];
+    const buyRow = rows.find((row) => row.querySelector('.shop__buy') !== null);
+    expect(buyRow?.textContent).toContain('Kiếm Gỗ');
+    expect(buyRow?.textContent).toContain('80 yên');
+    (buyRow?.querySelector('.shop__buy') as HTMLElement).click();
+
+    // Bảng "Bán" lấy thẳng túi đồ: có cả món ăn lẫn kiếm, không lọc theo hàng của shop.
+    const sellRows = rows.filter((row) => row.querySelector('.shop__sell') !== null);
+    expect(sellRows.map((row) => row.textContent)).toEqual(
+      expect.arrayContaining([expect.stringContaining('Bánh Bao Hấp')]),
+    );
+    const foodRow = sellRows.find((row) => row.textContent?.includes('Bánh Bao Hấp'));
+    expect(foodRow?.textContent).toContain('12 yên');
+    (foodRow?.querySelector('.shop__sell') as HTMLElement).click();
+    await render(fixture);
+
+    const buy = webSocket
+      .packets()
+      .filter((packet) => packet.op === Opcode.C2S_SHOP_BUY)
+      .at(-1);
+    expect(payloadOf(buy!)).toEqual({ itemId: 'item-kiem-go', quantity: 1 });
+    const sell = webSocket
+      .packets()
+      .filter((packet) => packet.op === Opcode.C2S_SHOP_SELL)
+      .at(-1);
+    expect(payloadOf(sell!)).toEqual({ itemId: 'item-banh-bao', quantity: 1 });
+
+    // Mua/bán xong quầy vẫn mở để người chơi bấm tiếp.
+    expect(element(fixture).querySelector('.shop')).not.toBeNull();
+    expect(window.__ninjaWorld?.shop()).not.toBeNull();
+
+    (element(fixture).querySelector('.shop__close') as HTMLElement).click();
+    await render(fixture);
+    expect(element(fixture).querySelector('.shop')).toBeNull();
+    expect(window.__ninjaWorld?.shop()).toBeNull();
+  });
+
+  it('hook kiểm thử phơi trạng thái M4 cho e2e', async () => {
+    fixture = await setup();
+    const webSocket = await joinWorld(fixture, { map: false });
+    webSocket.deliver(enterMapWithMonstersFrame());
+    webSocket.deliver(equipmentFrame(7));
+    webSocket.deliver(gearInventoryFrame(8));
+    webSocket.deliver(npcShopDialogFrame(10));
+    await render(fixture);
+
+    const hook = window.__ninjaWorld;
+    expect(
+      hook?.inventory().map((item) => ({
+        itemId: item.itemId,
+        slot: item.slot,
+        upgradeLevel: item.upgradeLevel,
+        sellPrice: item.sellPrice,
+      })),
+    ).toEqual([
+      { itemId: 'item-banh-bao', slot: null, upgradeLevel: 0, sellPrice: 12 },
+      { itemId: 'item-kiem-go', slot: 'weapon', upgradeLevel: 2, sellPrice: 32 },
+    ]);
+
+    // Bốn ô theo thứ tự EQUIP_SLOTS, ô trống vừa có `empty` vừa có tên rỗng.
+    expect(hook?.equipment().map((entry) => entry.slot)).toEqual([
+      'weapon',
+      'body',
+      'head',
+      'accessory',
+    ]);
+    expect(hook?.equipment().map((entry) => entry.empty)).toEqual([false, true, true, true]);
+    expect(hook?.equipment()[0]).toMatchObject({
+      name: 'Kiếm Gỗ',
+      upgradeLevel: 2,
+      stats: { strength: 2, agility: 1, spirit: 0, hp: 8, mp: 0 },
+    });
+    expect(hook?.equipment()[1]?.name).toBe('');
+    expect(hook?.shop()?.entries[0]?.price).toBe(80);
+
+    hook?.toggleEquipment(true);
+    await render(fixture);
+    expect(hook?.equipmentOpen()).toBe(true);
+    expect(element(fixture).querySelector('.gear')).not.toBeNull();
+
+    hook?.toggleEquipment(false);
+    await render(fixture);
+    expect(hook?.equipmentOpen()).toBe(false);
+    expect(element(fixture).querySelector('.gear')).toBeNull();
+  });
+
+  it('hook kiểm thử phơi chỉ số nhân vật để e2e thấy mặc đồ là chỉ số tăng', async () => {
+    fixture = await setup();
+    const webSocket = await joinWorld(fixture, { map: false });
+    webSocket.deliver(characterFrame());
+    await render(fixture);
+
+    expect(window.__ninjaWorld?.character()).toMatchObject({
+      strength: 6,
+      agility: 5,
+      spirit: 4,
+      attack: 13,
+      defense: 2,
+      speed: 6,
+      maxHp: 60,
+    });
+
+    // Server gửi lại `S2C_CHARACTER` sau khi mặc đồ; hook phải đọc được ngay con số mới.
+    webSocket.deliver(characterFrame({ strength: 8, maxHp: 68, hp: 68 }));
+    await render(fixture);
+
+    expect(window.__ninjaWorld?.character()).toMatchObject({ strength: 8, maxHp: 68, hp: 68 });
   });
 
   it('trong trận thì bấm chỗ khác không gửi lệnh di chuyển', async () => {

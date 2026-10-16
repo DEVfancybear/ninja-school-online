@@ -1,9 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import {
+  EQUIP_SLOTS,
   Opcode,
   TICK_RATE_MS,
   type CharacterStats,
   type Entity,
+  type EquipmentUpdate,
+  type InventoryItem,
   type InventoryUpdate,
   type LevelUp,
   type MapSnapshot,
@@ -42,6 +45,26 @@ function enterMap(overrides: Partial<ServerEnterMap> = {}): ServerEnterMap {
     entity: entity('p1', 'Kakashi', { x: 16, y: 16 }),
     entities: [entity('npc1', 'Thầy Hiệu Trưởng', { kind: 'npc', x: 64, y: 32 })],
     chatBacklog: [{ channel: 'map', fromName: 'Kakashi', text: 'xin chào', at: 10 }],
+    ...overrides,
+  };
+}
+
+/** Một món trong túi với đủ trường của hợp đồng M4 (`slot`, `stats`, giá, trần cường hóa). */
+function bagItem(overrides: Partial<InventoryItem> = {}): InventoryItem {
+  return {
+    itemId: 'item-banh-bao',
+    name: 'Bánh Bao Hấp',
+    kind: 'consumable',
+    quantity: 2,
+    usable: true,
+    description: '',
+    slot: null,
+    upgradeLevel: 0,
+    stats: { strength: 0, agility: 0, spirit: 0, hp: 0, mp: 0 },
+    levelRequired: 1,
+    price: 30,
+    sellPrice: 12,
+    upgradeMaxLevel: 0,
     ...overrides,
   };
 }
@@ -230,16 +253,7 @@ describe('WorldState', () => {
 
     expect(
       world.applyPacket(Opcode.S2C_INVENTORY_UPDATE, {
-        items: [
-          {
-            itemId: 'item-banh-bao',
-            name: 'Bánh Bao Hấp',
-            kind: 'consumable',
-            quantity: 2,
-            usable: true,
-            description: '',
-          },
-        ],
+        items: [bagItem()],
         capacity: 40,
       } satisfies InventoryUpdate),
     ).toBe(true);
@@ -309,6 +323,43 @@ describe('WorldState', () => {
     expect(monsters[0]?.hp).toBe(0);
   });
 
+  it('S2C_EQUIPMENT xếp lại thành đủ bốn ô theo thứ tự EQUIP_SLOTS', () => {
+    // Chưa nhận gói nào thì giao diện vẫn phải vẽ đủ bốn ô trống.
+    expect(world.equipment().map((entry) => entry.slot)).toEqual([...EQUIP_SLOTS]);
+    expect(world.equipment().map((entry) => entry.item)).toEqual([null, null, null, null]);
+
+    const sword = bagItem({
+      itemId: 'item-kiem-go',
+      name: 'Kiếm Gỗ',
+      kind: 'weapon',
+      slot: 'weapon',
+      quantity: 1,
+      usable: false,
+      upgradeLevel: 2,
+      stats: { strength: 2, agility: 1, spirit: 0, hp: 8, mp: 0 },
+      price: 80,
+      sellPrice: 32,
+      upgradeMaxLevel: 5,
+    });
+
+    // Hợp đồng không hứa thứ tự ô trong gói, nên gửi ô `head` trước vẫn phải ra đúng thứ tự bảng.
+    expect(
+      world.applyPacket(Opcode.S2C_EQUIPMENT, {
+        slots: [
+          { slot: 'head', item: null },
+          { slot: 'weapon', item: sword },
+        ],
+      } satisfies EquipmentUpdate),
+    ).toBe(true);
+
+    const equipment = world.equipment();
+    expect(equipment.map((entry) => entry.slot)).toEqual([...EQUIP_SLOTS]);
+    expect(equipment[0]?.item?.name).toBe('Kiếm Gỗ');
+    expect(equipment[0]?.item?.upgradeLevel).toBe(2);
+    expect(equipment[0]?.item?.stats.strength).toBe(2);
+    expect(equipment[1]?.item).toBeNull();
+  });
+
   it('reset() xoá sạch thế giới khi mất kết nối', () => {
     world.applyPacket(Opcode.S2C_ENTER_MAP, enterMap());
     world.reset();
@@ -319,6 +370,7 @@ describe('WorldState', () => {
     expect(world.chat()).toEqual([]);
     expect(world.character()).toBeNull();
     expect(world.inventory()).toEqual([]);
+    expect(world.equipment().map((entry) => entry.item)).toEqual([null, null, null, null]);
     expect(world.lastLevelUp()).toBeNull();
   });
 

@@ -1,0 +1,42 @@
+<aside class="gear">
+  <header class="gear__head">
+    <h2 class="gear__title">Trang bị</h2>
+    <button
+      type="button"
+      class="gear__close"
+      (click)="closed.emit()"
+      aria-label="Đóng bảng trang bị"
+    >
+      ×
+    </button>
+  </header>
+
+  <ul class="gear__list">
+    @for (row of rows(); track row.slot) {
+      <li class="gear__row" [attr.data-slot]="row.slot">
+        <span class="gear__slot">{{ row.label }}</span>
+        @if (row.item; as item) {
+          <span class="gear__item">
+            {{ item.name }}
+            @if (row.plus) {
+              <span class="gear__plus">{{ row.plus }}</span>
+            }
+          </span>
+          @if (row.stats) {
+            <span class="gear__stats">{{ row.stats }}</span>
+          }
+          <button
+            type="button"
+            class="gear__unequip"
+            [title]="'Tháo ' + item.name"
+            (click)="unequip.emit(row.slot)"
+          >
+            Tháo
+          </button>
+        } @else {
+          <span class="gear__empty">Trống</span>
+        }
+      </li>
+    }
+  </ul>
+</aside>

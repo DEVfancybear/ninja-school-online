@@ -1,0 +1,126 @@
+/* Bên trái, sát đáy: bảng hội thoại NPC đã chiếm giữa đáy còn khung chat ở góc phải. */
+:host {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  z-index: 6;
+  display: block;
+}
+
+.shop {
+  width: min(340px, 88vw);
+  max-height: 64vh;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  background: rgba(8, 14, 20, 0.94);
+  color: #e8f1f8;
+  overflow-y: auto;
+}
+
+.shop__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.shop__title {
+  margin: 0;
+  font-size: 15px;
+}
+
+.shop__close {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 7px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.shop__section {
+  margin-top: 4px;
+}
+
+.shop__heading {
+  margin: 6px 0 2px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #fbbf24;
+}
+
+.shop__empty {
+  margin: 0;
+  font-size: 12px;
+  color: #9fb3c8;
+}
+
+.shop__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shop__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.shop__info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.shop__name {
+  font-size: 13px;
+}
+
+.shop__qty {
+  margin-left: 6px;
+  color: #fbbf24;
+}
+
+.shop__note {
+  font-size: 11px;
+  color: #86efac;
+}
+
+.shop__req {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.shop__price {
+  font-size: 12px;
+  color: #fbbf24;
+  white-space: nowrap;
+}
+
+.shop__buy,
+.shop__sell {
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(74, 222, 128, 0.5);
+  background: rgba(21, 94, 55, 0.85);
+  color: #e8f1f8;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.shop__sell {
+  border-color: rgba(148, 163, 184, 0.5);
+  background: rgba(51, 65, 85, 0.85);
+}

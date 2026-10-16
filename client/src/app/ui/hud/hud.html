@@ -51,6 +51,14 @@
     >
       Túi đồ ({{ bagCount() }})
     </button>
+    <button
+      type="button"
+      class="hud__gear ghost"
+      [class.ghost--active]="equipmentOpen()"
+      (click)="toggleEquipment.emit()"
+    >
+      Trang bị
+    </button>
     <button type="button" class="ghost" (click)="toggleChat.emit()">
       {{ chatVisible() ? 'Ẩn chat' : 'Hiện chat' }}
     </button>

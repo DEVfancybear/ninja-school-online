@@ -21,7 +21,9 @@ import {
   TICK_RATE_MS,
   type BattleAction,
   type Character,
+  type EquipSlot,
   type Notify,
+  type UpgradeResult,
 } from '@ninja/shared';
 import { apiErrorMessage } from '../../core/api/api-error';
 import { AuthService } from '../../core/auth/auth.service';
@@ -37,10 +39,12 @@ import { type Facing } from '../../net/world-types';
 import { WorldState } from '../../net/world-state';
 import { BattlePanel, type BattleActionRequest } from '../../ui/battle-panel/battle-panel';
 import { ChatPanel } from '../../ui/chat-panel/chat-panel';
+import { EquipmentPanel } from '../../ui/equipment-panel/equipment-panel';
 import { Hud } from '../../ui/hud/hud';
 import { InventoryPanel } from '../../ui/inventory-panel/inventory-panel';
 import { NoticeBar } from '../../ui/notice-bar/notice-bar';
 import { NpcDialogPanel } from '../../ui/npc-dialog/npc-dialog';
+import { ShopPanel } from '../../ui/shop-panel/shop-panel';
 
 /** Thời gian thanh thông báo tự ẩn. */
 export const NOTICE_HIDE_MS = 4000;
@@ -78,6 +82,8 @@ export const SNAPSHOT_FALLBACK_DELAY = new InjectionToken<number>('ninja.snapsho
     NoticeBar,
     BattlePanel,
     InventoryPanel,
+    EquipmentPanel,
+    ShopPanel,
   ],
   templateUrl: './play.html',
   styleUrl: './play.css',
@@ -104,6 +110,8 @@ export class Play implements OnInit, OnDestroy {
   readonly started = signal(false);
   readonly chatVisible = signal(true);
   readonly bagOpen = signal(false);
+  /** Mở/đóng bảng trang bị; mặc và tháo đều không tự đóng bảng để còn mặc tiếp món khác. */
+  readonly equipmentOpen = signal(false);
   readonly notice = signal<string | null>(null);
   readonly chatNotice = signal<string | null>(null);
   readonly localFacing = signal<Facing | null>(null);
@@ -123,6 +131,7 @@ export class Play implements OnInit, OnDestroy {
   readonly stats = this.world.character;
   readonly inventory = this.world.inventory;
   readonly bagCapacity = this.world.inventoryCapacity;
+  readonly equipment = this.world.equipment;
   readonly battle = this.battleState.battle;
   readonly battleLog = this.battleState.log;
   readonly battleOutcome = this.battleState.outcome;
@@ -132,6 +141,15 @@ export class Play implements OnInit, OnDestroy {
 
   readonly characterName = computed(() => this.world.self()?.name ?? this.character()?.name ?? '');
   readonly mapName = computed(() => this.world.mapName());
+
+  /**
+   * Quầy hàng của NPC đang nói chuyện. Bảng shop sống theo hội thoại nên không có trạng thái riêng:
+   * đóng hội thoại là đóng luôn quầy, còn NPC chỉ nói chuyện thì `S2C_NPC_DIALOG` gửi `shop` null.
+   */
+  readonly shopCounter = computed(() => {
+    const dialog = this.dialog();
+    return dialog?.shop ? { npcName: dialog.npcName, shop: dialog.shop } : null;
+  });
 
   /** Lỗi ở mức kết nối mà việc nối lại không giải quyết được. */
   readonly fatalError = computed(() => {
@@ -194,6 +212,7 @@ export class Play implements OnInit, OnDestroy {
         this.snapshotEpoch = 0;
         this.pendingAttackId = null;
         this.bagOpen.set(false);
+        this.equipmentOpen.set(false);
         this.clearSnapshotTimer();
       });
     });
@@ -255,6 +274,8 @@ export class Play implements OnInit, OnDestroy {
       useItem: (itemId) => this.onUseItem(itemId),
       toggleInventory: (open) => this.setInventoryOpen(open),
       inventoryOpen: () => this.bagOpen(),
+      toggleEquipment: (open) => this.setEquipmentOpen(open),
+      equipmentOpen: () => this.equipmentOpen(),
       closeBattle: () => this.dismissBattleOutcome(),
       lastError: () => this.notice(),
     });
@@ -379,6 +400,14 @@ export class Play implements OnInit, OnDestroy {
     this.bagOpen.set(open);
   }
 
+  toggleEquipment(): void {
+    this.equipmentOpen.update((open) => !open);
+  }
+
+  setEquipmentOpen(open: boolean): void {
+    this.equipmentOpen.set(open);
+  }
+
   /** Dùng một vật phẩm ngoài trận (trong trận phải dùng qua lượt của mình). */
   onUseItem(itemId: string): void {
     if (this.inBattle()) {
@@ -386,6 +415,31 @@ export class Play implements OnInit, OnDestroy {
       return;
     }
     this.socket.send(Opcode.C2S_USE_ITEM, { itemId });
+  }
+
+  /** Mặc một món trong túi. Chỉ số sau khi mặc do server gửi lại bằng `S2C_CHARACTER`, client không tự cộng. */
+  onEquip(itemId: string): void {
+    this.socket.send(Opcode.C2S_EQUIP, { itemId });
+  }
+
+  /** Tháo món ở một ô trang bị. */
+  onUnequip(slot: EquipSlot): void {
+    this.socket.send(Opcode.C2S_UNEQUIP, { slot });
+  }
+
+  /** Mua một món ở quầy đang mở; bấm nhiều lần là mua nhiều món. */
+  onShopBuy(itemId: string): void {
+    this.socket.send(Opcode.C2S_SHOP_BUY, { itemId, quantity: 1 });
+  }
+
+  /** Bán một món trong túi; bấm nhiều lần là bán nhiều món. */
+  onShopSell(itemId: string): void {
+    this.socket.send(Opcode.C2S_SHOP_SELL, { itemId, quantity: 1 });
+  }
+
+  /** Thử cường hóa một món; kết quả về sau bằng `S2C_UPGRADE_RESULT`. */
+  onUpgrade(itemId: string): void {
+    this.socket.send(Opcode.C2S_UPGRADE, { itemId });
   }
 
   /** Bấm vào một NPC (từ canvas Phaser). */
@@ -420,6 +474,8 @@ export class Play implements OnInit, OnDestroy {
       this.battleState.setSelfId(this.world.selfId());
     } else if (op === Opcode.S2C_NOTIFY) {
       this.showNotice((payload as Notify).message);
+    } else if (op === Opcode.S2C_UPGRADE_RESULT) {
+      this.onUpgradeResult(payload as UpgradeResult);
     }
     if (!this.battleState.applyPacket(op, payload)) {
       this.world.applyPacket(op, payload);
@@ -530,6 +586,16 @@ export class Play implements OnInit, OnDestroy {
       this.noticeTimer = undefined;
       this.notice.set(null);
     }, NOTICE_HIDE_MS);
+  }
+
+  /**
+   * Kết quả cường hóa: server đã soạn câu tiếng Việt nên client hiện thẳng `message`, chỉ nhắc thêm
+   * tỉ lệ của chính lần thử này (trường `successRate` có sẵn để nói cho người chơi biết lần vừa rồi
+   * khó tới đâu). Tỉ lệ 100% thì không cần nhắc.
+   */
+  private onUpgradeResult(result: UpgradeResult): void {
+    const rate = Math.round(result.successRate * 100);
+    this.showNotice(result.successRate < 1 ? `${result.message} (tỉ lệ ${rate}%)` : result.message);
   }
 
   private showChatNotice(message: string): void {

@@ -64,6 +64,16 @@ export interface NinjaTestCharacter {
   readonly mp: number;
   readonly maxMp: number;
   readonly yen: number;
+  /**
+   * Chỉ số gốc: server đã cộng trang bị vào rồi, nên e2e kiểm được "mặc vào thấy chỉ số tăng" bằng
+   * chính những số này sau khi mặc/tháo.
+   */
+  readonly strength: number;
+  readonly agility: number;
+  readonly spirit: number;
+  readonly attack: number;
+  readonly defense: number;
+  readonly speed: number;
   readonly skills: readonly {
     readonly skillId: string;
     readonly name: string;
@@ -77,6 +87,36 @@ export interface NinjaTestItem {
   readonly name: string;
   readonly quantity: number;
   readonly usable: boolean;
+  /** Ô mặc của món; `null` với vật phẩm không mặc được. */
+  readonly slot: string | null;
+  readonly upgradeLevel: number;
+  readonly sellPrice: number;
+}
+
+/** Một ô trong bảng trang bị, đúng thứ tự `EQUIP_SLOTS` mà giao diện đang vẽ. */
+export interface NinjaTestEquipmentSlot {
+  readonly slot: string;
+  /** Ô trống: e2e kiểm được bằng trường này hoặc bằng `name` rỗng. */
+  readonly empty: boolean;
+  readonly name: string;
+  readonly upgradeLevel: number;
+  readonly stats: {
+    readonly strength: number;
+    readonly agility: number;
+    readonly spirit: number;
+    readonly hp: number;
+    readonly mp: number;
+  };
+}
+
+/** Quầy hàng của NPC đang nói chuyện; `null` khi NPC chỉ nói chuyện. */
+export interface NinjaTestShop {
+  readonly npcName: string;
+  readonly entries: readonly {
+    readonly name: string;
+    readonly price: number;
+    readonly sellPrice: number;
+  }[];
 }
 
 /** Cầu nối cho e2e: đọc trạng thái client đang vẽ và mô phỏng hành động của người chơi. */
@@ -104,6 +144,12 @@ export interface NinjaWorldTestHook {
   useItem(name: string): void;
   toggleInventory(open?: boolean): void;
   inventoryOpen(): boolean;
+  /** Bốn ô trang bị theo thứ tự `EQUIP_SLOTS`; ô trống có `empty: true` và `name` rỗng. */
+  equipment(): NinjaTestEquipmentSlot[];
+  /** Quầy hàng của NPC đang nói chuyện, `null` khi không có hội thoại bán hàng. */
+  shop(): NinjaTestShop | null;
+  toggleEquipment(open?: boolean): void;
+  equipmentOpen(): boolean;
   /** Câu lỗi gần nhất đang hiện trên thanh thông báo (server từ chối lệnh chẳng hạn). */
   lastError(): string | null;
 }
@@ -117,6 +163,8 @@ export interface NinjaWorldTestActions {
   useItem(itemId: string): void;
   toggleInventory(open: boolean): void;
   inventoryOpen(): boolean;
+  toggleEquipment(open: boolean): void;
+  equipmentOpen(): boolean;
   closeBattle(): void;
   lastError(): string | null;
 }
@@ -173,6 +221,9 @@ export class WorldTestHook {
           name: item.name,
           quantity: item.quantity,
           usable: item.usable,
+          slot: item.slot,
+          upgradeLevel: item.upgradeLevel,
+          sellPrice: item.sellPrice,
         })),
       useItem: (name) => {
         const item = this.world.inventory().find((candidate) => candidate.name === name);
@@ -184,6 +235,32 @@ export class WorldTestHook {
         actions.toggleInventory(open ?? true);
       },
       inventoryOpen: () => actions.inventoryOpen(),
+      equipment: () =>
+        this.world.equipment().map(({ slot, item }) => ({
+          slot,
+          empty: item === null,
+          name: item?.name ?? '',
+          upgradeLevel: item?.upgradeLevel ?? 0,
+          stats: item?.stats ?? EMPTY_STATS,
+        })),
+      shop: () => {
+        const dialog = this.world.npcDialog();
+        if (!dialog?.shop) {
+          return null;
+        }
+        return {
+          npcName: dialog.npcName,
+          entries: dialog.shop.entries.map((entry) => ({
+            name: entry.name,
+            price: entry.price,
+            sellPrice: entry.sellPrice,
+          })),
+        };
+      },
+      toggleEquipment: (open) => {
+        actions.toggleEquipment(open ?? true);
+      },
+      equipmentOpen: () => actions.equipmentOpen(),
       lastError: () => actions.lastError(),
     };
   }
@@ -217,6 +294,12 @@ export class WorldTestHook {
       mp: stats.mp,
       maxMp: stats.maxMp,
       yen: stats.yen,
+      strength: stats.strength,
+      agility: stats.agility,
+      spirit: stats.spirit,
+      attack: stats.attack,
+      defense: stats.defense,
+      speed: stats.speed,
       skills: stats.skills.map((skill) => ({
         skillId: skill.skillId,
         name: skill.name,
@@ -273,3 +356,6 @@ export class WorldTestHook {
     delete window.__ninjaWorld;
   }
 }
+
+/** Ô trang bị trống không có món nào để đọc chỉ số, nhưng e2e vẫn cần đủ năm trường. */
+const EMPTY_STATS = { strength: 0, agility: 0, spirit: 0, hp: 0, mp: 0 } as const;

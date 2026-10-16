@@ -1,5 +1,6 @@
 import { Injectable, computed, signal } from '@angular/core';
 import {
+  EQUIP_SLOTS,
   Opcode,
   TICK_RATE_MS,
   type CharacterStats,
@@ -8,6 +9,8 @@ import {
   type EntityAdd,
   type EntityMove,
   type EntityRemove,
+  type EquipmentSlot,
+  type EquipmentUpdate,
   type InventoryItem,
   type InventoryUpdate,
   type LevelUp,
@@ -39,6 +42,26 @@ export interface ChatLine {
 export const CHAT_LOG_LIMIT = 100;
 
 /**
+ * Trang bị rỗng: đủ bốn ô theo đúng thứ tự `EQUIP_SLOTS`.
+ *
+ * Giao diện luôn vẽ đủ bốn ô nên client tự dựng sẵn thay vì chờ gói `S2C_EQUIPMENT` đầu tiên.
+ */
+export function emptyEquipment(): EquipmentSlot[] {
+  return EQUIP_SLOTS.map((slot) => ({ slot, item: null }));
+}
+
+/**
+ * Xếp lại `S2C_EQUIPMENT` thành đúng bốn ô theo thứ tự `EQUIP_SLOTS`.
+ *
+ * Hợp đồng chỉ nói "danh sách ô", không hứa thứ tự cũng không hứa đủ ô, còn bảng trang bị và hook
+ * kiểm thử đầu-cuối đều dựa vào thứ tự này — nên xếp lại ngay khi nhận, một chỗ duy nhất.
+ */
+export function normalizeEquipment(slots: readonly EquipmentSlot[]): EquipmentSlot[] {
+  const bySlot = new Map(slots.map((entry) => [entry.slot, entry.item] as const));
+  return EQUIP_SLOTS.map((slot) => ({ slot, item: bySlot.get(slot) ?? null }));
+}
+
+/**
  * Trạng thái thế giới mà client nhìn thấy, giữ bằng signals.
  *
  * Service chỉ tiêu thụ gói tin **đã** được `GameSocket` kiểm bằng `decodeServerPacket`, nên
@@ -56,6 +79,7 @@ export class WorldState {
   private readonly characterSignal = signal<CharacterStats | null>(null);
   private readonly inventorySignal = signal<readonly InventoryItem[]>([]);
   private readonly inventoryCapacitySignal = signal(0);
+  private readonly equipmentSignal = signal<readonly EquipmentSlot[]>(emptyEquipment());
   private readonly levelUpSignal = signal<LevelUp | null>(null);
 
   readonly map = this.mapSignal.asReadonly();
@@ -67,6 +91,8 @@ export class WorldState {
   readonly character = this.characterSignal.asReadonly();
   readonly inventory = this.inventorySignal.asReadonly();
   readonly inventoryCapacity = this.inventoryCapacitySignal.asReadonly();
+  /** Bốn ô trang bị theo thứ tự `EQUIP_SLOTS`; ô trống là `item: null`. */
+  readonly equipment = this.equipmentSignal.asReadonly();
   /**
    * Lần lên cấp gần nhất, để trang `/play` báo cho người chơi biết vừa học được chiêu gì.
    * Trang gọi `clearLevelUp()` sau khi báo xong.
@@ -133,6 +159,9 @@ export class WorldState {
         this.inventoryCapacitySignal.set(bag.capacity);
         return true;
       }
+      case Opcode.S2C_EQUIPMENT:
+        this.equipmentSignal.set(normalizeEquipment((payload as EquipmentUpdate).slots));
+        return true;
       default:
         return false;
     }
@@ -148,6 +177,7 @@ export class WorldState {
     this.characterSignal.set(null);
     this.inventorySignal.set([]);
     this.inventoryCapacitySignal.set(0);
+    this.equipmentSignal.set(emptyEquipment());
     this.levelUpSignal.set(null);
   }
 
