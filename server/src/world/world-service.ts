@@ -304,6 +304,8 @@ export class WorldService {
     }
 
     session.send(Opcode.S2C_EQUIPMENT, await this.options.equipment.toPacket(located.player.id));
+    // Món vừa mặc rời túi nên túi phải được gửi lại, nếu không client còn thấy nó trong túi.
+    await this.sendInventory(session, located.player.id);
     await this.sendCharacterStats(session, located.player.id);
   }
 
@@ -325,6 +327,8 @@ export class WorldService {
     }
 
     session.send(Opcode.S2C_EQUIPMENT, await this.options.equipment.toPacket(located.player.id));
+    // Món vừa tháo quay lại túi: gửi lại túi cùng lúc với bảng trang bị.
+    await this.sendInventory(session, located.player.id);
     await this.sendCharacterStats(session, located.player.id);
   }
 
@@ -536,6 +540,11 @@ export class WorldService {
     session.send(Opcode.S2C_INVENTORY_UPDATE, await this.options.inventory.toPacket(characterId));
     await this.sendCharacterStats(session, characterId);
     session.send(Opcode.S2C_NOTIFY, { message } satisfies Notify);
+  }
+
+  /** Gửi lại túi đồ: mặc/tháo làm món rời túi hoặc quay lại túi nên client phải thấy ngay. */
+  private async sendInventory(session: GameSession, characterId: string): Promise<void> {
+    session.send(Opcode.S2C_INVENTORY_UPDATE, await this.options.inventory.toPacket(characterId));
   }
 
   /**

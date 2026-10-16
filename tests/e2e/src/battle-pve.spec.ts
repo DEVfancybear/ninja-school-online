@@ -142,8 +142,21 @@ async function character(page: Page): Promise<HookCharacter | null> {
   });
 }
 
-/** Bấm vào một con quái còn sống: đủ gần thì vào trận ngay, ở xa thì client tự đi tới rồi vào trận. */
+/**
+ * Bấm vào một con quái còn sống: đủ gần thì vào trận ngay, ở xa thì client tự đi tới rồi vào trận.
+ * Phải chờ có con nào còn sống trước đã: bài trước có thể vừa giết hết cả bãi (4 con bù nhìn) và
+ * quái chưa kịp hồi sinh, bấm lúc đó thì không có trận nào mở ra.
+ */
 async function attackMonster(page: Page, name: string): Promise<void> {
+  await expect
+    .poll(
+      async () => (await monsters(page)).some((monster) => monster.name === name && monster.alive),
+      {
+        message: `chờ ${name} hồi sinh trước khi bấm`,
+        timeout: 30_000,
+      },
+    )
+    .toBe(true);
   await page.evaluate((target) => {
     (globalThis as unknown as { __ninjaWorld?: HookApi }).__ninjaWorld?.attackMonster(target);
   }, name);
@@ -190,17 +203,20 @@ async function waitForBattle(page: Page): Promise<void> {
  */
 async function fightToTheEnd(page: Page): Promise<HookBattle> {
   const attackButton = page.getByRole('button', { name: 'Đánh thường' });
-  for (let step = 0; step < 60; step += 1) {
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline) {
     const current = await battle(page);
     if (current?.outcome) {
       return current;
     }
     if (current?.isMyTurn) {
-      await attackButton.click();
+      // Hạn ngắn cho cú bấm: trận vừa kết thúc thì nút biến mất và bảng kết trận thay chỗ, bấm
+      // không giới hạn sẽ treo tới hết bài; bấm hụt thì vòng lặp quay lại và thấy `outcome`.
+      await attackButton.click({ timeout: 2_000 }).catch(() => undefined);
     }
-    await page.waitForTimeout(150);
+    await page.waitForTimeout(120);
   }
-  throw new Error('trận đấu không kết thúc sau 60 bước');
+  throw new Error('trận đấu không kết thúc sau 60 giây');
 }
 
 /** Đánh hạ một con quái rồi đóng bảng kết trận. */

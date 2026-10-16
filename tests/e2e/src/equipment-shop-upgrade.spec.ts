@@ -28,6 +28,13 @@ const START_YEN = 200;
 const BREAD_SELL_PRICE = 12;
 /** Cường hóa từ cấp 0 lên 1 tốn 50 yên và tỉ lệ là 1.0 nên luôn thành công. */
 const UPGRADE_FIRST_COST = 50;
+/**
+ * Mỗi lần thử cường hóa còn tốn 1 đá vụn (`UPGRADE_MATERIAL_ID` trong shared), thứ chỉ rơi từ quái:
+ * Chuột Đồng trong làng rơi 70% mỗi trận nên chỉ cần vài trận là có.
+ */
+const MATERIAL = 'Đá Vụn';
+const VILLAGE_MONSTER = 'Chuột Đồng';
+const MAX_FARM_KILLS = 5;
 
 /** Hook kiểm thử mà trang `/play` phơi ra ở chế độ phát triển (xem `game/test-hook.ts`). */
 interface HookApi {
@@ -36,6 +43,9 @@ interface HookApi {
   inventory(): HookItem[];
   equipment(): HookEquipmentSlot[];
   shop(): HookShop | null;
+  monsters(): HookMonster[];
+  battle(): HookBattle | null;
+  attackMonster(name: string): void;
   toggleInventory(open?: boolean): void;
   toggleEquipment(open?: boolean): void;
   lastError(): string | null;
@@ -43,6 +53,7 @@ interface HookApi {
 
 interface HookCharacter {
   readonly level: number;
+  readonly hp: number;
   readonly maxHp: number;
   readonly yen: number;
   readonly attack: number;
@@ -73,6 +84,22 @@ interface HookShop {
     readonly price: number;
     readonly sellPrice: number;
   }[];
+}
+
+interface HookMonster {
+  readonly name: string;
+  readonly hp: number;
+  readonly alive: boolean;
+}
+
+interface HookBattle {
+  readonly isMyTurn: boolean;
+  readonly outcome: string | null;
+  readonly rewards: {
+    readonly exp: number;
+    readonly yen: number;
+    readonly drops: readonly { readonly name: string; readonly qty: number }[];
+  } | null;
 }
 
 function uniqueSuffix(): string {
@@ -139,8 +166,14 @@ async function openShop(page: Page): Promise<void> {
   await expect(page.locator('.shop')).toBeVisible();
 }
 
-/** Mở túi đồ bằng đúng nút trên HUD (không gọi thẳng hook) để kiểm luôn đường người chơi đi. */
+/**
+ * Mở túi đồ bằng đúng nút trên HUD (không gọi thẳng hook) để kiểm luôn đường người chơi đi.
+ * Gọi lại khi túi đang mở thì không làm gì — nút trên HUD là nút bật/tắt.
+ */
 async function openBag(page: Page): Promise<void> {
+  if (await page.locator('.bag').isVisible()) {
+    return;
+  }
   await page.locator('.hud button', { hasText: 'Túi đồ' }).click();
   await expect(page.locator('.bag')).toBeVisible();
 }
@@ -163,6 +196,126 @@ function sellRow(page: Page, name: string) {
 
 function bagRow(page: Page, name: string) {
   return page.locator('.bag__row', { hasText: name });
+}
+
+/** Quái đang vẽ trên bản đồ (hook chỉ có ở chế độ phát triển). */
+async function monsters(page: Page): Promise<HookMonster[]> {
+  return page.evaluate(() => {
+    const api = (globalThis as unknown as { __ninjaWorld?: HookApi }).__ninjaWorld;
+    return api ? api.monsters() : [];
+  });
+}
+
+/** Trạng thái trận đấu mà client đang vẽ. */
+async function battle(page: Page): Promise<HookBattle | null> {
+  return page.evaluate(() => {
+    const api = (globalThis as unknown as { __ninjaWorld?: HookApi }).__ninjaWorld;
+    return api ? api.battle() : null;
+  });
+}
+
+/** Bấm vào một con quái còn sống: đủ gần thì vào trận ngay, ở xa thì client tự đi tới rồi vào trận. */
+async function attackMonster(page: Page, name: string): Promise<void> {
+  await page.evaluate((target) => {
+    (globalThis as unknown as { __ninjaWorld?: HookApi }).__ninjaWorld?.attackMonster(target);
+  }, name);
+}
+
+/** Chờ có một con quái cùng tên còn sống (con vừa gục hồi sinh sau ít giây). */
+async function waitForAliveMonster(page: Page, name: string): Promise<void> {
+  await expect
+    .poll(
+      async () => (await monsters(page)).some((monster) => monster.name === name && monster.alive),
+      {
+        message: `chờ ${name} hồi sinh`,
+        timeout: 30_000,
+      },
+    )
+    .toBe(true);
+}
+
+/** Chờ trận mở ra (server nhận lệnh chạm quái và trả `S2C_BATTLE_START`). */
+async function waitForBattle(page: Page): Promise<void> {
+  await expect
+    .poll(async () => (await battle(page)) !== null, {
+      message: 'chờ trận đấu mở ra',
+      timeout: 25_000,
+    })
+    .toBe(true);
+}
+
+/**
+ * Đánh cho tới khi trận kết thúc: mỗi lần tới lượt thì bấm nút "Đánh thường" **trong giao diện**
+ * (đúng đường người chơi đi, không gọi thẳng hàm nội bộ).
+ */
+async function fightToTheEnd(page: Page): Promise<HookBattle> {
+  const attackButton = page.getByRole('button', { name: 'Đánh thường' });
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline) {
+    const current = await battle(page);
+    if (current?.outcome) {
+      return current;
+    }
+    if (current?.isMyTurn) {
+      // Hạn ngắn cho cú bấm: trận vừa kết thúc thì nút biến mất và bảng kết trận thay chỗ, bấm
+      // không giới hạn sẽ treo tới hết bài; bấm hụt thì vòng lặp quay lại và thấy `outcome`.
+      await attackButton.click({ timeout: 2_000 }).catch(() => undefined);
+    }
+    await page.waitForTimeout(120);
+  }
+  throw new Error('trận đấu không kết thúc sau 60 giây');
+}
+
+/** Đánh hạ một con quái rồi đóng bảng kết trận. */
+async function killOneMonster(page: Page, name: string): Promise<HookBattle> {
+  await attackMonster(page, name);
+  await waitForBattle(page);
+  const finished = await fightToTheEnd(page);
+  await page.getByRole('button', { name: 'Đóng' }).click();
+  await expect.poll(async () => (await battle(page)) === null, { timeout: 10_000 }).toBe(true);
+  return finished;
+}
+
+/** Ăn một bánh bao trong túi để hồi máu trước trận sau (đánh nhau không tự hồi máu). */
+async function healWithBread(page: Page): Promise<void> {
+  const before = (await character(page))?.hp ?? 0;
+  await openBag(page);
+  const bread = bagRow(page, BREAD);
+  if ((await bread.count()) === 0) {
+    return;
+  }
+  await bread.locator('.bag__use').click();
+  await expect
+    .poll(async () => (await character(page))?.hp ?? 0, {
+      message: 'chờ máu hồi sau khi ăn bánh bao',
+      timeout: 10_000,
+    })
+    .toBeGreaterThan(before);
+}
+
+/**
+ * Đi đánh quái cho tới khi nhặt được `itemName`: mỗi trận rơi theo tỉ lệ trong `game-data`, nên
+ * vòng lặp chỉ dừng khi đã có đồ — hết `maxKills` trận mà vẫn không rơi thì coi như hỏng.
+ */
+async function farmDrop(
+  page: Page,
+  monsterName: string,
+  itemName: string,
+  maxKills: number,
+): Promise<void> {
+  for (let kill = 1; kill <= maxKills; kill += 1) {
+    await waitForAliveMonster(page, monsterName);
+    if (kill > 1) {
+      await healWithBread(page);
+    }
+    const finished = await killOneMonster(page, monsterName);
+    expect(finished.outcome, `trận ${kill} phải thắng`).toBe('victory');
+    const held = (await inventory(page)).find((item) => item.name === itemName)?.quantity ?? 0;
+    if (held >= 1) {
+      return;
+    }
+  }
+  throw new Error(`không nhặt được ${itemName} sau ${maxKills} trận`);
 }
 
 test('mua áo vải ở shop, mặc vào thấy chỉ số tăng, tải lại trang vẫn giữ', async ({ page }) => {
@@ -208,7 +361,8 @@ test('mua áo vải ở shop, mặc vào thấy chỉ số tăng, tải lại tr
   expect((await inventory(page)).some((item) => item.name === ARMOR)).toBe(false);
 });
 
-test('bán bánh bao cho shop và cường hóa kiếm gỗ +1', async ({ page }) => {
+test('bán bánh bao, đánh quái lấy đá vụn rồi cường hóa kiếm gỗ +1', async ({ page }) => {
+  test.setTimeout(240_000);
   await enterWorld(page);
   await openShop(page);
 
@@ -223,13 +377,21 @@ test('bán bánh bao cho shop và cường hóa kiếm gỗ +1', async ({ page }
     breadBefore - 1,
   );
 
-  // Mua kiếm gỗ (100 yên) rồi cường hóa: cấp 0 → 1 luôn thành công, tốn 50 yên.
+  // Mua kiếm gỗ (100 yên) rồi đóng quầy để đi đánh quái.
   await buyRow(page, SWORD).locator('.shop__buy').click();
   await expect
     .poll(async () => (await inventory(page)).some((item) => item.name === SWORD))
     .toBe(true);
-  const yenBeforeUpgrade = (await character(page))?.yen ?? 0;
+  await page.locator('.shop__close').click();
+  await expect(page.locator('.shop')).toBeHidden();
 
+  // Cường hóa tốn 1 đá vụn — thứ chỉ rơi từ quái — nên phải vào một trận trước.
+  await farmDrop(page, VILLAGE_MONSTER, MATERIAL, MAX_FARM_KILLS);
+
+  // Cấp 0 → 1 luôn thành công, tốn 50 yên và 1 đá vụn.
+  const yenBeforeUpgrade = (await character(page))?.yen ?? 0;
+  const materialBefore =
+    (await inventory(page)).find((item) => item.name === MATERIAL)?.quantity ?? 0;
   await openBag(page);
   await bagRow(page, SWORD).locator('.bag__upgrade').click();
   await expect
@@ -238,6 +400,10 @@ test('bán bánh bao cho shop và cường hóa kiếm gỗ +1', async ({ page }
   await expect(page.locator('.notice-bar')).toBeVisible();
   await expect(page.locator('.notice-bar')).toContainText(SWORD);
   expect((await character(page))?.yen).toBe(yenBeforeUpgrade - UPGRADE_FIRST_COST);
+  // Tiêu hết đá vụn thì hàng đó biến khỏi túi (server xoá hàng khi số lượng về 0) nên `?? 0`.
+  const materialAfter =
+    (await inventory(page)).find((item) => item.name === MATERIAL)?.quantity ?? 0;
+  expect(materialAfter).toBe(materialBefore - 1);
 
   // Mặc kiếm đã cường hóa: bảng trang bị hiện cấp, chỉ số tấn công tăng theo món.
   const attackBefore = (await character(page))?.attack ?? 0;
