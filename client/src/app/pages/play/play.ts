@@ -16,8 +16,10 @@ import {
   CHAT_MAX_LENGTH,
   ErrorCode,
   MAX_CHARACTERS_PER_ACCOUNT,
+  MONSTER_ENGAGE_RANGE_PX,
   Opcode,
   TICK_RATE_MS,
+  type BattleAction,
   type Character,
   type Notify,
 } from '@ninja/shared';
@@ -29,11 +31,14 @@ import { WorldTestHook } from '../../game/test-hook';
 import { type Point } from '../../game/world-logic';
 import { isTypingTarget } from '../../input/key-map';
 import { MOVE_COMMAND_INTERVAL_MS, MovementController } from '../../input/movement-controller';
+import { BattleState } from '../../net/battle-state';
 import { GameSocket, type SocketError } from '../../net/game-socket';
 import { type Facing } from '../../net/world-types';
 import { WorldState } from '../../net/world-state';
+import { BattlePanel, type BattleActionRequest } from '../../ui/battle-panel/battle-panel';
 import { ChatPanel } from '../../ui/chat-panel/chat-panel';
 import { Hud } from '../../ui/hud/hud';
+import { InventoryPanel } from '../../ui/inventory-panel/inventory-panel';
 import { NoticeBar } from '../../ui/notice-bar/notice-bar';
 import { NpcDialogPanel } from '../../ui/npc-dialog/npc-dialog';
 
@@ -64,7 +69,16 @@ export const SNAPSHOT_FALLBACK_DELAY = new InjectionToken<number>('ninja.snapsho
  */
 @Component({
   selector: 'app-play',
-  imports: [RouterLink, WorldCanvas, Hud, ChatPanel, NpcDialogPanel, NoticeBar],
+  imports: [
+    RouterLink,
+    WorldCanvas,
+    Hud,
+    ChatPanel,
+    NpcDialogPanel,
+    NoticeBar,
+    BattlePanel,
+    InventoryPanel,
+  ],
   templateUrl: './play.html',
   styleUrl: './play.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -74,6 +88,7 @@ export class Play implements OnInit, OnDestroy {
   private readonly characters = inject(CharacterService);
   private readonly socket = inject(GameSocket);
   private readonly world = inject(WorldState);
+  private readonly battleState = inject(BattleState);
   private readonly testHook = inject(WorldTestHook);
   private readonly snapshotFallbackMs = inject(SNAPSHOT_FALLBACK_DELAY);
 
@@ -88,6 +103,7 @@ export class Play implements OnInit, OnDestroy {
   readonly noCharacter = signal(false);
   readonly started = signal(false);
   readonly chatVisible = signal(true);
+  readonly bagOpen = signal(false);
   readonly notice = signal<string | null>(null);
   readonly chatNotice = signal<string | null>(null);
   readonly localFacing = signal<Facing | null>(null);
@@ -103,6 +119,16 @@ export class Play implements OnInit, OnDestroy {
   readonly chat = this.world.chat;
   readonly dialog = this.world.npcDialog;
   readonly tickRateMs = this.world.tickRateMs;
+  /** Chỉ số nhân vật (máu, nội lực, cấp, chiêu) — khác `character` là dữ liệu REST của nhân vật. */
+  readonly stats = this.world.character;
+  readonly inventory = this.world.inventory;
+  readonly bagCapacity = this.world.inventoryCapacity;
+  readonly battle = this.battleState.battle;
+  readonly battleLog = this.battleState.log;
+  readonly battleOutcome = this.battleState.outcome;
+  readonly battleRemainingMs = this.battleState.remainingMs;
+  readonly isMyTurn = this.battleState.isMyTurn;
+  readonly inBattle = this.battleState.inBattle;
 
   readonly characterName = computed(() => this.world.self()?.name ?? this.character()?.name ?? '');
   readonly mapName = computed(() => this.world.mapName());
@@ -146,6 +172,11 @@ export class Play implements OnInit, OnDestroy {
   /** Lần bắt tay đã nhận được dữ liệu map; 0 nghĩa là chưa nhận lần nào. */
   private snapshotEpoch = 0;
   private unsubscribe?: () => void;
+  /**
+   * Quái người chơi vừa bấm nhưng còn ở ngoài tầm: đi tới gần rồi tự xin vào trận. Xoá khi đã vào
+   * trận, khi con quái biến mất, khi mất kết nối, hoặc khi người chơi bấm chỗ khác.
+   */
+  private pendingAttackId: string | null = null;
 
   constructor() {
     // Rời khỏi `ready` (mất mạng, chưa nối được) là bỏ ngay dữ liệu thế giới cũ. Xoá ở đây,
@@ -157,10 +188,28 @@ export class Play implements OnInit, OnDestroy {
           return;
         }
         this.world.reset();
+        this.battleState.reset();
         this.movement.reset();
         this.localFacing.set(null);
         this.snapshotEpoch = 0;
+        this.pendingAttackId = null;
+        this.bagOpen.set(false);
         this.clearSnapshotTimer();
+      });
+    });
+
+    // Lên cấp: báo cho người chơi biết mình vừa mạnh lên và học được chiêu gì.
+    effect(() => {
+      const levelUp = this.world.lastLevelUp();
+      if (!levelUp) {
+        return;
+      }
+      untracked(() => {
+        const learned = levelUp.learnedSkills.map((skill) => skill.name).join(', ');
+        this.showNotice(
+          `Lên cấp ${levelUp.character.level}!` + (learned ? ` Học được: ${learned}.` : ''),
+        );
+        this.world.clearLevelUp();
       });
     });
 
@@ -184,7 +233,20 @@ export class Play implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.testHook.install({ clickEntity: (name) => this.clickEntityByName(name) });
+    this.testHook.install({
+      clickEntity: (name) => this.clickEntityByName(name),
+      attackMonster: (name) => {
+        const monster = this.world.entities().find((entity) => entity.name === name);
+        if (monster) {
+          this.onAttackMonster(monster.id);
+        }
+      },
+      useItem: (itemId) => this.onUseItem(itemId),
+      toggleInventory: (open) => this.setInventoryOpen(open),
+      inventoryOpen: () => this.bagOpen(),
+      closeBattle: () => this.dismissBattleOutcome(),
+      lastError: () => this.notice(),
+    });
     void this.start();
   }
 
@@ -195,6 +257,7 @@ export class Play implements OnInit, OnDestroy {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.socket.disconnect();
+    this.battleState.reset();
     this.world.reset();
   }
 
@@ -247,7 +310,71 @@ export class Play implements OnInit, OnDestroy {
 
   /** Bấm vào một ô trên bản đồ (từ canvas Phaser). */
   onMoveTo(destination: Point): void {
+    if (this.inBattle()) {
+      // Trong trận thì đứng yên (server cũng từ chối lệnh di chuyển), nhưng chặn ở đây cho đỡ gửi.
+      return;
+    }
+    this.pendingAttackId = null;
     this.movement.requestDestination(destination);
+  }
+
+  /**
+   * Bấm vào một con quái (từ canvas Phaser): đủ gần thì xin vào trận ngay, còn xa thì đi tới trước.
+   * Tầm được so bằng đúng con số server dùng (`MONSTER_ENGAGE_RANGE_PX`) để không có chuyện client
+   * tưởng đã đủ gần rồi bị từ chối.
+   */
+  onAttackMonster(monsterId: string): void {
+    if (this.inBattle()) {
+      return;
+    }
+    const self = this.world.self();
+    const monster = this.world.entities().find((entity) => entity.id === monsterId);
+    if (!self || !monster) {
+      return;
+    }
+    if (distance(self, monster) <= MONSTER_ENGAGE_RANGE_PX) {
+      this.pendingAttackId = null;
+      this.movement.reset();
+      this.socket.send(Opcode.C2S_ATTACK_MOB, { targetId: monster.id });
+      return;
+    }
+    this.pendingAttackId = monsterId;
+    this.movement.requestDestination({ x: monster.x, y: monster.y });
+  }
+
+  /** Người chơi chọn một hành động trong trận (từ bảng trận đấu). */
+  onBattleAction(request: BattleActionRequest): void {
+    const battle = this.battleState.battle();
+    if (!battle) {
+      return;
+    }
+    const targetId = this.battleState.monster()?.alive
+      ? (this.battleState.monster()?.id ?? undefined)
+      : undefined;
+    const payload: BattleAction = { battleId: battle.battleId, ...request, targetId };
+    this.socket.send(Opcode.C2S_BATTLE_ACTION, payload);
+  }
+
+  /** Đóng bảng kết trận. */
+  dismissBattleOutcome(): void {
+    this.battleState.closeOutcome();
+  }
+
+  toggleInventory(): void {
+    this.bagOpen.update((open) => !open);
+  }
+
+  setInventoryOpen(open: boolean): void {
+    this.bagOpen.set(open);
+  }
+
+  /** Dùng một vật phẩm ngoài trận (trong trận phải dùng qua lượt của mình). */
+  onUseItem(itemId: string): void {
+    if (this.inBattle()) {
+      this.showNotice('Đang trong trận, hãy dùng vật phẩm ở lượt của bạn.');
+      return;
+    }
+    this.socket.send(Opcode.C2S_USE_ITEM, { itemId });
   }
 
   /** Bấm vào một NPC (từ canvas Phaser). */
@@ -270,18 +397,26 @@ export class Play implements OnInit, OnDestroy {
   // ------------------------------------------------------------------ nội bộ
 
   private readonly handlePacket = (op: number, payload: unknown): void => {
+    if (op === Opcode.S2C_CHARACTER || op === Opcode.S2C_LEVEL_UP) {
+      // "Ai đang chơi" là điều kiện để biết lượt nào là của mình trong trận.
+      this.battleState.setSelfId((payload as { id?: string }).id ?? this.world.selfId());
+    }
     if (op === Opcode.S2C_ENTER_MAP) {
       // Dữ liệu map này thuộc lần bắt tay hiện tại: không cần xin lại nữa.
       this.snapshotEpoch = this.socket.connectionEpoch();
       this.clearSnapshotTimer();
+      // Id nhân vật nằm ngay trong gói này, nên biết "ai là mình" không cần chờ gói chỉ số.
+      this.battleState.setSelfId(this.world.selfId());
     } else if (op === Opcode.S2C_NOTIFY) {
       this.showNotice((payload as Notify).message);
     }
-    this.world.applyPacket(op, payload);
+    if (!this.battleState.applyPacket(op, payload)) {
+      this.world.applyPacket(op, payload);
+    }
   };
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
-    if (isTypingTarget(event.target)) {
+    if (isTypingTarget(event.target) || this.inBattle()) {
       return;
     }
     if (this.movement.press(event.key)) {
@@ -290,7 +425,7 @@ export class Play implements OnInit, OnDestroy {
   };
 
   private readonly onKeyUp = (event: KeyboardEvent): void => {
-    if (isTypingTarget(event.target)) {
+    if (isTypingTarget(event.target) || this.inBattle()) {
       return;
     }
     if (this.movement.release(event.key)) {
@@ -316,6 +451,12 @@ export class Play implements OnInit, OnDestroy {
   }
 
   private tickMovement(): void {
+    this.tryEngagePendingMonster();
+    if (this.inBattle()) {
+      // Trong trận thì không gửi lệnh di chuyển nào; hướng đứng yên cũng bỏ để nhân vật đứng lại.
+      this.localFacing.set(null);
+      return;
+    }
     const self = this.world.self();
     this.movement.tick(Date.now(), self ? { x: self.x, y: self.y } : null);
     this.localFacing.set(this.movement.moving ? this.movement.facing() : null);
@@ -326,6 +467,8 @@ export class Play implements OnInit, OnDestroy {
     this.movement.reset();
     this.localFacing.set(null);
     this.chatNotice.set(null);
+    this.pendingAttackId = null;
+    this.battleState.reset();
     if (this.snapshotEpoch === epoch) {
       this.clearSnapshotTimer();
       return;
@@ -389,6 +532,32 @@ export class Play implements OnInit, OnDestroy {
     }, NOTICE_HIDE_MS);
   }
 
+  /**
+   * Người chơi đã bấm một con quái ở xa: mỗi khung hình kiểm lại khoảng cách, tới đủ tầm thì xin vào
+   * trận. Kiểm ở vòng lặp khung hình (chứ không phải `effect`) vì đây là việc phụ thuộc **thời gian
+   * và vị trí**, đúng chỗ mà vòng lặp này đã chạy mỗi khung hình.
+   */
+  private tryEngagePendingMonster(): void {
+    const pending = this.pendingAttackId;
+    if (pending === null) {
+      return;
+    }
+    if (this.inBattle()) {
+      this.pendingAttackId = null;
+      return;
+    }
+    const self = this.world.self();
+    const monster = this.world.entities().find((entity) => entity.id === pending);
+    if (!self || !monster || (monster.hp ?? 1) <= 0) {
+      this.pendingAttackId = null;
+      return;
+    }
+    if (distance(self, monster) <= MONSTER_ENGAGE_RANGE_PX) {
+      this.pendingAttackId = null;
+      this.socket.send(Opcode.C2S_ATTACK_MOB, { targetId: monster.id });
+    }
+  }
+
   /** Dùng chung cho cú bấm thật ngoài canvas và hàm hook của kiểm thử đầu-cuối. */
   private clickEntityByName(name: string): void {
     const entity = this.world.entities().find((candidate) => candidate.name === name);
@@ -399,6 +568,15 @@ export class Play implements OnInit, OnDestroy {
       this.talkTo(entity.id);
       return;
     }
+    if (entity.kind === 'monster') {
+      this.onAttackMonster(entity.id);
+      return;
+    }
     this.onMoveTo({ x: entity.x, y: entity.y });
   }
+}
+
+/** Khoảng cách giữa hai điểm trong hệ toạ độ thế giới (pixel). */
+function distance(a: Point, b: Point): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
 }

@@ -2,7 +2,10 @@ import { TestBed } from '@angular/core/testing';
 import {
   Opcode,
   TICK_RATE_MS,
+  type CharacterStats,
   type Entity,
+  type InventoryUpdate,
+  type LevelUp,
   type MapSnapshot,
   type ServerEnterMap,
 } from '@ninja/shared';
@@ -42,6 +45,37 @@ function enterMap(overrides: Partial<ServerEnterMap> = {}): ServerEnterMap {
     ...overrides,
   };
 }
+
+/** Chỉ số tối thiểu của một nhân vật để thử các gói tin về chỉ số. */
+const STATS: CharacterStats = {
+  id: 'p1',
+  name: 'Kakashi',
+  school: 'haruna',
+  class: 'dao',
+  level: 1,
+  exp: 0,
+  expToNext: 50,
+  yen: 200,
+  hp: 60,
+  maxHp: 60,
+  mp: 40,
+  maxMp: 40,
+  strength: 6,
+  agility: 5,
+  spirit: 4,
+  attack: 13,
+  defense: 2,
+  speed: 6,
+  skills: [
+    {
+      skillId: 'skill-tram-co-ban',
+      name: 'Trảm Cơ Bản',
+      costMp: 5,
+      cooldownTurns: 0,
+      levelRequired: 1,
+    },
+  ],
+};
 
 describe('WorldState', () => {
   let world: WorldState;
@@ -185,6 +219,96 @@ describe('WorldState', () => {
     expect(world.npcDialog()).toBeNull();
   });
 
+  it('nhận chỉ số nhân vật và túi đồ, rồi cập nhật khi có thay đổi', () => {
+    expect(world.character()).toBeNull();
+    expect(world.inventory()).toEqual([]);
+    expect(world.inventoryCapacity()).toBe(0);
+
+    expect(world.applyPacket(Opcode.S2C_CHARACTER, STATS)).toBe(true);
+    expect(world.character()?.level).toBe(1);
+    expect(world.character()?.hp).toBe(60);
+
+    expect(
+      world.applyPacket(Opcode.S2C_INVENTORY_UPDATE, {
+        items: [
+          {
+            itemId: 'item-banh-bao',
+            name: 'Bánh Bao Hấp',
+            kind: 'consumable',
+            quantity: 2,
+            usable: true,
+            description: '',
+          },
+        ],
+        capacity: 40,
+      } satisfies InventoryUpdate),
+    ).toBe(true);
+    expect(world.inventory().map((item) => item.quantity)).toEqual([2]);
+    expect(world.inventoryCapacity()).toBe(40);
+
+    expect(world.applyPacket(Opcode.S2C_INVENTORY_UPDATE, { items: [], capacity: 40 })).toBe(true);
+    expect(world.inventory()).toEqual([]);
+  });
+
+  it('S2C_LEVEL_UP cập nhật chỉ số và ghi lại lần lên cấp để báo cho người chơi', () => {
+    world.applyPacket(Opcode.S2C_CHARACTER, STATS);
+    const levelUp: LevelUp = {
+      character: { ...STATS, level: 4, exp: 8, expToNext: 209, maxHp: 102, hp: 102 },
+      levelsGained: 3,
+      learnedSkills: [{ skillId: 'skill-tram-cuong-phong', name: 'Trảm Cuồng Phong' }],
+    };
+
+    expect(world.applyPacket(Opcode.S2C_LEVEL_UP, levelUp)).toBe(true);
+    expect(world.character()?.level).toBe(4);
+    expect(world.lastLevelUp()?.levelsGained).toBe(3);
+    expect(world.lastLevelUp()?.learnedSkills[0]?.name).toBe('Trảm Cuồng Phong');
+
+    world.clearLevelUp();
+    expect(world.lastLevelUp()).toBeNull();
+  });
+
+  it('quái trong S2C_ENTER_MAP mang theo máu, máu tối đa và hình dáng', () => {
+    world.applyPacket(
+      Opcode.S2C_ENTER_MAP,
+      enterMap({
+        entities: [
+          entity('mob:lang-khoi-nguon:0', 'Bù Nhìn Tập Luyện', {
+            kind: 'monster',
+            x: 96,
+            y: 64,
+            hp: 30,
+            maxHp: 30,
+            shape: 'scarecrow',
+          }),
+        ],
+      }),
+    );
+
+    const monster = world.entities().find((each) => each.kind === 'monster');
+    expect(monster).toMatchObject({
+      name: 'Bù Nhìn Tập Luyện',
+      hp: 30,
+      maxHp: 30,
+      shape: 'scarecrow',
+    });
+  });
+
+  it('server báo lại thực thể quái khi máu đổi thì client thay thế chứ không thêm mới', () => {
+    const scarecrow = entity('mob:lang-khoi-nguon:0', 'Bù Nhìn Tập Luyện', {
+      kind: 'monster',
+      hp: 30,
+      maxHp: 30,
+      shape: 'scarecrow',
+    });
+    world.applyPacket(Opcode.S2C_ENTER_MAP, enterMap({ entities: [scarecrow] }));
+
+    world.applyPacket(Opcode.S2C_ENTITY_ADD, { entity: { ...scarecrow, hp: 0 } });
+
+    const monsters = world.entities().filter((each) => each.kind === 'monster');
+    expect(monsters).toHaveLength(1);
+    expect(monsters[0]?.hp).toBe(0);
+  });
+
   it('reset() xoá sạch thế giới khi mất kết nối', () => {
     world.applyPacket(Opcode.S2C_ENTER_MAP, enterMap());
     world.reset();
@@ -193,6 +317,9 @@ describe('WorldState', () => {
     expect(world.entities()).toEqual([]);
     expect(world.self()).toBeNull();
     expect(world.chat()).toEqual([]);
+    expect(world.character()).toBeNull();
+    expect(world.inventory()).toEqual([]);
+    expect(world.lastLevelUp()).toBeNull();
   });
 
   it('bỏ qua gói không thuộc phần thế giới và nhận nhịp tick từ S2C_HELLO', () => {

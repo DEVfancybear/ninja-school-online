@@ -4,6 +4,36 @@
     <span class="map-name" title="Bản đồ hiện tại">{{ mapName() || '…' }}</span>
   </div>
 
+  @if (character(); as stats) {
+    <div class="stats">
+      <span class="stats__level">Cấp {{ level() }}</span>
+      <div class="stats__bars">
+        <div class="bar bar--hp" title="Máu">
+          <span class="bar__fill" [style.width.%]="percent(stats.hp, stats.maxHp)"></span>
+          <span class="bar__text">{{ stats.hp }} / {{ stats.maxHp }}</span>
+        </div>
+        <div class="bar bar--mp" title="Nội lực">
+          <span class="bar__fill" [style.width.%]="percent(stats.mp, stats.maxMp)"></span>
+          <span class="bar__text">{{ stats.mp }} / {{ stats.maxMp }}</span>
+        </div>
+        <div
+          class="bar bar--exp"
+          [title]="maxLevel() ? 'Đã đạt cấp tối đa' : 'Kinh nghiệm tới cấp sau'"
+        >
+          <span class="bar__fill" [style.width.%]="expPercent()"></span>
+          <span class="bar__text">
+            @if (maxLevel()) {
+              Cấp tối đa
+            } @else {
+              {{ stats.exp }} / {{ stats.expToNext }}
+            }
+          </span>
+        </div>
+      </div>
+      <span class="stats__yen" title="Yên đang có">{{ stats.yen }} yên</span>
+    </div>
+  }
+
   <div class="state">
     <span class="dot" [class.online]="online()" aria-hidden="true"></span>
     <span class="connection-status" [attr.data-status]="status()">{{ statusLabel() }}</span>
@@ -13,6 +43,14 @@
   </div>
 
   <div class="actions">
+    <button
+      type="button"
+      class="ghost"
+      [class.ghost--active]="bagOpen()"
+      (click)="toggleInventory.emit()"
+    >
+      Túi đồ ({{ bagCount() }})
+    </button>
     <button type="button" class="ghost" (click)="toggleChat.emit()">
       {{ chatVisible() ? 'Ẩn chat' : 'Hiện chat' }}
     </button>

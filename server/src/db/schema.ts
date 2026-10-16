@@ -110,4 +110,3 @@ export const inventoryItems = pgTable(
     check('inventory_items_quantity_positive', sql`${table.quantity} > 0`),
   ],
 );
-

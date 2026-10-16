@@ -2,11 +2,15 @@ import { Injectable, computed, signal } from '@angular/core';
 import {
   Opcode,
   TICK_RATE_MS,
+  type CharacterStats,
   type ChatChannel,
   type ChatMessage,
   type EntityAdd,
   type EntityMove,
   type EntityRemove,
+  type InventoryItem,
+  type InventoryUpdate,
+  type LevelUp,
   type NpcDialog,
   type ServerEnterMap,
 } from '@ninja/shared';
@@ -49,12 +53,25 @@ export class WorldState {
   private readonly chatSignal = signal<readonly ChatLine[]>([]);
   private readonly dialogSignal = signal<NpcDialog | null>(null);
   private readonly tickRateSignal = signal(TICK_RATE_MS);
+  private readonly characterSignal = signal<CharacterStats | null>(null);
+  private readonly inventorySignal = signal<readonly InventoryItem[]>([]);
+  private readonly inventoryCapacitySignal = signal(0);
+  private readonly levelUpSignal = signal<LevelUp | null>(null);
 
   readonly map = this.mapSignal.asReadonly();
   readonly entities = this.entitiesSignal.asReadonly();
   readonly selfId = this.selfIdSignal.asReadonly();
   readonly chat = this.chatSignal.asReadonly();
   readonly npcDialog = this.dialogSignal.asReadonly();
+  /** Chỉ số nhân vật của mình: HUD vẽ máu/nội lực/kinh nghiệm, bảng trận đấu lấy danh sách chiêu. */
+  readonly character = this.characterSignal.asReadonly();
+  readonly inventory = this.inventorySignal.asReadonly();
+  readonly inventoryCapacity = this.inventoryCapacitySignal.asReadonly();
+  /**
+   * Lần lên cấp gần nhất, để trang `/play` báo cho người chơi biết vừa học được chiêu gì.
+   * Trang gọi `clearLevelUp()` sau khi báo xong.
+   */
+  readonly lastLevelUp = this.levelUpSignal.asReadonly();
   /** Nhịp tick server báo trong `S2C_HELLO`; dùng để nội suy chuyển động. */
   readonly tickRateMs = this.tickRateSignal.asReadonly();
 
@@ -100,6 +117,22 @@ export class WorldState {
       case Opcode.S2C_NPC_DIALOG:
         this.dialogSignal.set(payload as NpcDialog);
         return true;
+      case Opcode.S2C_CHARACTER:
+        this.characterSignal.set(payload as CharacterStats);
+        return true;
+      case Opcode.S2C_LEVEL_UP: {
+        const levelUp = payload as LevelUp;
+        // `S2C_LEVEL_UP` mang theo chỉ số mới, nên không cần chờ `S2C_CHARACTER` riêng.
+        this.characterSignal.set(levelUp.character);
+        this.levelUpSignal.set(levelUp);
+        return true;
+      }
+      case Opcode.S2C_INVENTORY_UPDATE: {
+        const bag = payload as InventoryUpdate;
+        this.inventorySignal.set(bag.items);
+        this.inventoryCapacitySignal.set(bag.capacity);
+        return true;
+      }
       default:
         return false;
     }
@@ -112,10 +145,19 @@ export class WorldState {
     this.selfIdSignal.set(null);
     this.chatSignal.set([]);
     this.dialogSignal.set(null);
+    this.characterSignal.set(null);
+    this.inventorySignal.set([]);
+    this.inventoryCapacitySignal.set(0);
+    this.levelUpSignal.set(null);
   }
 
   closeDialog(): void {
     this.dialogSignal.set(null);
+  }
+
+  /** Báo xong lần lên cấp vừa rồi; nếu không xoá thì thông báo sẽ hiện lại mỗi lần vẽ lại. */
+  clearLevelUp(): void {
+    this.levelUpSignal.set(null);
   }
 
   private applyEnterMap(data: ServerEnterMap): void {

@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import type { MonsterShape } from '@ninja/shared';
 import { parseHexColor, type MapTile } from './world-logic';
 
 /**
@@ -764,5 +765,149 @@ export function drawCharacter(
       headRadius * 1.3,
       2,
     );
+  }
+}
+
+// ------------------------------------------------------------------- quái
+
+/** Hình dáng quái để vẽ; dữ liệu quái chọn hình dáng, không chứa cách vẽ. */
+export interface MonsterArt {
+  readonly shape: MonsterShape;
+  readonly color: number;
+  readonly hp: number;
+  readonly maxHp: number;
+  readonly alive: boolean;
+  readonly height: number;
+}
+
+/** Màu phụ trợ của quái: cọc rơm, đuôi, nanh — màu chính lấy từ dữ liệu quái. */
+const MONSTER_POLE = 0x6b4a2f;
+const MONSTER_STRAW = 0xd9c07a;
+const MONSTER_DARK = 0x2a2118;
+const MONSTER_TOOTH = 0xf2ead6;
+
+/**
+ * Vẽ một con quái bằng hình khối: mỗi hình dáng có thân, đầu và chi tiết riêng để nhìn là biết
+ * đang đánh con gì. Quái đã chết được vẽ mờ và có thanh máu rỗng — xác vẫn nằm đó tới lúc hồi sinh.
+ */
+export function drawMonster(graphics: Phaser.GameObjects.Graphics, art: MonsterArt): void {
+  const { color, height } = art;
+  const alpha = art.alive && art.hp > 0 ? 1 : 0.35;
+  const bodyRadius = height * 0.34;
+  const headRadius = height * 0.22;
+
+  switch (art.shape) {
+    case 'scarecrow': {
+      // Bù nhìn: cọc gỗ, thân rơm, hai tay ngang và vành nón.
+      graphics.fillStyle(MONSTER_POLE, alpha);
+      graphics.fillRect(-2, -height * 0.5, 4, height);
+      graphics.fillStyle(color, alpha);
+      graphics.fillEllipse(0, height * 0.02, bodyRadius * 2.1, bodyRadius * 2.4);
+      graphics.fillStyle(MONSTER_STRAW, alpha);
+      graphics.fillRect(-bodyRadius * 1.5, -height * 0.12, bodyRadius * 3, 4);
+      graphics.fillRect(-2, height * 0.34, -bodyRadius, 3);
+      graphics.fillStyle(MONSTER_STRAW, alpha);
+      graphics.fillTriangle(
+        -headRadius * 1.5,
+        -height * 0.3,
+        headRadius * 1.5,
+        -height * 0.3,
+        0,
+        -height * 0.5,
+      );
+      graphics.fillStyle(color, alpha);
+      graphics.fillCircle(0, -height * 0.3, headRadius);
+      graphics.fillStyle(MONSTER_DARK, alpha);
+      graphics.fillRect(-headRadius * 0.6, -height * 0.32, 3, 3);
+      graphics.fillRect(headRadius * 0.2, -height * 0.32, 3, 3);
+      break;
+    }
+    case 'rodent': {
+      // Chuột: thân bầu, tai tròn, mõm nhọn và đuôi dài.
+      graphics.fillStyle(MONSTER_DARK, alpha);
+      graphics.fillRect(-bodyRadius * 1.2, height * 0.32, bodyRadius, 3);
+      graphics.fillRect(bodyRadius * 0.2, height * 0.32, bodyRadius, 3);
+      graphics.lineStyle(3, MONSTER_DARK, alpha);
+      graphics.beginPath();
+      graphics.moveTo(-bodyRadius * 0.9, height * 0.05);
+      graphics.lineTo(-bodyRadius * 2.2, -height * 0.1);
+      graphics.lineTo(-bodyRadius * 1.6, -height * 0.32);
+      graphics.strokePath();
+      graphics.fillStyle(color, alpha);
+      graphics.fillEllipse(0, height * 0.08, bodyRadius * 2.2, bodyRadius * 1.7);
+      graphics.fillTriangle(
+        bodyRadius * 0.6,
+        -height * 0.02,
+        bodyRadius * 1.9,
+        height * 0.06,
+        bodyRadius * 0.7,
+        height * 0.2,
+      );
+      graphics.fillCircle(-bodyRadius * 0.5, -height * 0.3, headRadius * 0.75);
+      graphics.fillCircle(bodyRadius * 0.35, -height * 0.3, headRadius * 0.75);
+      graphics.fillStyle(MONSTER_DARK, alpha);
+      graphics.fillCircle(bodyRadius * 1.7, height * 0.05, 2);
+      graphics.fillStyle(MONSTER_TOOTH, alpha);
+      graphics.fillRect(bodyRadius * 1.25, height * 0.1, 4, 3);
+      break;
+    }
+    case 'beast': {
+      // Thú: thân to, chân ngắn, mõm nhọn và hai nanh.
+      graphics.fillStyle(MONSTER_DARK, alpha);
+      graphics.fillRect(-bodyRadius * 1.35, height * 0.3, bodyRadius * 0.7, height * 0.18);
+      graphics.fillRect(bodyRadius * 0.65, height * 0.3, bodyRadius * 0.7, height * 0.18);
+      graphics.fillStyle(color, alpha);
+      graphics.fillEllipse(0, height * 0.05, bodyRadius * 2.9, bodyRadius * 2.1);
+      graphics.fillTriangle(
+        bodyRadius * 0.9,
+        -height * 0.08,
+        bodyRadius * 1.9,
+        height * 0.12,
+        bodyRadius * 0.95,
+        height * 0.3,
+      );
+      graphics.fillStyle(color, alpha);
+      graphics.fillCircle(-bodyRadius * 0.85, -height * 0.28, headRadius);
+      graphics.fillTriangle(
+        -bodyRadius * 1.2,
+        -height * 0.34,
+        -bodyRadius * 0.6,
+        -height * 0.34,
+        -bodyRadius * 0.9,
+        -height * 0.5,
+      );
+      graphics.fillStyle(MONSTER_TOOTH, alpha);
+      graphics.fillTriangle(
+        bodyRadius * 1.5,
+        height * 0.16,
+        bodyRadius * 1.8,
+        height * 0.16,
+        bodyRadius * 1.55,
+        height * 0.02,
+      );
+      graphics.fillStyle(MONSTER_DARK, alpha);
+      graphics.fillCircle(bodyRadius * 1.5, height * 0.02, 2.5);
+      break;
+    }
+  }
+
+  drawMonsterHealthBar(graphics, art);
+}
+
+/** Thanh máu nhỏ trên đầu quái: chỉ hiện khi đã mất máu, để bản đồ không đầy thanh trang trí. */
+function drawMonsterHealthBar(graphics: Phaser.GameObjects.Graphics, art: MonsterArt): void {
+  if (art.alive && art.hp >= art.maxHp) {
+    return;
+  }
+  const width = 30;
+  const height = 4;
+  const top = -art.height * 0.62;
+  const ratio = art.maxHp > 0 ? Math.max(0, Math.min(1, art.hp / art.maxHp)) : 0;
+
+  graphics.fillStyle(0x101820, 0.85);
+  graphics.fillRect(-width / 2, top, width, height);
+  if (ratio > 0) {
+    graphics.fillStyle(ratio > 0.5 ? 0x6cc36c : ratio > 0.25 ? 0xd9b64a : 0xc05757, 1);
+    graphics.fillRect(-width / 2 + 1, top + 1, (width - 2) * ratio, height - 2);
   }
 }

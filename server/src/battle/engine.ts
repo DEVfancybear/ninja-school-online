@@ -67,11 +67,7 @@ export interface Hit {
  * Một đòn đánh: dao động ±`DAMAGE_VARIANCE`, có thể chí mạng, trừ phòng thủ của mục tiêu, và **luôn**
  * gây ít nhất `MIN_DAMAGE` — phòng thủ cao không được biến trận thành bất tử.
  */
-export function rollHit(
-  target: Combatant,
-  base: number,
-  rng: Rng,
-): Hit {
+export function rollHit(target: Combatant, base: number, rng: Rng): Hit {
   const critical = rng() < CRITICAL_CHANCE;
   const variance = 1 + (rng() * 2 - 1) * DAMAGE_VARIANCE;
   const rolled = base * variance * (critical ? CRITICAL_MULTIPLIER : 1);

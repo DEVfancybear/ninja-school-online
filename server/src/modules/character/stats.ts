@@ -117,15 +117,13 @@ export function characterStatsPayload(options: {
     attack: resolved.attack,
     defense: resolved.defense,
     speed: resolved.speed,
-    skills: skillsOf(data, record).map(
-      (skill): BattleSkill => ({
-        skillId: skill.id,
-        name: skill.name,
-        costMp: skill.costMp,
-        cooldownTurns: skillCooldownTurns(skill.cooldownMs),
-        levelRequired: skill.levelRequired,
-      }),
-    ),
+    skills: skillsOf(data, record).map((skill): BattleSkill => ({
+      skillId: skill.id,
+      name: skill.name,
+      costMp: skill.costMp,
+      cooldownTurns: skillCooldownTurns(skill.cooldownMs),
+      levelRequired: skill.levelRequired,
+    })),
   };
 }
 

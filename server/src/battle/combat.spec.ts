@@ -14,17 +14,12 @@ import {
   type ServerError,
 } from '@ninja/shared';
 import { closeTestDb, resetDatabase } from '../test/database.js';
-import {
-  accountWithCharacter,
-  startTestServer,
-  type TestServer,
-} from '../test/game-server.js';
+import { accountWithCharacter, startTestServer, type TestServer } from '../test/game-server.js';
 import { copyGameDataDir, removeTemporaryGameDataDirs } from '../test/game-data-dir.js';
 import { TestGameClient, delay } from '../test/ws-client.js';
 
 /** Bãi luyện tập: điểm spawn mặc định và bốn con bù nhìn. */
 const TRAINING_MAP_ID = 'bai-luyen-tap';
-const TRAINING_SPAWN = { x: 208, y: 464 };
 /** Ô (14, 12) → tâm ô (464, 400); cách điểm spawn 264 px nên một lệnh di chuyển là tới. */
 const SCARECROW_TARGET = { x: 464, y: 400 };
 const SCARECROW_ID = `mob:${TRAINING_MAP_ID}:0`;
@@ -110,7 +105,12 @@ async function fightToTheEnd(
 
   while (Date.now() < deadline) {
     const next = await client.nextPacket(
-      [Opcode.S2C_BATTLE_START, Opcode.S2C_BATTLE_TURN, Opcode.S2C_BATTLE_RESULT, Opcode.S2C_BATTLE_END],
+      [
+        Opcode.S2C_BATTLE_START,
+        Opcode.S2C_BATTLE_TURN,
+        Opcode.S2C_BATTLE_RESULT,
+        Opcode.S2C_BATTLE_END,
+      ],
       cursor,
       10_000,
     );
@@ -161,7 +161,11 @@ afterAll(async () => {
 
 describe('vào trận và đánh quái', () => {
   it('bắt tay xong là có ngay chỉ số nhân vật và túi đồ', async () => {
-    const { access, characterId } = await accountWithCharacter(server.app, 'ninja_m3_who', 'XemChiSo');
+    const { access, characterId } = await accountWithCharacter(
+      server.app,
+      'ninja_m3_who',
+      'XemChiSo',
+    );
     const client = await connect(server.wsUrl);
     await client.hello({ access, characterId });
 
@@ -208,7 +212,11 @@ describe('vào trận và đánh quái', () => {
 
   it('chạm quái khi đứng xa → out_of_range và không mở trận', async () => {
     // Vào bãi luyện tập nhưng đứng ở điểm spawn, cách con bù nhìn 264 px (> 96 px).
-    const { access, characterId } = await accountWithCharacter(server.app, 'ninja_m3_far', 'DungXa');
+    const { access, characterId } = await accountWithCharacter(
+      server.app,
+      'ninja_m3_far',
+      'DungXa',
+    );
     const client = await connect(server.wsUrl);
     await client.hello({ access, characterId });
     client.send(Opcode.C2S_MOVE, { x: 1152, y: 528 });
@@ -258,7 +266,10 @@ describe('vào trận và đánh quái', () => {
     // Máu của quái giảm đúng bằng tổng sát thương server báo, và có lượt của cả hai bên.
     const dealt = results.reduce((total, result) => total + resultDamage(result, SCARECROW_ID), 0);
     expect(dealt).toBeGreaterThanOrEqual(30);
-    expect(end.participants.find((c) => c.kind === 'monster')).toMatchObject({ hp: 0, alive: false });
+    expect(end.participants.find((c) => c.kind === 'monster')).toMatchObject({
+      hp: 0,
+      alive: false,
+    });
     expect(results.some((result) => result.actorId === SCARECROW_ID)).toBe(true);
 
     // Trên bản đồ, con quái cũng về 0 máu để mọi người thấy nó đã chết.
@@ -360,7 +371,11 @@ describe('luật trong trận', () => {
     });
     const lawServer = await startTestServer({ gameDataDir });
     try {
-      const { access, characterId } = await accountWithCharacter(lawServer.app, 'ninja_m3_cd', 'HoiChieu');
+      const { access, characterId } = await accountWithCharacter(
+        lawServer.app,
+        'ninja_m3_cd',
+        'HoiChieu',
+      );
       const client = await TestGameClient.connect(lawServer.wsUrl);
       clients.push(client);
       await client.hello({ access, characterId });
@@ -469,7 +484,9 @@ describe('chơi chung và phần thưởng', () => {
     second.client.send(Opcode.C2S_ATTACK_MOB, { targetId: SCARECROW_ID });
     const startTwo = await second.client.waitFor<BattleStart>(Opcode.S2C_BATTLE_START);
     expect(startTwo.battleId).toBe(startOne.battleId);
-    expect(startTwo.participants.filter((combatant) => combatant.kind === 'player')).toHaveLength(2);
+    expect(startTwo.participants.filter((combatant) => combatant.kind === 'player')).toHaveLength(
+      2,
+    );
 
     // Người thứ nhất cũng nhận được thông báo có người vào trận.
     const joined = await first.client.waitFor<BattleStart>(

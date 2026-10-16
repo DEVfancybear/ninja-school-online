@@ -198,4 +198,25 @@ describe('tìm thực thể theo điểm bấm', () => {
   it('danh sách rỗng thì trả về null', () => {
     expect(entityAtPoint([], { x: 0, y: 0 })).toBeNull();
   });
+
+  it('bấm trúng quái thì trả về con quái (để vào trận)', () => {
+    const monster = entity({
+      id: 'mob:1',
+      kind: 'monster',
+      name: 'Bù Nhìn Tập Luyện',
+      x: 100,
+      y: 100,
+      hp: 30,
+      maxHp: 30,
+      shape: 'scarecrow',
+    });
+
+    expect(entityAtPoint([monster], { x: 100, y: 100 })?.id).toBe('mob:1');
+    expect(entityAtPoint([monster], { x: 120, y: 118 })?.kind).toBe('monster');
+    expect(entityAtPoint([monster], { x: 160, y: 100 })).toBeNull();
+  });
+
+  it('quái có vùng bấm riêng trong bảng kích thước thực thể', () => {
+    expect(entityStyle('monster')).toEqual({ width: 34, height: 30, radius: 9 });
+  });
 });

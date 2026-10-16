@@ -4,7 +4,14 @@ import { dirname, join } from 'node:path';
 import { DEFAULT_GAME_DATA_DIR } from '../world/game-data.js';
 
 /** Sáu thư mục con của game-data; bản sao dùng cho kiểm thử phải có **đủ cả sáu**. */
-export const GAME_DATA_COLLECTIONS = ['maps', 'npcs', 'monsters', 'skills', 'items', 'classes'] as const;
+export const GAME_DATA_COLLECTIONS = [
+  'maps',
+  'npcs',
+  'monsters',
+  'skills',
+  'items',
+  'classes',
+] as const;
 export type CollectionDir = (typeof GAME_DATA_COLLECTIONS)[number];
 
 /** Nội dung một bộ game-data, khoá theo đường dẫn tương đối (`maps/lang-khoi-nguon.json`). */

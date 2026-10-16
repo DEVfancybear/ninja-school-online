@@ -1,0 +1,159 @@
+<section class="battle" [class.battle--waiting]="!isMyTurn()">
+  <div class="battle__field">
+    @if (monster(); as mob) {
+      <article class="card card--monster" [class.card--dead]="!mob.alive">
+        <header class="card__head">
+          <span class="card__name">{{ mob.name }}</span>
+          <span class="card__level">cấp {{ mob.level }}</span>
+        </header>
+        <div class="bar bar--hp">
+          <span class="bar__fill" [style.width.%]="percent(mob.hp, mob.maxHp)"></span>
+          <span class="bar__text">{{ mob.hp }} / {{ mob.maxHp }}</span>
+        </div>
+        @if (!mob.alive) {
+          <p class="card__note">Đã gục — sẽ sống lại sau ít phút</p>
+        }
+      </article>
+    }
+
+    <div class="squad">
+      @for (player of players(); track player.id) {
+        <article
+          class="card"
+          [class.card--self]="player.id === selfId()"
+          [class.card--dead]="!player.alive"
+        >
+          <header class="card__head">
+            <span class="card__name">{{ player.name }}</span>
+            <span class="card__level">cấp {{ player.level }}</span>
+          </header>
+          <div class="bar bar--hp">
+            <span class="bar__fill" [style.width.%]="percent(player.hp, player.maxHp)"></span>
+            <span class="bar__text">{{ player.hp }} / {{ player.maxHp }}</span>
+          </div>
+          <div class="bar bar--mp">
+            <span class="bar__fill" [style.width.%]="percent(player.mp, player.maxMp)"></span>
+            <span class="bar__text">{{ player.mp }} / {{ player.maxMp }}</span>
+          </div>
+        </article>
+      }
+    </div>
+  </div>
+
+  <div class="battle__turn">
+    <span class="battle__turn-text">{{ turnText() }}</span>
+    @if (outcome() === null) {
+      <span class="battle__clock" [class.battle__clock--urgent]="urgent()"
+        >{{ secondsLeft() }}s</span
+      >
+    }
+  </div>
+
+  @if (outcome() === null) {
+    <div class="battle__actions">
+      <button
+        type="button"
+        class="btn btn--primary"
+        [disabled]="!canAct()"
+        (click)="choose({ action: 'attack' })"
+      >
+        Đánh thường
+      </button>
+      @for (skill of skills(); track skill.skillId) {
+        <button
+          type="button"
+          class="btn"
+          [disabled]="skill.disabled"
+          [title]="'tốn ' + skill.costMp + ' nội lực, hồi ' + skill.cooldownTurns + ' vòng'"
+          (click)="choose({ action: 'skill', skillId: skill.skillId })"
+        >
+          {{ skill.name }}
+          <small>
+            {{ skill.costMp }} NL
+            @if (skill.readyInTurns > 0) {
+              · chờ {{ skill.readyInTurns }} vòng
+            }
+          </small>
+        </button>
+      }
+      <button type="button" class="btn" [disabled]="!canAct()" (click)="toggleItems()">
+        Dùng vật phẩm
+      </button>
+      <button
+        type="button"
+        class="btn btn--flee"
+        [disabled]="!canAct()"
+        (click)="choose({ action: 'flee' })"
+      >
+        Bỏ chạy
+      </button>
+    </div>
+
+    @if (itemsOpen()) {
+      <div class="items">
+        @if (usableItems().length === 0) {
+          <p class="items__empty">Túi không có món nào dùng được trong trận.</p>
+        }
+        @for (item of usableItems(); track item.itemId) {
+          <button
+            type="button"
+            class="items__row"
+            [disabled]="!canAct()"
+            (click)="choose({ action: 'item', itemId: item.itemId })"
+          >
+            <span class="items__name">{{ item.name }} ×{{ item.quantity }}</span>
+            <span class="items__effect">
+              @if (item.healHp) {
+                +{{ item.healHp }} máu
+              }
+              @if (item.healMp) {
+                +{{ item.healMp }} nội lực
+              }
+            </span>
+          </button>
+        }
+      </div>
+    }
+  }
+
+  <ol class="battle__log">
+    @for (line of log(); track $index) {
+      <li class="battle__line">{{ line.text }}</li>
+    }
+  </ol>
+</section>
+
+@if (outcome(); as end) {
+  <div class="result">
+    <article class="result__box">
+      <h2 class="result__title" [class.result__title--lose]="end.outcome !== 'victory'">
+        {{ outcomeTitle() }}
+      </h2>
+      <p class="result__text">{{ outcomeText() }}</p>
+
+      @if (end.rewards; as rewards) {
+        <ul class="result__rewards">
+          <li>
+            Kinh nghiệm: <strong>+{{ rewards.exp }}</strong>
+          </li>
+          <li>
+            Yên: <strong>+{{ rewards.yen }}</strong>
+          </li>
+          @if (rewards.levelsGained > 0) {
+            <li class="result__level">Lên cấp {{ rewards.level }}!</li>
+          }
+        </ul>
+        @if (rewards.drops.length > 0) {
+          <p class="result__drops">
+            Rơi được:
+            @for (drop of rewards.drops; track drop.itemId) {
+              <span class="result__drop">{{ drop.name }} ×{{ drop.qty }}</span>
+            }
+          </p>
+        }
+      }
+
+      <button type="button" class="btn btn--primary" (click)="dismiss()">Đóng</button>
+    </article>
+  </div>
+}

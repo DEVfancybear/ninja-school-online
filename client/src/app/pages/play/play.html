@@ -39,6 +39,7 @@
         [tickRateMs]="tickRateMs()"
         (moveTo)="onMoveTo($event)"
         (talkTo)="talkTo($event)"
+        (attackMonster)="onAttackMonster($event)"
       />
 
       <app-hud
@@ -47,7 +48,11 @@
         [latencyMs]="latencyMs()"
         [status]="status()"
         [chatVisible]="chatVisible()"
+        [character]="stats()"
+        [bagCount]="inventory().length"
+        [bagOpen]="bagOpen()"
         (toggleChat)="toggleChat()"
+        (toggleInventory)="toggleInventory()"
       />
 
       @if (chatVisible()) {
@@ -60,8 +65,33 @@
         />
       }
 
+      @if (bagOpen()) {
+        <app-inventory-panel
+          [items]="inventory()"
+          [capacity]="bagCapacity()"
+          [locked]="inBattle()"
+          (use)="onUseItem($event)"
+          (closed)="setInventoryOpen(false)"
+        />
+      }
+
       @if (dialog(); as npcDialog) {
         <app-npc-dialog [dialog]="npcDialog" (closed)="closeDialog()" />
+      }
+
+      @if (battle(); as battleState) {
+        <app-battle-panel
+          [battle]="battleState"
+          [log]="battleLog()"
+          [outcome]="battleOutcome()"
+          [character]="stats()"
+          [inventory]="inventory()"
+          [selfId]="selfId()"
+          [isMyTurn]="isMyTurn()"
+          [remainingMs]="battleRemainingMs()"
+          (action)="onBattleAction($event)"
+          (dismissed)="dismissBattleOutcome()"
+        />
       }
 
       @if (reconnecting()) {

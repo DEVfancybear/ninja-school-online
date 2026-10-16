@@ -19,6 +19,7 @@ describe('buildGameConfig', () => {
   const scene = new WorldScene({
     moveTo: () => undefined,
     talkTo: () => undefined,
+    attackMonster: () => undefined,
   });
 
   it('gắn Phaser vào đúng phần tử cha', () => {

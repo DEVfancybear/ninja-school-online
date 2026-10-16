@@ -3,6 +3,7 @@ import { TICK_RATE_MS, type MapSnapshot } from '@ninja/shared';
 import type { Facing, WorldEntity } from '../net/world-types';
 import {
   drawCharacter,
+  drawMonster,
   drawTile,
   lookDirection,
   type TileLayerKind,
@@ -43,6 +44,8 @@ const LABEL_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
 export interface WorldSceneHooks {
   readonly moveTo: (destination: Point) => void;
   readonly talkTo: (npcId: string) => void;
+  /** Bấm vào quái: tầng Angular quyết định vào trận hay đi tới trước cho đủ tầm. */
+  readonly attackMonster: (monsterId: string) => void;
 }
 
 /** Toàn bộ dữ liệu cảnh cần để vẽ, gom thành một gói để cập nhật nguyên tử. */
@@ -262,13 +265,26 @@ export class WorldScene extends Phaser.Scene {
   }
 
   /**
-   * Vẽ lại nhân vật: hình khối sinh trong `tile-art.ts` (không có tài nguyên hình). Nhân vật của
-   * mình có vòng sáng dưới chân, NPC đội nón lá và có râu.
+   * Vẽ lại thực thể: hình khối sinh trong `tile-art.ts` (không có tài nguyên hình). Nhân vật của
+   * mình có vòng sáng dưới chân, NPC đội nón lá và có râu, quái vẽ theo hình dáng trong dữ liệu
+   * kèm thanh máu ở trên đầu.
    */
   private drawShape(view: EntityView, entity: WorldEntity, isSelf: boolean): void {
     const style = entityStyle(entity.kind);
     view.shape.clear();
     view.shape.setPosition(0, 0);
+    if (entity.kind === 'monster') {
+      drawMonster(view.shape, {
+        shape: entity.shape ?? 'beast',
+        color: parseHexColor(entity.color),
+        hp: entity.hp ?? entity.maxHp ?? 1,
+        maxHp: entity.maxHp ?? entity.hp ?? 1,
+        alive: (entity.hp ?? 1) > 0,
+        height: style.height,
+      });
+      view.styleKey = viewKey(entity, isSelf);
+      return;
+    }
     drawCharacter(
       view.shape,
       {
@@ -341,6 +357,11 @@ export class WorldScene extends Phaser.Scene {
       this.hooks.talkTo(hit.id);
       return;
     }
+    if (hit && hit.kind === 'monster') {
+      // Đánh quái quan trọng hơn đi bộ: bấm trúng quái thì không đi tới ô đó nữa.
+      this.hooks.attackMonster(hit.id);
+      return;
+    }
 
     const map = this.state.map;
     if (!map) {
@@ -366,6 +387,11 @@ function neighbourIds(layer: TileLayer, col: number, row: number): TileNeighbour
   };
 }
 
+/**
+ * Khoá để biết có phải vẽ lại thực thể không. Với quái, máu và hình dáng nằm trong hình vẽ nên
+ * phải nằm trong khoá — nếu không thanh máu sẽ đứng yên dù server vừa báo máu mới.
+ */
 function viewKey(entity: WorldEntity, isSelf: boolean): string {
-  return `${entity.kind}|${entity.color}|${isSelf ? 'self' : 'other'}`;
+  const monster = entity.kind === 'monster' ? `|${entity.shape}|${entity.hp}` : '';
+  return `${entity.kind}|${entity.color}|${isSelf ? 'self' : 'other'}${monster}`;
 }

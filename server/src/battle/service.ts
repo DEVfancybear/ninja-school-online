@@ -207,7 +207,9 @@ export class BattleService {
       session.sendError(ErrorCode.BATTLE_NOT_FOUND, 'trận này không còn nữa');
       return;
     }
-    await this.enqueue(battle, () => this.applyPlayerAction(battle, characterId, request, 'action'));
+    await this.enqueue(battle, () =>
+      this.applyPlayerAction(battle, characterId, request, 'action'),
+    );
   }
 
   /**
@@ -353,13 +355,7 @@ export class BattleService {
         this.reject(characterId, ErrorCode.ITEM_NOT_OWNED, 'bạn không có vật phẩm này trong túi');
         return;
       }
-      const healed = this.applyConsumable(
-        item,
-        actor.hp,
-        actor.maxHp,
-        actor.mp,
-        actor.maxMp,
-      );
+      const healed = this.applyConsumable(item, actor.hp, actor.maxHp, actor.mp, actor.maxMp);
       const restoredHp = healed.hp - actor.hp;
       const restoredMp = healed.mp - actor.mp;
       actor.hp = healed.hp;
@@ -383,7 +379,10 @@ export class BattleService {
         );
       }
       if (session) {
-        session.send(Opcode.S2C_INVENTORY_UPDATE, await this.options.inventory.toPacket(characterId));
+        session.send(
+          Opcode.S2C_INVENTORY_UPDATE,
+          await this.options.inventory.toPacket(characterId),
+        );
       }
       await this.conclude(battle, actor, 'item', events);
       return;
@@ -396,7 +395,11 @@ export class BattleService {
         events.push(
           this.event('flee', actor.id, { text: `${actor.name} đã chạy thoát khỏi trận` }),
         );
-        this.broadcast(battle, Opcode.S2C_BATTLE_RESULT, this.resultPayload(battle, actor.id, 'flee', events));
+        this.broadcast(
+          battle,
+          Opcode.S2C_BATTLE_RESULT,
+          this.resultPayload(battle, actor.id, 'flee', events),
+        );
         battle.players.delete(actor.id);
         await this.settlePlayer(battle, actor, 'fled');
         if (battle.players.size === 0) {
@@ -471,7 +474,12 @@ export class BattleService {
       );
     }
 
-    await this.conclude(battle, actor, cause === 'timeout' ? 'timeout' : skill ? 'skill' : 'attack', events);
+    await this.conclude(
+      battle,
+      actor,
+      cause === 'timeout' ? 'timeout' : skill ? 'skill' : 'attack',
+      events,
+    );
   }
 
   /** Sau một hành động: phát kết quả rồi mở lượt kế tiếp, hoặc kết thúc trận nếu đã ngã ngũ. */
@@ -481,7 +489,11 @@ export class BattleService {
     action: BattleResult['action'],
     events: BattleEvent[],
   ): Promise<void> {
-    this.broadcast(battle, Opcode.S2C_BATTLE_RESULT, this.resultPayload(battle, actor.id, action, events));
+    this.broadcast(
+      battle,
+      Opcode.S2C_BATTLE_RESULT,
+      this.resultPayload(battle, actor.id, action, events),
+    );
 
     if (this.allMonstersDead(battle)) {
       await this.finish(battle, 'victory');
@@ -532,7 +544,11 @@ export class BattleService {
       );
     }
 
-    this.broadcast(battle, Opcode.S2C_BATTLE_RESULT, this.resultPayload(battle, monster.id, 'attack', events));
+    this.broadcast(
+      battle,
+      Opcode.S2C_BATTLE_RESULT,
+      this.resultPayload(battle, monster.id, 'attack', events),
+    );
 
     if (this.allPlayersDead(battle)) {
       await this.finish(battle, 'defeat');
@@ -592,8 +608,7 @@ export class BattleService {
     if (outcome === 'victory' && monsterData) {
       const expReward = monsterData.expReward;
       const yenReward =
-        monsterData.yenMin +
-        Math.floor(this.rng() * (monsterData.yenMax - monsterData.yenMin + 1));
+        monsterData.yenMin + Math.floor(this.rng() * (monsterData.yenMax - monsterData.yenMin + 1));
       const gain = applyExpGain(record.level, record.exp, expReward);
 
       // Lên cấp thì máu/nội lực tối đa tăng theo; phần tăng thêm được cộng luôn vào máu hiện tại để
@@ -643,7 +658,12 @@ export class BattleService {
       } satisfies BattleEnd);
 
       if (session) {
-        const updated: CharacterRecord = { ...record, level: gain.level, exp: gain.exp, yen: record.yen + yenReward };
+        const updated: CharacterRecord = {
+          ...record,
+          level: gain.level,
+          exp: gain.exp,
+          yen: record.yen + yenReward,
+        };
         this.sendCharacter(session, updated, hp, mp);
         if (gain.levelsGained > 0) {
           const learned = skillsOf(this.options.gameData, {
@@ -662,7 +682,10 @@ export class BattleService {
           };
           session.send(Opcode.S2C_LEVEL_UP, payload);
         }
-        session.send(Opcode.S2C_INVENTORY_UPDATE, await this.options.inventory.toPacket(combatant.id));
+        session.send(
+          Opcode.S2C_INVENTORY_UPDATE,
+          await this.options.inventory.toPacket(combatant.id),
+        );
       }
       return;
     }

@@ -1,0 +1,52 @@
+<aside class="bag">
+  <header class="bag__head">
+    <h2 class="bag__title">Túi đồ</h2>
+    <span class="bag__count">{{ items().length }} / {{ capacity() }} ô</span>
+    <button type="button" class="bag__close" (click)="closed.emit()" aria-label="Đóng túi đồ">
+      ×
+    </button>
+  </header>
+
+  @if (items().length === 0) {
+    <p class="bag__empty">Túi đang trống. Đánh quái để nhặt vật phẩm rơi.</p>
+  }
+
+  <ul class="bag__list">
+    @for (item of items(); track item.itemId) {
+      <li class="bag__row">
+        <div class="bag__info">
+          <span class="bag__name"
+            >{{ item.name }}<span class="bag__qty">×{{ item.quantity }}</span></span
+          >
+          <span class="bag__desc">{{ item.description }}</span>
+          @if (item.healHp || item.healMp) {
+            <span class="bag__effect">
+              @if (item.healHp) {
+                hồi {{ item.healHp }} máu
+              }
+              @if (item.healHp && item.healMp) {
+                ·
+              }
+              @if (item.healMp) {
+                hồi {{ item.healMp }} nội lực
+              }
+            </span>
+          }
+        </div>
+        @if (item.usable) {
+          <button
+            type="button"
+            class="bag__use"
+            [disabled]="locked()"
+            [title]="
+              locked() ? 'Trong trận, dùng vật phẩm là một lượt của bạn' : 'Dùng ' + item.name
+            "
+            (click)="use.emit(item.itemId)"
+          >
+            Dùng
+          </button>
+        }
+      </li>
+    }
+  </ul>
+</aside>

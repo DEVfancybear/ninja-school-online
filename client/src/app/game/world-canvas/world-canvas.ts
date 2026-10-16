@@ -40,6 +40,8 @@ export class WorldCanvas implements AfterViewInit, OnDestroy {
   readonly moveTo = output<Point>();
   /** Người chơi bấm vào một NPC. */
   readonly talkTo = output<string>();
+  /** Người chơi bấm vào một con quái (kèm id thực thể để xin vào trận). */
+  readonly attackMonster = output<string>();
 
   private readonly canvasHost = viewChild.required<ElementRef<HTMLDivElement>>('canvasHost');
   private scene?: WorldScene;
@@ -64,6 +66,7 @@ export class WorldCanvas implements AfterViewInit, OnDestroy {
     const scene = new WorldScene({
       moveTo: (destination) => this.moveTo.emit(destination),
       talkTo: (npcId) => this.talkTo.emit(npcId),
+      attackMonster: (monsterId) => this.attackMonster.emit(monsterId),
     });
     this.scene = scene;
     this.game = new Phaser.Game(buildGameConfig(this.canvasHost().nativeElement, scene));

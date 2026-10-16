@@ -439,4 +439,3 @@ export class WorldService {
     session.sendError(ErrorCode.INTERNAL, 'bạn chưa vào bản đồ nào, hãy bắt tay lại');
   }
 }
-

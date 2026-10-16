@@ -100,6 +100,159 @@ function enterMapFrame(): string {
   );
 }
 
+/** Bản đồ có một con quái ngay cạnh nhân vật và một con ở xa, để thử cả hai nhánh bấm quái. */
+function enterMapWithMonstersFrame(): string {
+  return encodePacket(
+    Opcode.S2C_ENTER_MAP,
+    {
+      map: MAP,
+      entity: { id: 'p1', kind: 'player', name: 'Kakashi', color: '#ff8844', x: 32, y: 32 },
+      entities: [
+        {
+          id: 'mob:lang-khoi-nguon:0',
+          kind: 'monster',
+          name: 'Bù Nhìn Tập Luyện',
+          color: '#c8a165',
+          x: 64,
+          y: 32,
+          level: 1,
+          hp: 30,
+          maxHp: 30,
+          shape: 'scarecrow',
+        },
+        {
+          id: 'mob:lang-khoi-nguon:1',
+          kind: 'monster',
+          name: 'Chuột Đồng',
+          color: '#8d7f6a',
+          // Cách nhân vật 128 px: ngoài tầm đánh (96 px) nhưng vẫn trong bản đồ 4×3 ô.
+          x: 160,
+          y: 32,
+          level: 2,
+          hp: 46,
+          maxHp: 46,
+          shape: 'rodent',
+        },
+      ],
+      chatBacklog: [],
+    },
+    2,
+  );
+}
+
+function characterFrame(overrides: Record<string, unknown> = {}): string {
+  return encodePacket(
+    Opcode.S2C_CHARACTER,
+    {
+      id: 'p1',
+      name: 'Kakashi',
+      school: 'haruna',
+      class: 'dao',
+      level: 1,
+      exp: 0,
+      expToNext: 50,
+      yen: 200,
+      hp: 60,
+      maxHp: 60,
+      mp: 40,
+      maxMp: 40,
+      strength: 6,
+      agility: 5,
+      spirit: 4,
+      attack: 13,
+      defense: 2,
+      speed: 6,
+      skills: [
+        {
+          skillId: 'skill-tram-co-ban',
+          name: 'Trảm Cơ Bản',
+          costMp: 5,
+          cooldownTurns: 0,
+          levelRequired: 1,
+        },
+      ],
+      ...overrides,
+    },
+    3,
+  );
+}
+
+function inventoryFrame(): string {
+  return encodePacket(
+    Opcode.S2C_INVENTORY_UPDATE,
+    {
+      items: [
+        {
+          itemId: 'item-banh-bao',
+          name: 'Bánh Bao Hấp',
+          kind: 'consumable',
+          quantity: 2,
+          usable: true,
+          description: 'Hồi máu',
+          healHp: 40,
+        },
+      ],
+      capacity: 40,
+    },
+    4,
+  );
+}
+
+function battleStartFrame(overrides: Record<string, unknown> = {}): string {
+  return encodePacket(
+    Opcode.S2C_BATTLE_START,
+    {
+      battleId: 'btl:lang-khoi-nguon:mob:lang-khoi-nguon:0:1',
+      roundNo: 1,
+      participants: [
+        {
+          id: 'mob:lang-khoi-nguon:0',
+          kind: 'monster',
+          name: 'Bù Nhìn Tập Luyện',
+          level: 1,
+          hp: 30,
+          maxHp: 30,
+          mp: 0,
+          maxMp: 0,
+          attack: 4,
+          defense: 1,
+          speed: 3,
+          alive: true,
+        },
+        {
+          id: 'p1',
+          kind: 'player',
+          name: 'Kakashi',
+          level: 1,
+          hp: 60,
+          maxHp: 60,
+          mp: 40,
+          maxMp: 40,
+          attack: 13,
+          defense: 2,
+          speed: 6,
+          alive: true,
+          skills: [
+            {
+              skillId: 'skill-tram-co-ban',
+              name: 'Trảm Cơ Bản',
+              costMp: 5,
+              cooldownTurns: 0,
+              levelRequired: 1,
+              readyInTurns: 0,
+            },
+          ],
+        },
+      ],
+      actorId: 'p1',
+      turnMs: 30000,
+      turnEndsAt: Date.now() + 30000,
+      ...overrides,
+    },
+    5,
+  );
+}
+
 function noCharacterFrame(): string {
   return encodePacket(
     Opcode.S2C_ERROR,
@@ -219,6 +372,133 @@ describe('Play', () => {
     expect(webSocket.packets()[0].op).toBe(Opcode.C2S_HELLO);
     expect(hello['characterId']).toBe(CHARACTER_B.id);
     expect(hello['clientVersion']).toBe('web-0.1.0');
+  });
+
+  it('bấm vào quái đủ gần thì xin vào trận ngay', async () => {
+    fixture = await setup();
+    const webSocket = await joinWorld(fixture, { map: false });
+    webSocket.deliver(enterMapWithMonstersFrame());
+    await render(fixture);
+
+    window.__ninjaWorld?.attackMonster('Bù Nhìn Tập Luyện');
+    await render(fixture);
+
+    const attack = webSocket
+      .packets()
+      .filter((packet) => packet.op === Opcode.C2S_ATTACK_MOB)
+      .at(-1);
+    expect(payloadOf(attack!)).toEqual({ targetId: 'mob:lang-khoi-nguon:0' });
+    expect(webSocket.packets().some((packet) => packet.op === Opcode.C2S_MOVE)).toBe(false);
+  });
+
+  it('bấm vào quái ở xa thì đi tới trước, tới đủ tầm thì tự xin vào trận', async () => {
+    fixture = await setup();
+    const webSocket = await joinWorld(fixture, { map: false });
+    webSocket.deliver(enterMapWithMonstersFrame());
+    await render(fixture);
+
+    window.__ninjaWorld?.attackMonster('Chuột Đồng');
+    // Lệnh di chuyển đi theo nhịp 10 lệnh/giây nên phải chờ một nhịp.
+    await sleep(140);
+    await render(fixture);
+
+    const move = webSocket
+      .packets()
+      .filter((packet) => packet.op === Opcode.C2S_MOVE)
+      .at(-1);
+    expect(payloadOf(move!)['y']).toBe(32);
+    expect(webSocket.packets().some((packet) => packet.op === Opcode.C2S_ATTACK_MOB)).toBe(false);
+
+    // Server báo con chuột đã tới sát nhân vật: client tự xin vào trận, không cần bấm lại.
+    webSocket.deliver(
+      encodePacket(
+        Opcode.S2C_ENTITY_MOVE,
+        { moves: [{ id: 'mob:lang-khoi-nguon:1', x: 64, y: 32, facing: 'none' }] },
+        6,
+      ),
+    );
+    await sleep(140);
+    await render(fixture);
+    const attack = webSocket
+      .packets()
+      .filter((packet) => packet.op === Opcode.C2S_ATTACK_MOB)
+      .at(-1);
+    expect(payloadOf(attack!)).toEqual({ targetId: 'mob:lang-khoi-nguon:1' });
+  });
+
+  it('bảng trận đấu hiện ra khi server mở trận và nút Đánh thường gửi hành động', async () => {
+    fixture = await setup();
+    const webSocket = await joinWorld(fixture, { map: false });
+    webSocket.deliver(enterMapWithMonstersFrame());
+    webSocket.deliver(characterFrame());
+    webSocket.deliver(battleStartFrame());
+    await render(fixture);
+
+    expect(text(fixture)).toContain('Bù Nhìn Tập Luyện');
+    expect(text(fixture)).toContain('Tới lượt bạn');
+    expect(text(fixture)).toContain('Đánh thường');
+
+    const attackButton = [...element(fixture).querySelectorAll('button')].find((button) =>
+      button.textContent?.includes('Đánh thường'),
+    );
+    attackButton?.click();
+    await render(fixture);
+
+    const action = webSocket
+      .packets()
+      .filter((packet) => packet.op === Opcode.C2S_BATTLE_ACTION)
+      .at(-1);
+    expect(payloadOf(action!)).toMatchObject({
+      battleId: 'btl:lang-khoi-nguon:mob:lang-khoi-nguon:0:1',
+      action: 'attack',
+      targetId: 'mob:lang-khoi-nguon:0',
+    });
+  });
+
+  it('túi đồ mở được và nút Dùng gửi C2S_USE_ITEM', async () => {
+    fixture = await setup();
+    const webSocket = await joinWorld(fixture, { map: false });
+    webSocket.deliver(enterMapWithMonstersFrame());
+    webSocket.deliver(characterFrame());
+    webSocket.deliver(inventoryFrame());
+    await render(fixture);
+
+    expect(window.__ninjaWorld?.inventory()).toEqual([
+      { itemId: 'item-banh-bao', name: 'Bánh Bao Hấp', quantity: 2, usable: true },
+    ]);
+
+    window.__ninjaWorld?.toggleInventory(true);
+    await render(fixture);
+    expect(text(fixture)).toContain('Bánh Bao Hấp');
+    expect(window.__ninjaWorld?.inventoryOpen()).toBe(true);
+
+    const useButton = [...element(fixture).querySelectorAll('button')].find(
+      (button) => button.textContent?.trim() === 'Dùng',
+    );
+    useButton?.click();
+    await render(fixture);
+
+    const use = webSocket
+      .packets()
+      .filter((packet) => packet.op === Opcode.C2S_USE_ITEM)
+      .at(-1);
+    expect(payloadOf(use!)).toEqual({ itemId: 'item-banh-bao' });
+  });
+
+  it('trong trận thì bấm chỗ khác không gửi lệnh di chuyển', async () => {
+    fixture = await setup();
+    const webSocket = await joinWorld(fixture, { map: false });
+    webSocket.deliver(enterMapWithMonstersFrame());
+    webSocket.deliver(battleStartFrame());
+    await render(fixture);
+
+    const before = webSocket.packets().filter((packet) => packet.op === Opcode.C2S_MOVE).length;
+    window.__ninjaWorld?.clickEntity('Kakashi');
+    await render(fixture);
+
+    expect(webSocket.packets().filter((packet) => packet.op === Opcode.C2S_MOVE)).toHaveLength(
+      before,
+    );
   });
 
   it('hiện lớp phủ đang kết nối lại khi mất kết nối', async () => {

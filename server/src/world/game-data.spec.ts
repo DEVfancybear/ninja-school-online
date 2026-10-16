@@ -6,7 +6,6 @@ import {
   copyGameDataDir,
   makeGameDataDir,
   removeTemporaryGameDataDirs,
-  type GameDataFiles,
 } from '../test/game-data-dir.js';
 import { GameDataError, loadGameData } from './game-data.js';
 

@@ -192,7 +192,8 @@ export function entityAtPoint(
   point: Point,
   slackPx: number = ENTITY_HIT_SLACK_PX,
 ): WorldEntity | null {
-  const preferred: readonly EntityKind[] = ['npc', 'player'];
+  // Quái đứng trước: bấm vào chỗ có quái là để vào trận, không phải để nói chuyện hay đi bộ.
+  const preferred: readonly EntityKind[] = ['monster', 'npc', 'player'];
   for (const kind of preferred) {
     let best: WorldEntity | null = null;
     let bestDistance = Number.POSITIVE_INFINITY;
