@@ -10,10 +10,11 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
-import { CLASSES, SCHOOLS } from '@ninja/shared';
+import { CLASSES, EQUIP_SLOTS, SCHOOLS, type EquipSlot } from '@ninja/shared';
 
 const schoolValues = sql.raw(SCHOOLS.map((s) => `'${s}'`).join(', '));
 const classValues = sql.raw(CLASSES.map((c) => `'${c}'`).join(', '));
+const equipSlotValues = sql.raw(EQUIP_SLOTS.map((s) => `'${s}'`).join(', '));
 
 export const accounts = pgTable(
   'accounts',
@@ -92,6 +93,10 @@ export type CharacterRow = typeof characters.$inferSelect;
 /**
  * Túi đồ. Mỗi hàng là một loại vật phẩm (gộp số lượng), khớp cách hiển thị của túi: một dòng một
  * vật phẩm kèm số lượng. Sức chứa đếm theo **số loại**, xem `INVENTORY_CAPACITY`.
+ *
+ * Mỗi nhân vật chỉ có **một bản** của mỗi loại (`inventory_items_character_item_unique`), nên món
+ * trang bị đang mặc nằm ngay trên hàng này với `equipped_slot` khác `null` — túi chỉ gồm các hàng
+ * có `equipped_slot is null`, và mặc vào thì món rời túi chứ không sinh hàng thứ hai.
  */
 export const inventoryItems = pgTable(
   'inventory_items',
@@ -102,11 +107,60 @@ export const inventoryItems = pgTable(
       .references(() => characters.id, { onDelete: 'cascade' }),
     itemId: varchar('item_id', { length: 64 }).notNull(),
     quantity: integer('quantity').notNull().default(1),
+    /** Cấp cường hóa hiện tại; `0` là món chưa cường hóa. Chỉ trang bị mới lên được cấp > 0. */
+    upgradeLevel: integer('upgrade_level').notNull().default(0),
+    /** Ô đang mặc; `null` là đang nằm trong túi. Mỗi ô chỉ một món (xem index bên dưới). */
+    equippedSlot: varchar('equipped_slot', { length: 16 }).$type<EquipSlot>(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     uniqueIndex('inventory_items_character_item_unique').on(table.characterId, table.itemId),
+    // Một ô chỉ một món. Index **một phần** vì `null` (đang trong túi) không phải là một ô.
+    uniqueIndex('inventory_items_character_slot_unique')
+      .on(table.characterId, table.equippedSlot)
+      .where(sql`${table.equippedSlot} is not null`),
     index('inventory_items_character_idx').on(table.characterId),
     check('inventory_items_quantity_positive', sql`${table.quantity} > 0`),
+    check('inventory_items_upgrade_level_non_negative', sql`${table.upgradeLevel} >= 0`),
+    check(
+      'inventory_items_equipped_slot_valid',
+      sql`${table.equippedSlot} is null or ${table.equippedSlot} in (${equipSlotValues})`,
+    ),
   ],
 );
+
+/** Ba loại giao dịch được ghi vào nhật ký; mỗi loại một mã riêng để lọc sổ dễ. */
+export const TRANSACTION_KINDS = ['buy', 'sell', 'upgrade'] as const;
+export type TransactionKind = (typeof TRANSACTION_KINDS)[number];
+
+const transactionKindValues = sql.raw(TRANSACTION_KINDS.map((kind) => `'${kind}'`).join(', '));
+
+/**
+ * Nhật ký giao dịch (audit log). Mỗi lần **thành công** một giao dịch mua/bán/cường hóa ghi đúng
+ * một hàng: ai, món gì, bao nhiêu, yên tăng hay giảm, và câu giải thích cho người đọc sổ. Giao dịch
+ * bị từ chối thì không ghi gì — chúng không đổi trạng thái của ai.
+ */
+export const transactions = pgTable(
+  'transactions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    characterId: uuid('character_id')
+      .notNull()
+      .references(() => characters.id, { onDelete: 'cascade' }),
+    kind: varchar('kind', { length: 16 }).$type<TransactionKind>().notNull(),
+    itemId: varchar('item_id', { length: 64 }).notNull(),
+    quantity: integer('quantity').notNull().default(1),
+    /** Yên tăng (bán) hay giảm (mua, cường hóa) so với trước giao dịch. */
+    yenDelta: integer('yen_delta').notNull(),
+    detail: text('detail').notNull().default(''),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('transactions_character_created_idx').on(table.characterId, table.createdAt),
+    check('transactions_quantity_positive', sql`${table.quantity} > 0`),
+    check('transactions_kind_valid', sql`${table.kind} in (${transactionKindValues})`),
+  ],
+);
+
+export type InventoryRow = typeof inventoryItems.$inferSelect;
+export type TransactionRow = typeof transactions.$inferSelect;

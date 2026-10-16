@@ -137,4 +137,27 @@ export class CharacterService {
       .set({ level: values.level, exp: values.exp, yen: values.yen, updatedAt: sql`now()` })
       .where(eq(characters.id, characterId));
   }
+
+  /**
+   * Trừ yên khi mua/cường hóa, trong **một** câu lệnh có kèm điều kiện đủ tiền — nên không có kẽ hở
+   * giữa lúc kiểm và lúc trừ. Trả số yên còn lại, hoặc `undefined` nếu không đủ (khi đó không trừ gì).
+   */
+  async spendYen(characterId: string, amount: number): Promise<number | undefined> {
+    const [row] = await this.db
+      .update(characters)
+      .set({ yen: sql`${characters.yen} - ${amount}`, updatedAt: sql`now()` })
+      .where(and(eq(characters.id, characterId), sql`${characters.yen} >= ${amount}`))
+      .returning({ yen: characters.yen });
+    return row?.yen;
+  }
+
+  /** Cộng yên khi bán được đồ (hoặc khi hoàn lại một giao dịch không thành). Trả số yên sau khi cộng. */
+  async addYen(characterId: string, amount: number): Promise<number | undefined> {
+    const [row] = await this.db
+      .update(characters)
+      .set({ yen: sql`${characters.yen} + ${amount}`, updatedAt: sql`now()` })
+      .where(eq(characters.id, characterId))
+      .returning({ yen: characters.yen });
+    return row?.yen;
+  }
 }

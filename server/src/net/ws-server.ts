@@ -15,9 +15,14 @@ import {
   type ChatSend,
   type ClientHello,
   type EnterMap,
+  type Equip,
   type Move,
   type NpcTalk,
   type Ping,
+  type ShopBuy,
+  type ShopSell,
+  type Unequip,
+  type Upgrade,
   type UseItem,
 } from '@ninja/shared';
 import type { FastifyInstance } from 'fastify';
@@ -380,6 +385,41 @@ export class WebSocketGateway {
         const use = this.decode<UseItem>(session, op, payload);
         if (use) {
           world.useItem(session, use);
+        }
+        return;
+      }
+      case Opcode.C2S_EQUIP: {
+        const request = this.decode<Equip>(session, op, payload);
+        if (request) {
+          await world.equip(session, request);
+        }
+        return;
+      }
+      case Opcode.C2S_UNEQUIP: {
+        const request = this.decode<Unequip>(session, op, payload);
+        if (request) {
+          await world.unequip(session, request);
+        }
+        return;
+      }
+      case Opcode.C2S_SHOP_BUY: {
+        const request = this.decode<ShopBuy>(session, op, payload);
+        if (request) {
+          await world.shopBuy(session, request);
+        }
+        return;
+      }
+      case Opcode.C2S_SHOP_SELL: {
+        const request = this.decode<ShopSell>(session, op, payload);
+        if (request) {
+          await world.shopSell(session, request);
+        }
+        return;
+      }
+      case Opcode.C2S_UPGRADE: {
+        const request = this.decode<Upgrade>(session, op, payload);
+        if (request) {
+          await world.upgrade(session, request);
         }
         return;
       }

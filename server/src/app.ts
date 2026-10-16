@@ -12,8 +12,11 @@ import { registerAccountRoutes } from './modules/account/routes.js';
 import { CharacterService } from './modules/character/service.js';
 import { registerCharacterRoutes } from './modules/character/routes.js';
 import { ChatService } from './modules/chat/service.js';
+import { EquipmentService } from './modules/equipment/service.js';
 import { InventoryService } from './modules/inventory/service.js';
 import { NpcService } from './modules/npc/service.js';
+import { ShopService } from './modules/shop/service.js';
+import { UpgradeService } from './modules/upgrade/service.js';
 import { RoomManager } from './core/room-manager.js';
 import { TickScheduler } from './core/tick.js';
 import { WebSocketGateway } from './net/ws-server.js';
@@ -83,6 +86,9 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
   const gameData = await loadGameData(options.gameDataDir);
   const inventoryService = new InventoryService(db, gameData);
   const characterService = new CharacterService(db, inventoryService, gameData);
+  const equipmentService = new EquipmentService(gameData, characterService, inventoryService);
+  const shopService = new ShopService(db, gameData, characterService, inventoryService);
+  const upgradeService = new UpgradeService(db, gameData, characterService, inventoryService);
   const tick = new TickScheduler();
   const rooms = new RoomManager({
     gameData,
@@ -111,8 +117,11 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
     sessions: new SessionRegistry(),
     characters: characterService,
     chat: new ChatService(),
-    npcs: new NpcService(),
+    npcs: new NpcService(shopService),
     inventory: inventoryService,
+    equipment: equipmentService,
+    shop: shopService,
+    upgrade: upgradeService,
     tick,
     verifyToken: verifyAccessToken,
   });

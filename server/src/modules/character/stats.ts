@@ -8,11 +8,15 @@ import {
   type Character,
   type CharacterStats,
   type Skill,
+  type StatBlock,
 } from '@ninja/shared';
 import type { GameData } from '../../world/game-data.js';
 
 /** Mỗi điểm sức mạnh cộng ngần này vào sức tấn công; thêm 1 theo cấp để lên cấp là mạnh lên thật. */
 export const ATTACK_PER_STRENGTH = 2;
+
+/** Không mặc gì: dùng làm mặc định để hàm tính chỉ số không phải nhận `undefined`. */
+export const NO_STATS_BONUS: StatBlock = { strength: 0, agility: 0, spirit: 0, hp: 0, mp: 0 };
 
 /** Dữ liệu cần để tính chỉ số: chỉ có trong hàng `characters`, không có trong gói tin REST. */
 export interface CharacterRecord extends Character {
@@ -34,23 +38,33 @@ export interface ResolvedStats {
 }
 
 /**
- * Chỉ số của một nhân vật: hệ số phái trong `game-data/classes/` nhân theo cấp.
+ * Chỉ số của một nhân vật: hệ số phái trong `game-data/classes/` nhân theo cấp, **cộng thêm trang bị
+ * đang mặc** trước khi suy ra các chỉ số dẫn xuất.
  *
  * Công thức (chốt ở M3, ghi cả ở `docs/02-architecture/network-and-data.md`):
  * `tấn công = 2 × sức mạnh + cấp`, `phòng thủ = nhanh nhẹn / 2` (làm tròn xuống),
  * `tốc độ = nhanh nhẹn + cấp` (tốc độ quyết định thứ tự lượt trong trận).
+ *
+ * `bonus` là tổng chỉ số trang bị (`EquipmentService.bonusFor`), cộng vào **gốc** nên mặc đồ nhanh
+ * nhẹn cũng tăng phòng thủ và tốc độ, mặc đồ sức mạnh cũng tăng tấn công, và máu tối đa tăng theo.
  */
-export function resolveStats(definition: ClassDefinitionStats, level: number): ResolvedStats {
+export function resolveStats(
+  definition: ClassDefinitionStats,
+  level: number,
+  bonus: StatBlock = NO_STATS_BONUS,
+): ResolvedStats {
   const base = statsAtLevel(definition.baseStats, definition.perLevel, level);
+  const strength = base.strength + bonus.strength;
+  const agility = base.agility + bonus.agility;
   return {
-    strength: base.strength,
-    agility: base.agility,
-    spirit: base.spirit,
-    maxHp: base.hp,
-    maxMp: base.mp,
-    attack: ATTACK_PER_STRENGTH * base.strength + level,
-    defense: defenseFromAgility(base.agility),
-    speed: base.agility + level,
+    strength,
+    agility,
+    spirit: base.spirit + bonus.spirit,
+    maxHp: Math.max(1, base.hp + bonus.hp),
+    maxMp: Math.max(0, base.mp + bonus.mp),
+    attack: ATTACK_PER_STRENGTH * strength + level,
+    defense: defenseFromAgility(agility),
+    speed: agility + level,
   };
 }
 
@@ -64,8 +78,9 @@ export type ClassDefinitionStats = {
 export function resolvedFor(
   data: GameData,
   record: Pick<CharacterRecord, 'school' | 'level'>,
+  bonus: StatBlock = NO_STATS_BONUS,
 ): ResolvedStats {
-  return resolveStats(data.classes.get(record.school) ?? FALLBACK_CLASS, record.level);
+  return resolveStats(data.classes.get(record.school) ?? FALLBACK_CLASS, record.level, bonus);
 }
 
 /** Máu hiện tại: `null` trong database nghĩa là **đang đầy** (xem `server/src/db/schema.ts`). */
@@ -90,12 +105,14 @@ export function skillsOf(data: GameData, character: Pick<Character, 'class' | 'l
 export function characterStatsPayload(options: {
   record: CharacterRecord;
   data: GameData;
+  /** Tổng chỉ số trang bị đang mặc; bỏ trống là không mặc gì. */
+  bonus?: StatBlock;
   /** Bỏ trống thì lấy máu/nội lực đang có trong database. */
   hp?: number;
   mp?: number;
 }): CharacterStats {
   const { record, data } = options;
-  const resolved = resolvedFor(data, record);
+  const resolved = resolvedFor(data, record, options.bonus ?? NO_STATS_BONUS);
   const hp = options.hp ?? currentHp(record, resolved.maxHp);
   const mp = options.mp ?? currentMp(record, resolved.maxMp);
   return {

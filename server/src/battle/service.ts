@@ -19,12 +19,14 @@ import {
   type LevelUp,
   type Monster,
   type Skill,
+  type StatBlock,
   type UseItem,
 } from '@ninja/shared';
 import type { TickScheduler } from '../core/tick.js';
 import type { RoomManager } from '../core/room-manager.js';
 import type { CharacterService } from '../modules/character/service.js';
 import {
+  NO_STATS_BONUS,
   characterStatsPayload,
   currentHp,
   currentMp,
@@ -32,6 +34,7 @@ import {
   skillsOf,
   type CharacterRecord,
 } from '../modules/character/stats.js';
+import type { EquipmentService } from '../modules/equipment/service.js';
 import type { InventoryService } from '../modules/inventory/service.js';
 import type { GameSession } from '../net/session.js';
 import type { SessionRegistry } from '../net/session-registry.js';
@@ -79,6 +82,8 @@ export interface BattleServiceOptions {
   sessions: SessionRegistry;
   characters: CharacterService;
   inventory: InventoryService;
+  /** Trang bị đang mặc: chỉ số cộng thêm phải có cả trong ảnh chụp lúc vào trận lẫn khi trả thưởng. */
+  equipment: EquipmentService;
   /** Nhịp dùng chung: trận đấu đếm lượt và hết giờ trên cùng nhịp với phần còn lại của server. */
   tick: TickScheduler;
   /**
@@ -164,7 +169,11 @@ export class BattleService {
     }
 
     const record = await this.options.characters.findById(player.id);
-    const combatant = record ? this.playerCombatant(record) : undefined;
+    // Ảnh chụp lúc vào trận phải gồm cả trang bị đang mặc, nếu không thì mặc đồ rồi vào trận vẫn yếu.
+    const bonus = record
+      ? await this.options.equipment.bonusFor(record.id)
+      : NO_STATS_BONUS;
+    const combatant = record ? this.playerCombatant(record, bonus) : undefined;
     if (!combatant) {
       session.sendError(ErrorCode.INTERNAL, 'không đọc được nhân vật của bạn, hãy vào lại');
       return;
@@ -238,7 +247,8 @@ export class BattleService {
       session.sendError(ErrorCode.INTERNAL, 'không đọc được nhân vật của bạn, hãy vào lại');
       return;
     }
-    const resolved = resolvedFor(this.options.gameData, record);
+    const bonus = await this.options.equipment.bonusFor(characterId);
+    const resolved = resolvedFor(this.options.gameData, record, bonus);
     const hp = currentHp(record, resolved.maxHp);
     const mp = currentMp(record, resolved.maxMp);
 
@@ -254,7 +264,7 @@ export class BattleService {
     }
 
     await this.options.characters.updateVitals(characterId, healed.hp, healed.mp);
-    this.sendCharacter(session, { ...record }, healed.hp, healed.mp);
+    this.sendCharacter(session, { ...record }, healed.hp, healed.mp, bonus);
     session.send(Opcode.S2C_INVENTORY_UPDATE, await this.options.inventory.toPacket(characterId));
   }
 
@@ -626,10 +636,11 @@ export class BattleService {
         monsterData.yenMin + Math.floor(this.rng() * (monsterData.yenMax - monsterData.yenMin + 1));
       const gain = applyExpGain(record.level, record.exp, expReward);
 
-      // Lên cấp thì máu/nội lực tối đa tăng theo; phần tăng thêm được cộng luôn vào máu hiện tại để
-      // lên cấp là thấy khỏe hơn ngay, không phải chờ hồi đầy.
-      const before = resolvedFor(this.options.gameData, record);
-      const after = resolvedFor(this.options.gameData, { ...record, level: gain.level });
+      // Trang bị ảnh hưởng máu/nội lực tối đa nên phải cộng vào **cả hai** vế so sánh: phần tăng
+      // thêm khi lên cấp vẫn chỉ là phần do cấp, không phải do đồ đang mặc.
+      const bonus = await this.options.equipment.bonusFor(combatant.id);
+      const before = resolvedFor(this.options.gameData, record, bonus);
+      const after = resolvedFor(this.options.gameData, { ...record, level: gain.level }, bonus);
       const hp = this.clamp(combatant.hp + (after.maxHp - before.maxHp), 1, after.maxHp);
       const mp = this.clamp(combatant.mp + (after.maxMp - before.maxMp), 0, after.maxMp);
       combatant.hp = hp;
@@ -679,7 +690,7 @@ export class BattleService {
           exp: gain.exp,
           yen: record.yen + yenReward,
         };
-        this.sendCharacter(session, updated, hp, mp);
+        this.sendCharacter(session, updated, hp, mp, bonus);
         if (gain.levelsGained > 0) {
           const learned = skillsOf(this.options.gameData, {
             class: record.class,
@@ -689,6 +700,7 @@ export class BattleService {
             character: characterStatsPayload({
               record: updated,
               data: this.options.gameData,
+              bonus,
               hp,
               mp,
             }),
@@ -706,7 +718,8 @@ export class BattleService {
     }
 
     if (outcome === 'defeat') {
-      const resolved = resolvedFor(this.options.gameData, record);
+      const bonus = await this.options.equipment.bonusFor(combatant.id);
+      const resolved = resolvedFor(this.options.gameData, record, bonus);
       const hp = Math.max(1, Math.round(resolved.maxHp * REVIVE_HP_RATIO));
       const yenLoss = Math.floor(record.yen * DEFEAT_YEN_LOSS_RATIO);
       await this.options.characters.updateVitals(combatant.id, hp, resolved.maxMp);
@@ -729,7 +742,7 @@ export class BattleService {
           ...record,
           yen: record.yen - yenLoss,
         };
-        this.sendCharacter(session, updated, hp, resolved.maxMp);
+        this.sendCharacter(session, updated, hp, resolved.maxMp, bonus);
       }
       this.options.onDefeat(combatant.id);
       return;
@@ -771,11 +784,11 @@ export class BattleService {
     return battle;
   }
 
-  private playerCombatant(record: CharacterRecord): Combatant | undefined {
+  private playerCombatant(record: CharacterRecord, bonus: StatBlock): Combatant | undefined {
     if (!this.options.gameData.classes.has(record.school)) {
       return undefined;
     }
-    const resolved = resolvedFor(this.options.gameData, record);
+    const resolved = resolvedFor(this.options.gameData, record, bonus);
     return {
       id: record.id,
       kind: 'player',
@@ -1029,10 +1042,11 @@ export class BattleService {
     record: CharacterRecord,
     hp: number,
     mp: number,
+    bonus: StatBlock,
   ): void {
     session.send(
       Opcode.S2C_CHARACTER,
-      characterStatsPayload({ record, data: this.options.gameData, hp, mp }),
+      characterStatsPayload({ record, data: this.options.gameData, bonus, hp, mp }),
     );
   }
 
