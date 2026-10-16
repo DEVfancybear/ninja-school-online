@@ -120,7 +120,7 @@ Phần **server** của M2 đã chạy thật (kiểm thử tích hợp bằng c
   (danh sách món + giá + yêu cầu cấp). Mua trừ yên bằng **một câu UPDATE có điều kiện** `yen >= amount`;
   bán nhận 40% giá gốc (`SELL_PRICE_RATIO`). Mỗi giao dịch thành công ghi **một hàng `transactions`**
   (`kind` `buy|sell|upgrade`, `yen_delta`, `detail` tiếng Việt).
-- **Cường hóa:** mỗi lần thử tốn 50 yên + 1 đá vụn (`UPGRADE_MATERIAL_ID`), tỉ lệ theo cấp (cấp 0→1 =
+- **Cường hóa:** mỗi lần thử tốn 1 đá vụn (`UPGRADE_MATERIAL_ID`) + yên theo cấp hiện tại của món (`UPGRADE_YEN_COST` = 50/120/260/520/1000), tỉ lệ theo cấp (cấp 0→1 =
   1.0), trần chung `UPGRADE_MAX_LEVEL` = 5 và trần riêng của món qua `upgradeMaxLevelOf()`. Trình tự:
   kiểm cấp/trần → **trừ yên** → **lấy đá** → gieo `rng`; thiếu đá thì hoàn yên và **không** gọi `rng`. Đá
   vụn rơi từ quái (Bù Nhìn 40%, Chuột Đồng 70%, Heo Rừng 80%).
@@ -187,7 +187,7 @@ Quy ước: `C2S_*` = client → server, `S2C_*` = server → client. Mọi gói
 | `C2S_EQUIP` / `C2S_UNEQUIP` | 2 chiều | Mặc/tháo trang bị theo ô (`itemId` / `slot`) — M4 |
 | `S2C_EQUIPMENT` | S→C | Đủ 4 ô trang bị (ô trống `item: null`) — M4; gửi ngay sau bắt tay/respawn và sau mỗi lần mặc/tháo/cường hóa |
 | `C2S_SHOP_BUY` / `C2S_SHOP_SELL` | 2 chiều | Mua/bán ở quầy NPC — M4; server nhớ NPC vừa nói chuyện nên **phải bấm NPC bán hàng trước khi mua**, còn bán thì không cần quầy |
-| `C2S_UPGRADE` / `S2C_UPGRADE_RESULT` | 2 chiều | Cường hóa trang bị — M4: tốn 50 yên + 1 đá vụn mỗi lần thử kể cả khi hỏng, tỉ lệ theo cấp (0→1 = 1.0), trần 5 |
+| `C2S_UPGRADE` / `S2C_UPGRADE_RESULT` | 2 chiều | Cường hóa trang bị — M4: tốn 1 đá vụn + yên theo cấp hiện tại (`UPGRADE_YEN_COST` = 50/120/260/520/1000) mỗi lần thử kể cả khi hỏng, tỉ lệ theo cấp (0→1 = 1.0), trần 5 |
 | `S2C_LEVEL_UP` / `S2C_CHARACTER` | S→C | Lên cấp (kèm chiêu mới học) và chỉ số nhân vật — M3 gửi `S2C_CHARACTER` ngay sau bắt tay và mỗi lần chỉ số đổi; chưa có `S2C_STATS_UPDATE` riêng |
 | `S2C_NOTIFY` | S→C | Thông báo hệ thống (thưởng, sự kiện, lỗi) |
 
