@@ -106,6 +106,30 @@ Phần **server** của M2 đã chạy thật (kiểm thử tích hợp bằng c
   trang bị ảnh hưởng chỉ số, lưu vị trí vào database, và rate limit chung cho mọi gói tin.
 
 
+### 2d. Hiện trạng đã cài đặt (M4 — trang bị theo ô, shop & cường hóa)
+
+- **Trang bị theo ô:** mỗi nhân vật có 4 ô (`EQUIP_SLOTS`: `weapon`, `body`, `feet`, `accessory`).
+  `inventory_items` thêm `upgrade_level` và `equipped_slot`, kèm **unique index một phần**
+  `(character_id, equipped_slot) where equipped_slot is not null` nên database tự chặn cảnh hai món cùng
+  một ô. **Túi = các hàng `equipped_slot is null`**, nên mặc/tháo chỉ đổi cột trên đúng hàng cũ: không
+  sinh hàng thứ hai, túi đầy 40 loại vẫn mặc được.
+- **Chỉ số:** `resolveStats()` nhận thêm `bonus` từ trang bị và cộng vào **gốc** trước khi suy ra tấn
+  công/phòng thủ/tốc độ/máu tối đa — nên vào trận, dùng vật phẩm, thắng/thua/lên cấp đều dùng đúng chỉ số.
+  Gói trang bị luôn đủ 4 ô, ô trống là `item: null`.
+- **Shop:** NPC bán hàng khai trong `game-data/npcs/npc-thay-do.json`; `S2C_NPC_DIALOG` mang thêm `shop`
+  (danh sách món + giá + yêu cầu cấp). Mua trừ yên bằng **một câu UPDATE có điều kiện** `yen >= amount`;
+  bán nhận 40% giá gốc (`SELL_PRICE_RATIO`). Mỗi giao dịch thành công ghi **một hàng `transactions`**
+  (`kind` `buy|sell|upgrade`, `yen_delta`, `detail` tiếng Việt).
+- **Cường hóa:** mỗi lần thử tốn 50 yên + 1 đá vụn (`UPGRADE_MATERIAL_ID`), tỉ lệ theo cấp (cấp 0→1 =
+  1.0), trần chung `UPGRADE_MAX_LEVEL` = 5 và trần riêng của món qua `upgradeMaxLevelOf()`. Trình tự:
+  kiểm cấp/trần → **trừ yên** → **lấy đá** → gieo `rng`; thiếu đá thì hoàn yên và **không** gọi `rng`. Đá
+  vụn rơi từ quái (Bù Nhìn 40%, Chuột Đồng 70%, Heo Rừng 80%).
+- **Chống lạm dụng:** mọi thao tác mặc/tháo/mua/bán/cường hóa đều kiểm quyền sở hữu trên hàng trong
+  `inventory_items` của đúng nhân vật, và bị chặn khi đang trong trận (`in_battle`).
+- **Client:** bảng trang bị (4 ô + nút Tháo), bảng shop (Mua/Bán, giá, yêu cầu cấp), nút Cường hóa trong
+  túi (yên + tỉ lệ, khoá khi chạm trần), thông báo kết quả; HUD thêm nút **Trang bị**; bảng túi nằm dưới
+  thanh HUD và hiện cấp `+N`, chỉ số, giá bán.
+
 ## 3. Định dạng gói tin
 
 Mỗi gói tin WebSocket là **một khung text JSON** (chưa dùng nhị phân/MessagePack; để dành khi băng thông thành vấn đề):
@@ -160,7 +184,10 @@ Quy ước: `C2S_*` = client → server, `S2C_*` = server → client. Mọi gói
 | `S2C_BATTLE_RESULT` | S→C | Kết quả một hành động: nhật ký dạng câu tiếng Việt + trạng thái mới của mọi người (M3) |
 | `S2C_BATTLE_END` | S→C | Kết thúc: thắng/thua/chạy thoát kèm phần thưởng **của riêng người nhận** (M3) |
 | `C2S_USE_ITEM` / `S2C_INVENTORY_UPDATE` | 2 chiều | Dùng vật phẩm ngoài trận (trong trận phải qua lượt), gửi lại cả túi mỗi lần đổi (M3) |
-| `C2S_UPGRADE_ITEM` / `S2C_UPGRADE_RESULT` | 2 chiều | Cường hóa trang bị |
+| `C2S_EQUIP` / `C2S_UNEQUIP` | 2 chiều | Mặc/tháo trang bị theo ô (`itemId` / `slot`) — M4 |
+| `S2C_EQUIPMENT` | S→C | Đủ 4 ô trang bị (ô trống `item: null`) — M4; gửi ngay sau bắt tay/respawn và sau mỗi lần mặc/tháo/cường hóa |
+| `C2S_SHOP_BUY` / `C2S_SHOP_SELL` | 2 chiều | Mua/bán ở quầy NPC — M4; server nhớ NPC vừa nói chuyện nên **phải bấm NPC bán hàng trước khi mua**, còn bán thì không cần quầy |
+| `C2S_UPGRADE` / `S2C_UPGRADE_RESULT` | 2 chiều | Cường hóa trang bị — M4: tốn 50 yên + 1 đá vụn mỗi lần thử kể cả khi hỏng, tỉ lệ theo cấp (0→1 = 1.0), trần 5 |
 | `S2C_LEVEL_UP` / `S2C_CHARACTER` | S→C | Lên cấp (kèm chiêu mới học) và chỉ số nhân vật — M3 gửi `S2C_CHARACTER` ngay sau bắt tay và mỗi lần chỉ số đổi; chưa có `S2C_STATS_UPDATE` riêng |
 | `S2C_NOTIFY` | S→C | Thông báo hệ thống (thưởng, sự kiện, lỗi) |
 
@@ -188,20 +215,20 @@ Game gốc xử lý gần hết ở client nên bị chế auto/mod dễ dàng. 
 
 ### 6.1 Bảng PostgreSQL (dữ liệu chạy)
 
-**Trạng thái: bảng này là thiết kế đích cho cả dự án, không phải danh sách "đã có".** Sau M3, database
-có `accounts`, `characters`, `refresh_tokens`, `inventory_items` (xem `server/src/db/schema.ts` và hai
-migration trong `server/drizzle/`); các bảng còn lại sẽ được tạo ở cột mốc tương ứng. Cột `map_id`, `x`,
-`y`, `stats`, `last_login` của `characters` **chưa có** (M2/M3 chưa lưu vị trí — xem 6.3), nhưng đã có
-thêm `hp`/`mp` với quy ước `null` = đang đầy.
+**Trạng thái: bảng này là thiết kế đích cho cả dự án, không phải danh sách "đã có".** Sau M4, database
+có `accounts`, `characters`, `refresh_tokens`, `inventory_items` (thêm `upgrade_level`, `equipped_slot`) và
+`transactions` — xem `server/src/db/schema.ts` và ba migration trong `server/drizzle/`; các bảng còn lại sẽ
+được tạo ở cột mốc tương ứng. Cột `map_id`, `x`, `y`, `stats`, `last_login` của `characters` **chưa có**
+(M2/M3 chưa lưu vị trí — xem 6.3), nhưng đã có thêm `hp`/`mp` với quy ước `null` = đang đầy.
 
 | Bảng | Cột chính | Ghi chú | Đã có |
 |---|---|---|---|
 | `accounts` | id, username, password_hash, email, status, created_at | 1 tài khoản nhiều nhân vật | ✅ M1 |
 | `refresh_tokens` | id, account_id, token_hash, expires_at, revoked_at | refresh token xoay vòng, lưu dạng băm | ✅ M1 |
 | `characters` | id, account_id, name, school, class, level, exp, yen, **hp, mp**, map_id, x, y, stats(jsonb), last_login | chỉ số suy từ `game-data/classes/` chứ không lưu; `hp`/`mp` là máu/nội lực **hiện tại**, `null` = đang đầy; `map_id/x/y/stats/last_login` **chưa làm** | ✅ M1 + M3 (hp/mp) |
-| `inventory_items` | id, character_id, item_id, quantity, created_at | **thay cho bảng `items` dự kiến**: một hàng cho mỗi **loại** vật phẩm kèm số lượng (khớp cách túi hiển thị), sức chứa đếm theo số loại | ✅ M3 |
+| `inventory_items` | id, character_id, item_id, quantity, **upgrade_level, equipped_slot**, created_at | **thay cho bảng `items` dự kiến**: một hàng cho mỗi **loại** vật phẩm kèm số lượng (khớp cách túi hiển thị), sức chứa đếm theo số loại. M4 thêm cấp cường hóa và ô đang mặc, kèm unique index một phần `(character_id, equipped_slot) where equipped_slot is not null`; **túi = hàng có `equipped_slot is null`** | ✅ M3 + M4 |
 | `char_skills` | char_id, skill_id, skill_level | **không dùng ở M3**: học chiêu là hàm của phái và cấp, dữ liệu chiêu là nguồn sự thật duy nhất | ❌ chưa có |
-| `items` | id, owner_id, template_id, qty, upgrade_level, bound, slot, meta(jsonb) | vật phẩm có thuộc tính riêng (cường hóa, khóa, ô trang bị) — thay bằng `inventory_items` ở M3, sẽ xem lại khi làm M4 | ❌ chưa có |
+| `items` | id, owner_id, template_id, qty, upgrade_level, bound, slot, meta(jsonb) | vật phẩm có thuộc tính riêng (cường hóa, khóa, ô trang bị) — thay bằng `inventory_items` ở M3; M4 giải quyết bằng cột `upgrade_level`/`equipped_slot` trên `inventory_items` nên bảng này vẫn không cần | ❌ không cần |
 | `quest_progress` | char_id, quest_id, state, progress(jsonb) | nhiệm vụ | M5 |
 | `friends` | char_id, friend_id, status | bạn bè | M6 |
 | `guilds` | id, name, level, exp, notice, created_at | bang hội | M7 |
@@ -209,9 +236,8 @@ thêm `hp`/`mp` với quy ước `null` = đang đầy.
 | `mails` | id, to_char_id, from_name, title, body, attach(jsonb), is_read, expires_at | thư + quà | M6 |
 | `arena_rank` | char_id, season, rating, wins, losses | Lôi Đài | M6 |
 | `daily_limits` | char_id, kind, count, day | giới hạn theo ngày (boss, sự kiện) | M7 |
-| `audit_logs` | id, actor, action, meta(jsonb), created_at | đối soát | M4 |
-| `trade_logs` | id, kind, payload(jsonb), created_at | giao dịch quan trọng | M4 |
-| `trade_logs` | id, kind, payload(jsonb), created_at | giao dịch quan trọng |
+| `transactions` | id, character_id, kind, item_id, quantity, yen_delta, detail, created_at | **thay cho `trade_logs` dự kiến**: sổ giao dịch mua/bán/cường hóa, ghi khi thành công (`yen_delta` âm khi mua/cường hóa, dương khi bán) | ✅ M4 |
+| `audit_logs` | id, actor, action, meta(jsonb), created_at | đối soát | ❌ chưa có |
 
 ### 6.2 Dữ liệu nội dung (game-data, JSON)
 

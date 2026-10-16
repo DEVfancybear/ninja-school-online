@@ -3,12 +3,14 @@
 Dự án game **nhập vai 2D nhiều người chơi (MMORPG nhẹ)**, chiến đấu theo lượt, **chơi trực tiếp trên trình duyệt** (máy tính + mobile web), lấy cảm hứng từ dòng game "Ninja School Online" nổi tiếng ở Việt Nam.
 
 > **Trạng thái: đã xong Giai đoạn 0 (nghiên cứu & thiết kế) và các mốc M0 (nền móng), M1 (tài khoản &
-> nhân vật), M2 (thế giới, di chuyển, chat), M3 (chiến đấu theo lượt PvE) — hết phạm vi MVP.**
+> nhân vật), M2 (thế giới, di chuyển, chat), M3 (chiến đấu theo lượt PvE) — hết phạm vi MVP — và M4
+> (trang bị theo ô, shop & cường hóa).**
 > Chơi được trên web: đăng ký/đăng nhập, tạo nhân vật, vào thế giới 2D bằng WebSocket, đi lại bằng bàn
-> phím, thấy người chơi khác cùng bản đồ, chat trong bản đồ, nói chuyện với NPC, đi qua cổng sang bản đồ
+> phím, thấy người chơi khác cùng bản đồ, chat trong bản đồ, nói chuyện với NPC, mua/bán ở shop, mặc đồ
+> vào 4 ô trang bị thấy chỉ số tăng, cường hóa đồ tốn yên + đá vụn rơi từ quái, đi qua cổng sang bản đồ
 > thứ hai, **chạm quái để vào trận theo lượt**, dùng chiêu và vật phẩm, nhận kinh nghiệm/yên/vật phẩm rơi,
-> lên cấp, và hồi sinh ở làng khi thua; dữ liệu tài khoản/nhân vật/túi đồ lưu trong PostgreSQL.
-> Chưa có hành trang & cường hóa (M4), nhiệm vụ (M5), xã hội & PvP (M6).
+> lên cấp, và hồi sinh ở làng khi thua; dữ liệu tài khoản/nhân vật/túi đồ/trang bị lưu trong PostgreSQL.
+> Chưa có nhiệm vụ (M5), xã hội & PvP (M6).
 
 ## Lệnh nhanh
 
@@ -17,14 +19,18 @@ pnpm install            # cài phụ thuộc (pnpm 12 trở lên)
 cp .env.example .env    # rồi chỉnh DATABASE_URL cho đúng máy bạn
 pnpm db:migrate         # tạo bảng trong PostgreSQL (tự build shared trước)
 pnpm dev                # chạy client (ng serve) + server (tsx watch)
-pnpm lint && pnpm typecheck && pnpm test # 339 test
-pnpm e2e                # 17 kịch bản trên trình duyệt thật (Playwright)
+pnpm lint && pnpm typecheck && pnpm test   # 422 test
+pnpm e2e                                   # 21 kịch bản trên trình duyệt thật (Playwright)
 pnpm validate:data      # kiểm tra game-data/ theo schema
 pnpm build
 ```
 
 Cần PostgreSQL đang chạy trước. Có Docker thì dùng `docker compose -f infra/docker/docker-compose.dev.yml up -d`;
 không có Docker thì xem cách chạy trực tiếp trong `infra/README.md`.
+
+> **Mẹo máy dev:** sau khi sửa `shared/`, xoá `client/.angular/cache` trước khi chạy lại dev/e2e — Vite
+> giữ bản `@ninja/shared` cũ trong cache nên trang chơi vỡ (`does not provide an export named
+> 'EQUIP_SLOTS'`) và e2e đỏ hàng loạt dù mã đúng.
 
 ## 1. Quyết định đã chốt (theo yêu cầu)
 
@@ -87,7 +93,7 @@ ninja/
 Các thư mục `client/`, `server/`, `shared/`, `tools/data-validator/` đã có mã nguồn chạy được.
 `assets/` mới chỉ có `README.md` và `CREDITS.md`; kiểm thử tải (`tests/load`) sẽ làm ở M8.
 
-## 5. Việc tiếp theo (từ M3)
+## 5. Việc tiếp theo (từ M4)
 
 - [x] ~~Xác nhận stack~~ → **Angular + Phaser + Node.js + PostgreSQL + Redis + Docker** (2026-10-15).
 - [x] ~~M0: khởi tạo monorepo pnpm, tsconfig, ESLint/Prettier, CI, docker-compose~~ → xong (xem `docs/03-plan/roadmap.md`).
@@ -97,7 +103,7 @@ Các thư mục `client/`, `server/`, `shared/`, `tools/data-validator/` đã c�
 - [x] ~~M3: chiến đấu theo lượt PvE~~ → xong: chạm quái để vào trận, trận theo lượt có đồng hồ 30 giây,
       chiêu và vật phẩm, quái trên bản đồ có máu và hồi sinh, phần thưởng/lên cấp/rơi đồ, hồi sinh khi
       thua, hai người đánh chung một con quái (xem `docs/03-plan/roadmap.md`).
-- [ ] **M4: hành trang & cường hóa** — trang bị, cường hóa +5.
+- [x] **M4: trang bị theo ô, shop & cường hóa** — 4 ô trang bị cộng chỉ số, shop mua/bán, cường hóa tới +5 (xong 2026-10-16).
 - [ ] Quyết định có đổi tên sản phẩm hay không (xem mục 6).
 
 ## 6. Lưu ý bản quyền (đọc kỹ)

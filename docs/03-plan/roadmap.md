@@ -175,9 +175,40 @@ Nội dung: chạm quái để vào trận, trận theo lượt có đồng hồ
    thì đổi ở mốc sau.
 5. **Thua thì hồi sinh ở làng với 50% máu, mất 10% yên**, không mất kinh nghiệm (chưa có gì để mất ở M3).
 
-### M4 — Hành trang & cường hóa (~1,5 tuần)
-Nội dung: túi đồ, trang bị theo ô, mặc/tháo, shop NPC mua/bán bằng Yên, cường hóa +1 → +5 với tỷ lệ thành công, thông báo kết quả, audit log giao dịch.
-**Xong khi:** mua trang bị ở shop, mặc vào thấy chỉ số tăng, cường hóa thành công/thất bại đúng tỷ lệ trong dữ liệu, tải lại trang vẫn giữ nguyên trạng thái.
+### M4 — Trang bị theo ô, shop & cường hóa (~1,5 tuần) — ✅ **ĐÃ XONG (2026-10-16)**
+
+**Nội dung:** 4 ô trang bị (vũ khí, giáp, giày, phụ kiện) cộng chỉ số vào nhân vật; shop mua/bán đồ; cường hóa tốn yên + nguyên liệu, tỉ lệ thành công theo cấp.
+
+**Xong khi:** mua một món ở shop rồi mặc vào thấy chỉ số tăng; bán được món trong túi; cường hóa lên cấp và chỉ số tăng theo; mọi thao tác đi qua gói tin có kiểm tra quyền sở hữu; reload vẫn giữ trang bị.
+
+**Đã giao:**
+- **Hợp đồng chung (commit `8b913ee`, `PROTOCOL_VERSION` 4):** bảy gói tin mới — `C2S_EQUIP` 0x0403, `C2S_UNEQUIP` 0x0404, `S2C_EQUIPMENT` 0x0405, `C2S_SHOP_BUY` 0x0406, `C2S_SHOP_SELL` 0x0407, `C2S_UPGRADE` 0x0408, `S2C_UPGRADE_RESULT` 0x0409; `InventoryItem` thêm `slot`, `upgradeLevel`, `stats`, `levelRequired`, `price`, `sellPrice`, `upgradeMaxLevel`, `usable`; `EQUIP_SLOTS` (4 ô), `SELL_PRICE_RATIO` 0,4, `UPGRADE_MAX_LEVEL` 5, mỗi lần thử cường hóa tốn 50 yên + 1 đá, `upgradeMaxLevelOf()`; mã lỗi `item_not_owned`, `not_equippable`, `level_too_low`, `not_for_sale`, `not_upgradable`, `upgrade_maxed`, `not_enough_yen`, `not_enough_material`.
+- **Server:** `inventory_items` thêm `upgrade_level` + `equipped_slot` kèm **unique index một phần** (`character_id, equipped_slot` khi ô khác null) nên một ô chỉ giữ được một món; bảng `transactions` ghi mọi giao dịch mua/bán/cường hóa; ba dịch vụ mới `EquipmentService`, `ShopService`, `UpgradeService`; chỉ số trang bị cộng vào **gốc** trước khi suy ra tấn công/phòng thủ/tốc độ/máu tối đa nên vào trận, dùng vật phẩm, thắng/thua/lên cấp đều đúng; `spendYen` là một câu UPDATE có điều kiện `yen >= amount` (không có kẽ hở kiểm-rồi-trừ).
+- **Client:** bảng trang bị 4 ô (nút **Tháo**), bảng shop (**Mua**/**Bán**, giá, yêu cầu cấp, tỉ lệ bán 40%), nút **Cường hóa** trong túi (hiện yên + tỉ lệ, tự khoá khi chạm trần), thông báo kết quả; HUD thêm nút **Trang bị**; bảng túi hiện cấp `+N`, chỉ số và giá bán.
+- **Dữ liệu:** NPC `npc-thay-do` (Thầy Đồ) bán 8 món; đá vụn rơi từ quái (Bù Nhìn 40%, Chuột Đồng 70%, Heo Rừng 80%) — muốn cường hóa phải đi đánh quái lấy đá.
+- **Migration:** `server/drizzle/0002_trang_bi_shop_cuong_hoa.sql`.
+
+**Kiểm chứng đã chạy trên máy dev (Windows, PostgreSQL thật + Chromium thật):**
+
+| Lệnh | Kết quả |
+|---|---|
+| `pnpm test` | ✅ **422 bài xanh** — shared 72 (5 file), server 162 (14 file), client 178 (20 file), data-validator 10 |
+| `pnpm e2e` (Playwright, `NINJA_E2E_CLIENT_PORT=4300`) | ✅ **21/21** — 17 bài M1–M3 + 4 bài M4 (mua–mặc–tải lại, bán–đánh quái lấy đá–cường hóa, thiếu yên, mua lại món đã có) |
+| `pnpm validate:data` | ✅ 26 file game-data hợp lệ |
+| `pnpm lint` / `pnpm typecheck` / `pnpm build` / `pnpm format:check` | ✅ exit 0 |
+| Bundle client | khởi tạo **726,35 kB**, chunk `play` lazy 1,47 MB |
+
+Riêng M4: server **44 bài** (equipment 10, shop 13, upgrade 9, WebSocket thật 12), client **+19 bài** (178 so với 159 của M3).
+
+**Quyết định thiết kế đã chốt ở M4:**
+1. **Túi = hàng `equipped_slot is null`** — mặc/tháo chỉ đổi cột trên đúng hàng cũ, không sinh hàng thứ hai nên túi đầy 40 loại vẫn mặc được (đã test).
+2. **Server gửi lại `S2C_INVENTORY_UPDATE` sau mặc/tháo** — hợp đồng chỉ nêu `S2C_EQUIPMENT` + `S2C_CHARACTER`, nhưng thiếu gói túi thì client vẫn thấy món đang mặc nằm trong túi (lỗi chỉ lộ ra khi chạy e2e thật).
+3. **Mua phải bấm NPC trước:** `C2S_SHOP_BUY`/`C2S_SHOP_SELL` không có `npcId`; server nhớ NPC vừa nói chuyện, nên luồng đúng là bấm NPC bán hàng rồi mới mua. Bán không cần quầy.
+4. **Cường hóa trừ yên + đá trước khi gieo**; thiếu đá thì hoàn yên và **không** gọi `rng`; sổ giao dịch chỉ ghi khi thành công.
+5. **Trần cường hóa theo món** qua `upgradeMaxLevelOf()` (món có thể khai trần riêng, không vượt trần chung 5).
+6. **Bảng túi đồ nằm dưới thanh HUD** — trước đây nó che nút "Trang bị" trên HUD nên bấm không được.
+
+**Ghi chú vận hành (máy dev):** sau khi sửa `shared/`, xoá `client/.angular/cache` trước khi chạy lại dev/e2e — Vite giữ bản `@ninja/shared` cũ trong cache nên trang chơi vỡ (`does not provide an export named 'EQUIP_SLOTS'`) và 13 bài e2e đỏ dù mã đúng.
 
 ### M5 — Nhiệm vụ chính tuyến chương 1 (~2 tuần)
 Nội dung: hệ nhiệm vụ tổng quát (nhận/tiến độ/trả), 10–15 nhiệm vụ đầu (chào làng → bài học đầu tiên → bái sư), hội thoại NPC theo cây, thưởng EXP/Yên/vật phẩm, mở khóa tính năng theo mốc.

@@ -21,7 +21,8 @@ logs/
 # === Kiểm thử ===
 coverage/
 playwright-report/
-test-results/
+test-results*/
+
 
 # === Editor / Hệ điều hành ===
 .DS_Store
