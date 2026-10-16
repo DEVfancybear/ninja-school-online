@@ -22,7 +22,7 @@ describe('nạp game-data', () => {
     const data = await loadGameData();
 
     expect([...data.maps.keys()].sort()).toEqual(['bai-luyen-tap', 'lang-khoi-nguon']);
-    expect([...data.npcs.keys()]).toEqual(['npc-thay-hieu-truong']);
+    expect([...data.npcs.keys()].sort()).toEqual(['npc-thay-do', 'npc-thay-hieu-truong']);
     expect([...data.monsters.keys()].sort()).toEqual([
       'mob-bui-nhon',
       'mob-chuot-dong',

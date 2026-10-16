@@ -15,6 +15,13 @@
       "when": 1792122826259,
       "tag": "0001_inventory_and_vitals",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792147097124,
+      "tag": "0002_trang_bi_shop_cuong_hoa",
+      "breakpoints": true
     }
   ]
 }

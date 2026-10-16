@@ -10,11 +10,17 @@ import {
   type ChatSend,
   type ClientHello,
   type EnterMap,
+  type Equip,
   type Move,
   type NpcTalk,
+  type Notify,
   type Ping,
   type ServerEnterMap,
   type ServerHello,
+  type ShopBuy,
+  type ShopSell,
+  type Unequip,
+  type Upgrade,
   type UseItem,
 } from '@ninja/shared';
 import { BattleService } from '../battle/service.js';
@@ -23,15 +29,18 @@ import type { TickScheduler } from '../core/tick.js';
 import type { ChatService } from '../modules/chat/service.js';
 import type { CharacterService } from '../modules/character/service.js';
 import { characterStatsPayload } from '../modules/character/stats.js';
+import type { EquipmentService } from '../modules/equipment/service.js';
 import type { InventoryService } from '../modules/inventory/service.js';
 import type { NpcService } from '../modules/npc/service.js';
+import type { ShopService } from '../modules/shop/service.js';
+import type { UpgradeService } from '../modules/upgrade/service.js';
 import type { GameSession } from '../net/session.js';
 import type { SessionRegistry } from '../net/session-registry.js';
 import { GameDataError, type GameData } from './game-data.js';
 import { HandshakeError } from './handshake-error.js';
 import type { MapPortal } from './map.js';
 import { checkMove, MOVE_REJECTION_MESSAGES } from './movement.js';
-import { createPlayer, playerView, type Room, type RoomPlayer } from './room.js';
+import { createPlayer, playerView, type Room, type RoomNpc, type RoomPlayer } from './room.js';
 
 /**
  * Bản đồ và điểm spawn khi vào game. **M2 chưa lưu vị trí vào database**: mỗi lần kết nối đều vào
@@ -48,6 +57,9 @@ export interface WorldServiceOptions {
   chat: ChatService;
   npcs: NpcService;
   inventory: InventoryService;
+  equipment: EquipmentService;
+  shop: ShopService;
+  upgrade: UpgradeService;
   /** Nhịp dùng chung: trận đấu đếm lượt và hết giờ trên cùng nhịp với phần còn lại của server. */
   tick: TickScheduler;
   /** Xác thực access token (dùng `app.jwt`); trả `undefined` nếu token sai hoặc hết hạn. */
@@ -71,6 +83,12 @@ export class WorldService {
    * kết nối, dữ liệu nhân vật, túi đồ — và cần gọi lại thế giới khi người chơi thua (hồi sinh về làng).
    */
   readonly battle: BattleService;
+  /**
+   * Quầy hàng người chơi đang mở, theo id nhân vật. `C2S_SHOP_BUY`/`C2S_SHOP_SELL` không có `npcId`
+   * (hợp đồng M4) nên server nhớ NPC mà người chơi vừa bấm vào ở `talkToNpc`. Quên đi khi rời thế
+   * giới hoặc đổi bản đồ — quầy thuộc về một NPC đang đứng trong map hiện tại.
+   */
+  private readonly openShops = new Map<string, string>();
 
   constructor(private readonly options: WorldServiceOptions) {
     this.now = options.now ?? (() => Date.now());
@@ -80,6 +98,7 @@ export class WorldService {
       sessions: options.sessions,
       characters: options.characters,
       inventory: options.inventory,
+      equipment: options.equipment,
       tick: options.tick,
       onDefeat: (characterId) => {
         this.respawnAtStart(characterId);
@@ -262,7 +281,128 @@ export class WorldService {
       return;
     }
 
+    // Bấm vào NPC bán hàng là mở quầy của NPC đó: các gói mua/bán sau không mang `npcId`.
+    this.openShops.set(located.player.id, npc.id);
     session.send(Opcode.S2C_NPC_DIALOG, this.options.npcs.dialog(npc));
+  }
+
+  /** `C2S_EQUIP`: mặc một món trong túi vào ô của nó (món đang ở ô đó tự về túi). */
+  async equip(session: GameSession, request: Equip): Promise<void> {
+    const located = this.locate(session);
+    if (!located) {
+      this.rejectNotInWorld(session);
+      return;
+    }
+    if (this.rejectWhileInBattle(session, located.player.id)) {
+      return;
+    }
+
+    const outcome = await this.options.equipment.equip(located.player.id, request.itemId);
+    if (!outcome.ok) {
+      session.sendError(outcome.code, outcome.message);
+      return;
+    }
+
+    session.send(Opcode.S2C_EQUIPMENT, await this.options.equipment.toPacket(located.player.id));
+    await this.sendCharacterStats(session, located.player.id);
+  }
+
+  /** `C2S_UNEQUIP`: tháo món đang mặc ở một ô về túi. */
+  async unequip(session: GameSession, request: Unequip): Promise<void> {
+    const located = this.locate(session);
+    if (!located) {
+      this.rejectNotInWorld(session);
+      return;
+    }
+    if (this.rejectWhileInBattle(session, located.player.id)) {
+      return;
+    }
+
+    const outcome = await this.options.equipment.unequip(located.player.id, request.slot);
+    if (!outcome.ok) {
+      session.sendError(outcome.code, outcome.message);
+      return;
+    }
+
+    session.send(Opcode.S2C_EQUIPMENT, await this.options.equipment.toPacket(located.player.id));
+    await this.sendCharacterStats(session, located.player.id);
+  }
+
+  /** `C2S_SHOP_BUY`: mua ở quầy của NPC mà người chơi vừa bấm vào (xem `openShops`). */
+  async shopBuy(session: GameSession, request: ShopBuy): Promise<void> {
+    const located = this.locate(session);
+    if (!located) {
+      this.rejectNotInWorld(session);
+      return;
+    }
+    if (this.rejectWhileInBattle(session, located.player.id)) {
+      return;
+    }
+
+    const npc = this.openShop(located.room, located.player.id);
+    if (!npc) {
+      session.sendError(ErrorCode.NOT_FOR_SALE, 'hãy bấm vào NPC bán hàng trước rồi mua');
+      return;
+    }
+
+    const outcome = await this.options.shop.buy(
+      located.player.id,
+      npc.data,
+      request.itemId,
+      request.quantity,
+    );
+    if (!outcome.ok) {
+      session.sendError(outcome.code, outcome.message);
+      return;
+    }
+    await this.sendAfterTrade(session, located.player.id, outcome.message);
+  }
+
+  /** `C2S_SHOP_SELL`: bán món trong túi — shop mua lại mọi món nên không cần đang mở quầy nào. */
+  async shopSell(session: GameSession, request: ShopSell): Promise<void> {
+    const located = this.locate(session);
+    if (!located) {
+      this.rejectNotInWorld(session);
+      return;
+    }
+    if (this.rejectWhileInBattle(session, located.player.id)) {
+      return;
+    }
+
+    const outcome = await this.options.shop.sell(
+      located.player.id,
+      request.itemId,
+      request.quantity,
+    );
+    if (!outcome.ok) {
+      session.sendError(outcome.code, outcome.message);
+      return;
+    }
+    await this.sendAfterTrade(session, located.player.id, outcome.message);
+  }
+
+  /** `C2S_UPGRADE`: cường hóa một món đang sở hữu (trong túi hay đang mặc đều được). */
+  async upgrade(session: GameSession, request: Upgrade): Promise<void> {
+    const located = this.locate(session);
+    if (!located) {
+      this.rejectNotInWorld(session);
+      return;
+    }
+    if (this.rejectWhileInBattle(session, located.player.id)) {
+      return;
+    }
+
+    const outcome = await this.options.upgrade.upgrade(located.player.id, request.itemId);
+    if (!outcome.ok) {
+      session.sendError(outcome.code, outcome.message);
+      return;
+    }
+
+    // Món vừa cường hóa có thể đang mặc hoặc đang trong túi: gửi lại cả hai gói, cộng chỉ số mới.
+    session.send(Opcode.S2C_UPGRADE_RESULT, outcome.result);
+    session.send(Opcode.S2C_INVENTORY_UPDATE, await this.options.inventory.toPacket(located.player.id));
+    session.send(Opcode.S2C_EQUIPMENT, await this.options.equipment.toPacket(located.player.id));
+    await this.sendCharacterStats(session, located.player.id);
   }
 
   /** `C2S_ATTACK_MOB`: chạm vào quái trong tầm để vào trận (hoặc vào chung trận đang có). */
@@ -307,6 +447,7 @@ export class WorldService {
     from.removePlayer(player.id);
     from.broadcast(Opcode.S2C_ENTITY_REMOVE, { id: player.id });
     this.options.rooms.dropIfEmpty(from);
+    this.openShops.delete(characterId);
 
     player.x = spawn.x;
     player.y = spawn.y;
@@ -338,6 +479,7 @@ export class WorldService {
       return;
     }
 
+    this.openShops.delete(characterId);
     this.options.chat.forget(characterId);
     // Rời trận trước khi rời bản đồ: người chơi biến khỏi trận, quái còn sống thì hồi đầy máu.
     this.battle.leave(characterId);
@@ -354,17 +496,61 @@ export class WorldService {
     }
   }
 
-  /** `S2C_CHARACTER` + túi đồ: trạng thái nhân vật mà HUD và trận đấu cần. */
+  /** `S2C_CHARACTER` + túi đồ + trang bị: trạng thái nhân vật mà HUD và trận đấu cần. */
   private async sendCharacterState(session: GameSession, characterId: string): Promise<void> {
     const record = await this.options.characters.findById(characterId);
     if (!record || session.closed) {
       return;
     }
+    const bonus = await this.options.equipment.bonusFor(characterId);
     session.send(
       Opcode.S2C_CHARACTER,
-      characterStatsPayload({ record, data: this.options.gameData }),
+      characterStatsPayload({ record, data: this.options.gameData, bonus }),
     );
     session.send(Opcode.S2C_INVENTORY_UPDATE, await this.options.inventory.toPacket(characterId));
+    session.send(Opcode.S2C_EQUIPMENT, await this.options.equipment.toPacket(characterId));
+  }
+
+  /** `S2C_CHARACTER` với chỉ số đã cộng trang bị đang mặc — HUD thấy ngay sau khi mặc/tháo/cường hóa. */
+  private async sendCharacterStats(session: GameSession, characterId: string): Promise<void> {
+    const record = await this.options.characters.findById(characterId);
+    if (!record || session.closed) {
+      return;
+    }
+    const bonus = await this.options.equipment.bonusFor(characterId);
+    session.send(
+      Opcode.S2C_CHARACTER,
+      characterStatsPayload({ record, data: this.options.gameData, bonus }),
+    );
+  }
+
+  /** Sau một giao dịch shop: túi đồ và yên đã đổi, kèm câu giải thích vừa làm gì. */
+  private async sendAfterTrade(
+    session: GameSession,
+    characterId: string,
+    message: string,
+  ): Promise<void> {
+    session.send(Opcode.S2C_INVENTORY_UPDATE, await this.options.inventory.toPacket(characterId));
+    await this.sendCharacterStats(session, characterId);
+    session.send(Opcode.S2C_NOTIFY, { message } satisfies Notify);
+  }
+
+  /**
+   * Đang trong trận thì chặn mọi thao tác đổi trang bị / túi đồ / yên — cùng luật với dùng vật phẩm
+   * ở M3: chỉ số lúc vào trận là chỉ số dùng suốt trận, không đổi giữa chừng.
+   */
+  private rejectWhileInBattle(session: GameSession, characterId: string): boolean {
+    if (!this.battle.isBusy(characterId)) {
+      return false;
+    }
+    session.sendError(ErrorCode.IN_BATTLE, 'đang trong trận đấu, không đổi trang bị hay mua bán được');
+    return true;
+  }
+
+  /** Quầy của NPC mà người chơi vừa bấm vào — chỉ còn hiệu lực nếu NPC đó đang ở bản đồ hiện tại. */
+  private openShop(room: Room, characterId: string): RoomNpc | undefined {
+    const npcId = this.openShops.get(characterId);
+    return npcId ? room.getNpc(npcId) : undefined;
   }
 
   private helloPayload(character: Character, mapId: string): ServerHello {
@@ -393,6 +579,7 @@ export class WorldService {
     room.removePlayer(player.id);
     room.broadcast(Opcode.S2C_ENTITY_REMOVE, { id: player.id });
     this.options.rooms.dropIfEmpty(room);
+    this.openShops.delete(player.id);
 
     player.x = spawn.x;
     player.y = spawn.y;
