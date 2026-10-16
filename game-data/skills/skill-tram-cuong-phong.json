@@ -1,0 +1,17 @@
+{
+  "id": "skill-tram-cuong-phong",
+  "name": "Trảm Cuồng Phong",
+  "school": "haruna",
+  "class": "dao",
+  "type": "active",
+  "levelRequired": 3,
+  "costMp": 14,
+  "cooldownMs": 60000,
+  "targets": 1,
+  "power": 18,
+  "scale": {
+    "stat": "strength",
+    "factor": 1.5
+  },
+  "effects": []
+}

@@ -1,0 +1,13 @@
+{
+  "id": "item-tra-rung",
+  "name": "Trà Rừng",
+  "kind": "consumable",
+  "slot": null,
+  "levelRequired": 1,
+  "price": 25,
+  "consumable": {
+    "healHp": 0,
+    "healMp": 25
+  },
+  "description": "Ấm trà hái ở ven rừng, uống vào hồi 25 nội lực."
+}

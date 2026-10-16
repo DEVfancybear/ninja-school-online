@@ -1,0 +1,29 @@
+{
+  "id": "mob-bui-nhon",
+  "name": "Bù Nhìn Tập Luyện",
+  "shape": "scarecrow",
+  "color": "#c8a165",
+  "level": 1,
+  "maxHp": 30,
+  "attack": 4,
+  "defense": 1,
+  "speed": 3,
+  "expReward": 25,
+  "yenMin": 5,
+  "yenMax": 12,
+  "drops": [
+    {
+      "itemId": "item-banh-bao",
+      "chance": 1.0,
+      "minQty": 1,
+      "maxQty": 1
+    },
+    {
+      "itemId": "item-da-vun",
+      "chance": 0.4,
+      "minQty": 1,
+      "maxQty": 2
+    }
+  ],
+  "respawnMs": 15000
+}

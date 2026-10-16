@@ -1,0 +1,25 @@
+{
+  "school": "hirosaki",
+  "name": "Trường Hirosaki",
+  "baseStats": {
+    "strength": 6,
+    "agility": 6,
+    "spirit": 3,
+    "hp": 62,
+    "mp": 34
+  },
+  "perLevel": {
+    "strength": 2,
+    "agility": 2,
+    "spirit": 1,
+    "hp": 14,
+    "mp": 5
+  },
+  "startingYen": 200,
+  "startingItems": [
+    {
+      "itemId": "item-banh-bao",
+      "qty": 2
+    }
+  ]
+}

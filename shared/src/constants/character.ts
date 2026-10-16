@@ -7,3 +7,6 @@ export const CHARACTER_NAME_MAX_LENGTH = 12;
  * Dùng chung cho client và server nên chỉ định nghĩa ở đây một lần.
  */
 export const CHARACTER_NAME_PATTERN = /^[\p{L}\p{N}]+$/u;
+
+/** Số ô tối đa trong túi đồ (M3 chưa có ngân hàng nên túi là chỗ chứa duy nhất). */
+export const INVENTORY_CAPACITY = 40;

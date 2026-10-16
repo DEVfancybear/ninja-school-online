@@ -37,6 +37,29 @@ export const Opcode = {
   C2S_NPC_TALK: 0x0309,
   /** Server trả lời hội thoại của NPC. */
   S2C_NPC_DIALOG: 0x030a,
+
+  /** Chỉ số nhân vật (cấp, kinh nghiệm, máu, nội lực, chiêu đã học) — gửi sau bắt tay và mỗi lần đổi. */
+  S2C_CHARACTER: 0x0201,
+  /** Nhân vật vừa lên cấp (kèm chiêu mới học được). */
+  S2C_LEVEL_UP: 0x0202,
+
+  /** Client dùng một vật phẩm trong túi. */
+  C2S_USE_ITEM: 0x0401,
+  /** Toàn bộ túi đồ sau khi có thay đổi. */
+  S2C_INVENTORY_UPDATE: 0x0402,
+
+  /** Client "chạm" vào một con quái để vào trận. */
+  C2S_ATTACK_MOB: 0x0501,
+  /** Trận bắt đầu (hoặc có người vào giữa trận): ai đang tham gia, tới lượt ai. */
+  S2C_BATTLE_START: 0x0502,
+  /** Đổi lượt: ai hành động tiếp theo và còn bao lâu. */
+  S2C_BATTLE_TURN: 0x0503,
+  /** Client chọn hành động trong lượt của mình. */
+  C2S_BATTLE_ACTION: 0x0504,
+  /** Kết quả một hành động: sát thương, hồi máu, nhật ký và trạng thái mới của mọi người. */
+  S2C_BATTLE_RESULT: 0x0505,
+  /** Trận kết thúc: thắng, thua hay chạy thoát, kèm phần thưởng của người nhận. */
+  S2C_BATTLE_END: 0x0506,
 } as const;
 
 export type Opcode = (typeof Opcode)[keyof typeof Opcode];

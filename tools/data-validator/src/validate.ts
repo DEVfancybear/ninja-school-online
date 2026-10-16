@@ -1,58 +1,94 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
+  checkGameData,
+  ClassDefinitionSchema,
   GameMapSchema,
   ItemSchema,
+  MonsterSchema,
   NpcSchema,
   SkillSchema,
+  type ClassDefinition,
+  type GameDataSet,
+  type GameDataIssue,
   type GameMap,
   type Item,
+  type Monster,
   type Npc,
   type Skill,
 } from '@ninja/shared';
 import type { ZodType } from 'zod';
 
-export interface ValidationError {
-  file: string;
-  path: string;
-  message: string;
-}
+export type ValidationError = GameDataIssue;
 
 export interface ValidationResult {
   checked: number;
   errors: ValidationError[];
 }
 
-/** Một bộ sưu tập dữ liệu: thư mục con của game-data và schema tương ứng. */
+/** Dữ liệu đọc được, còn là mảng để `checkGameData` kiểm liên-file. */
+interface WritableGameDataSet {
+  maps: GameMap[];
+  npcs: Npc[];
+  monsters: Monster[];
+  skills: Skill[];
+  items: Item[];
+  classes: ClassDefinition[];
+}
+
+/** Một bộ sưu tập dữ liệu: thư mục con của game-data, schema và chỗ đổ giá trị đã kiểm. */
 interface Collection {
   dir: string;
   schema: ZodType<unknown>;
+  push: (value: unknown) => void;
 }
 
-const COLLECTIONS: Collection[] = [
-  { dir: 'skills', schema: SkillSchema as ZodType<unknown> },
-  { dir: 'items', schema: ItemSchema as ZodType<unknown> },
-  { dir: 'maps', schema: GameMapSchema as ZodType<unknown> },
-  { dir: 'npcs', schema: NpcSchema as ZodType<unknown> },
-];
+function collections(target: WritableGameDataSet): readonly Collection[] {
+  return [
+    {
+      dir: 'maps',
+      schema: GameMapSchema as ZodType<unknown>,
+      push: (v) => target.maps.push(v as GameMap),
+    },
+    { dir: 'npcs', schema: NpcSchema as ZodType<unknown>, push: (v) => target.npcs.push(v as Npc) },
+    {
+      dir: 'monsters',
+      schema: MonsterSchema as ZodType<unknown>,
+      push: (v) => target.monsters.push(v as Monster),
+    },
+    {
+      dir: 'skills',
+      schema: SkillSchema as ZodType<unknown>,
+      push: (v) => target.skills.push(v as Skill),
+    },
+    {
+      dir: 'items',
+      schema: ItemSchema as ZodType<unknown>,
+      push: (v) => target.items.push(v as Item),
+    },
+    {
+      dir: 'classes',
+      schema: ClassDefinitionSchema as ZodType<unknown>,
+      push: (v) => target.classes.push(v as ClassDefinition),
+    },
+  ];
+}
 
 /** Đọc và kiểm tất cả file JSON trong một thư mục. Thư mục không tồn tại thì bỏ qua. */
-async function readCollection<T>(
+async function readCollection(
   gameDataDir: string,
   collection: Collection,
-): Promise<{ checked: number; errors: ValidationError[]; values: T[] }> {
+  errors: ValidationError[],
+): Promise<number> {
   const fullDir = join(gameDataDir, collection.dir);
   let names: string[];
   try {
     names = await readdir(fullDir);
   } catch {
-    return { checked: 0, errors: [], values: [] };
+    return 0;
   }
 
-  const errors: ValidationError[] = [];
-  const values: T[] = [];
   let checked = 0;
-
   for (const name of names.filter((n) => n.endsWith('.json')).sort()) {
     const relPath = `${collection.dir}/${name}`;
     const raw = (await readFile(join(fullDir, name), 'utf8')).replace(/^\uFEFF/, '');
@@ -75,87 +111,35 @@ async function readCollection<T>(
       }
       continue;
     }
-    values.push(result.data as T);
+    collection.push(result.data);
   }
 
-  return { checked, errors, values };
+  return checked;
 }
 
 /**
- * Kiểm tra liên-map: mỗi cổng phải dẫn tới một bản đồ có thật và điểm spawn có thật ở bản đồ đích.
- * Việc này không làm được trong schema của từng file vì cần thấy toàn bộ bản đồ cùng lúc.
+ * Kiểm tra toàn bộ game-data: schema từng file, rồi tới luật liên-file dùng chung với server
+ * (`checkGameData` trong `@ninja/shared`).
  */
-function validatePortals(maps: GameMap[]): ValidationError[] {
-  const errors: ValidationError[] = [];
-  const byId = new Map(maps.map((map) => [map.id, map]));
-
-  for (const map of maps) {
-    const file = `maps/${map.id}.json`;
-    for (const portal of map.portals) {
-      const target = byId.get(portal.toMap);
-      if (!target) {
-        errors.push({
-          file,
-          path: `portals.${portal.id}.toMap`,
-          message: `cổng dẫn tới bản đồ "${portal.toMap}" không tồn tại`,
-        });
-        continue;
-      }
-      if (!target.spawns.some((spawn) => spawn.id === portal.toSpawn)) {
-        errors.push({
-          file,
-          path: `portals.${portal.id}.toSpawn`,
-          message: `bản đồ "${target.id}" không có điểm spawn "${portal.toSpawn}"`,
-        });
-      }
-    }
-  }
-
-  return errors;
-}
-
-/** Kiểm tra NPC đặt trên bản đồ phải có file hội thoại tương ứng. */
-function validateNpcPlacements(maps: GameMap[], npcs: Npc[]): ValidationError[] {
-  const errors: ValidationError[] = [];
-  const known = new Set(npcs.map((npc) => npc.id));
-
-  for (const map of maps) {
-    for (const placement of map.npcs) {
-      if (!known.has(placement.id)) {
-        errors.push({
-          file: `maps/${map.id}.json`,
-          path: `npcs.${placement.id}`,
-          message: `chưa có file hội thoại cho NPC "${placement.id}" trong game-data/npcs/`,
-        });
-      }
-    }
-  }
-
-  return errors;
-}
-
-/** Kiểm tra toàn bộ game-data. Trả về số file đã kiểm và danh sách lỗi. */
 export async function validateGameData(gameDataDir: string): Promise<ValidationResult> {
-  let checked = 0;
+  const data: WritableGameDataSet = {
+    maps: [],
+    npcs: [],
+    monsters: [],
+    skills: [],
+    items: [],
+    classes: [],
+  };
   const errors: ValidationError[] = [];
-  const maps: GameMap[] = [];
-  const npcs: Npc[] = [];
+  let checked = 0;
 
-  for (const collection of COLLECTIONS) {
-    const result = await readCollection(gameDataDir, collection);
-    checked += result.checked;
-    errors.push(...result.errors);
-    if (collection.dir === 'maps') {
-      maps.push(...(result.values as GameMap[]));
-    }
-    if (collection.dir === 'npcs') {
-      npcs.push(...(result.values as Npc[]));
-    }
+  for (const collection of collections(data)) {
+    checked += await readCollection(gameDataDir, collection, errors);
   }
 
-  // Chỉ kiểm liên-map khi từng file đã hợp lệ, tránh báo lỗi dây chuyền khó hiểu.
+  // Chỉ kiểm liên-file khi từng file đã hợp lệ, tránh báo lỗi dây chuyền khó hiểu.
   if (errors.length === 0) {
-    errors.push(...validatePortals(maps), ...validateNpcPlacements(maps, npcs));
+    errors.push(...checkGameData(data as GameDataSet));
   }
 
   return { checked, errors };

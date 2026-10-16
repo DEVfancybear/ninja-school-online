@@ -4,3 +4,6 @@ export * from './character.js';
 export * from './skill.js';
 export * from './item.js';
 export * from './map.js';
+export * from './school.js';
+export * from './monster.js';
+export * from './game-data.js';

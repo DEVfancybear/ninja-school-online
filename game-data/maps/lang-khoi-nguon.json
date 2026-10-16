@@ -2613,5 +2613,32 @@
    "x": 20,
    "y": 10
   }
+ ],
+ "monsters": [
+  {
+   "id": "mob-chuot-dong",
+   "x": 10,
+   "y": 20
+  },
+  {
+   "id": "mob-chuot-dong",
+   "x": 26,
+   "y": 24
+  },
+  {
+   "id": "mob-chuot-dong",
+   "x": 30,
+   "y": 12
+  },
+  {
+   "id": "mob-heo-rung",
+   "x": 8,
+   "y": 27
+  },
+  {
+   "id": "mob-heo-rung",
+   "x": 22,
+   "y": 26
+  }
  ]
 }

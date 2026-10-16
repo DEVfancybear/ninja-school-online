@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { CLASSES, SCHOOLS } from '../constants/game.js';
+import { INVENTORY_CAPACITY } from '../constants/character.js';
 import { CHAT_MAX_LENGTH, MAX_MOVE_DISTANCE_PX } from '../constants/world.js';
+import { ITEM_KINDS } from '../schemas/item.js';
+import { MONSTER_SHAPES } from '../schemas/monster.js';
 import { CHAT_CHANNELS, Opcode } from './opcodes.js';
 
 /** Toạ độ trong thế giới, tính bằng pixel. */
@@ -10,7 +13,7 @@ export const PositionSchema = z.object({
 });
 
 /** Loại thực thể được vẽ trên map. */
-export const ENTITY_KINDS = ['player', 'npc'] as const;
+export const ENTITY_KINDS = ['player', 'npc', 'monster'] as const;
 export type EntityKind = (typeof ENTITY_KINDS)[number];
 
 export const EntitySchema = z.object({
@@ -24,6 +27,11 @@ export const EntitySchema = z.object({
   level: z.number().int().min(1).optional(),
   school: z.enum(SCHOOLS).optional(),
   class: z.enum(CLASSES).optional(),
+  /** Chỉ có ở quái: máu hiện tại để client vẽ thanh máu ngay trên bản đồ. */
+  hp: z.number().int().min(0).optional(),
+  maxHp: z.number().int().min(1).optional(),
+  /** Chỉ có ở quái: chọn hình dáng vẽ (xem `MONSTER_SHAPES`). */
+  shape: z.enum(MONSTER_SHAPES).optional(),
 });
 
 export type Entity = z.infer<typeof EntitySchema>;
@@ -71,6 +79,20 @@ export const ErrorCode = {
   UNKNOWN_MAP: 'unknown_map',
   UNKNOWN_ENTITY: 'unknown_entity',
   INTERNAL: 'internal_error',
+
+  // Chiến đấu (M3): mỗi nguyên nhân từ chối có mã riêng để client nói đúng lý do cho người chơi.
+  IN_BATTLE: 'in_battle',
+  BATTLE_NOT_FOUND: 'battle_not_found',
+  NOT_YOUR_TURN: 'not_your_turn',
+  OUT_OF_RANGE: 'out_of_range',
+  MONSTER_GONE: 'monster_gone',
+  SKILL_NOT_KNOWN: 'skill_not_known',
+  SKILL_COOLDOWN: 'skill_cooldown',
+  NOT_ENOUGH_MP: 'not_enough_mp',
+  ITEM_NOT_OWNED: 'item_not_owned',
+  ITEM_NOT_USABLE: 'item_not_usable',
+  ITEM_NO_EFFECT: 'item_no_effect',
+  INVALID_TARGET: 'invalid_target',
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 
@@ -181,6 +203,214 @@ export const NpcDialogSchema = z.object({
 });
 export type NpcDialog = z.infer<typeof NpcDialogSchema>;
 
+// ------------------------------------------------------ nhân vật, túi đồ
+
+/** Một chiêu đã học ở góc nhìn client. */
+export const BattleSkillSchema = z.object({
+  skillId: z.string().min(1),
+  name: z.string().min(1),
+  costMp: z.number().int().min(0),
+  /** Hồi chiêu tính theo **vòng** (mọi người hành động một lần là hết một vòng). */
+  cooldownTurns: z.number().int().min(0),
+  levelRequired: z.number().int().min(1),
+});
+export type BattleSkill = z.infer<typeof BattleSkillSchema>;
+
+/**
+ * Chỉ số nhân vật: HUD dùng để vẽ thanh máu/nội lực/kinh nghiệm, trận đấu dùng để biết chiêu nào
+ * đang có. Server gửi sau khi bắt tay và mỗi lần chỉ số đổi.
+ */
+export const CharacterStatsSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  school: z.enum(SCHOOLS),
+  class: z.enum(CLASSES),
+  level: z.number().int().min(1),
+  exp: z.number().int().min(0),
+  /** Kinh nghiệm cần để lên cấp kế tiếp; `0` nghĩa là đã đạt cấp tối đa. */
+  expToNext: z.number().int().min(0),
+  yen: z.number().int().min(0),
+  hp: z.number().int().min(0),
+  maxHp: z.number().int().min(1),
+  mp: z.number().int().min(0),
+  maxMp: z.number().int().min(0),
+  strength: z.number().int().min(0),
+  agility: z.number().int().min(0),
+  spirit: z.number().int().min(0),
+  attack: z.number().int().min(0),
+  defense: z.number().int().min(0),
+  speed: z.number().int().min(0),
+  skills: z.array(BattleSkillSchema),
+});
+export type CharacterStats = z.infer<typeof CharacterStatsSchema>;
+
+export const LevelUpSchema = z.object({
+  character: CharacterStatsSchema,
+  levelsGained: z.number().int().min(1),
+  /** Chiêu vừa học được ở cấp mới; rỗng nếu cấp mới không mở chiêu nào. */
+  learnedSkills: z.array(z.object({ skillId: z.string().min(1), name: z.string().min(1) })),
+});
+export type LevelUp = z.infer<typeof LevelUpSchema>;
+
+/** Một ô trong túi đồ. */
+export const InventoryItemSchema = z.object({
+  itemId: z.string().min(1),
+  name: z.string().min(1),
+  kind: z.enum(ITEM_KINDS),
+  quantity: z.number().int().min(1),
+  /** Dùng được ngay trong túi (vật phẩm hồi phục) hay chỉ để đó cho M4. */
+  usable: z.boolean(),
+  description: z.string().default(''),
+  healHp: z.number().int().min(0).optional(),
+  healMp: z.number().int().min(0).optional(),
+});
+export type InventoryItem = z.infer<typeof InventoryItemSchema>;
+
+/** Toàn bộ túi đồ — gửi lại mỗi khi túi đổi thay vì gửi từng ô. */
+export const InventoryUpdateSchema = z.object({
+  items: z.array(InventoryItemSchema),
+  /** Sức chứa túi, để client hiện "12/40" mà không phải biết luật ở phía server. */
+  capacity: z.number().int().min(1).default(INVENTORY_CAPACITY),
+});
+export type InventoryUpdate = z.infer<typeof InventoryUpdateSchema>;
+
+export const UseItemSchema = z.object({ itemId: z.string().min(1) });
+export type UseItem = z.infer<typeof UseItemSchema>;
+
+// -------------------------------------------------------------- chiến đấu
+
+/** Người tham gia trận đấu. Id quái có dạng `mob:<mapId>:<số thứ tự>` còn id người chơi là id nhân vật. */
+export const COMBATANT_KINDS = ['player', 'monster'] as const;
+
+export const BattleSkillReadySchema = BattleSkillSchema.extend({
+  /** Số vòng còn phải chờ mới dùng lại được; `0` là dùng được ngay. */
+  readyInTurns: z.number().int().min(0),
+});
+
+export const CombatantSchema = z.object({
+  id: z.string().min(1),
+  kind: z.enum(COMBATANT_KINDS),
+  name: z.string().min(1),
+  level: z.number().int().min(1),
+  hp: z.number().int().min(0),
+  maxHp: z.number().int().min(1),
+  mp: z.number().int().min(0),
+  maxMp: z.number().int().min(0),
+  attack: z.number().int().min(0),
+  defense: z.number().int().min(0),
+  speed: z.number().int().min(0),
+  alive: z.boolean(),
+  /** Chỉ có ở người chơi. */
+  skills: z.array(BattleSkillReadySchema).optional(),
+});
+export type Combatant = z.infer<typeof CombatantSchema>;
+
+/** Trận bắt đầu (với người vừa vào) hoặc có người vào giữa trận. */
+export const BattleStartSchema = z.object({
+  battleId: z.string().min(1),
+  roundNo: z.number().int().min(1),
+  participants: z.array(CombatantSchema).min(2),
+  actorId: z.string().min(1),
+  turnMs: z.number().int().min(1),
+  turnEndsAt: z.number().int().min(0),
+});
+export type BattleStart = z.infer<typeof BattleStartSchema>;
+
+/** Đổi lượt. */
+export const BattleTurnSchema = z.object({
+  battleId: z.string().min(1),
+  roundNo: z.number().int().min(1),
+  actorId: z.string().min(1),
+  turnMs: z.number().int().min(1),
+  turnEndsAt: z.number().int().min(0),
+});
+export type BattleTurn = z.infer<typeof BattleTurnSchema>;
+
+export const AttackMobSchema = z.object({ targetId: z.string().min(1) });
+export type AttackMob = z.infer<typeof AttackMobSchema>;
+
+export const BATTLE_ACTIONS = ['attack', 'skill', 'item', 'flee'] as const;
+export type BattleActionKind = (typeof BATTLE_ACTIONS)[number];
+
+export const BattleActionSchema = z
+  .object({
+    battleId: z.string().min(1),
+    action: z.enum(BATTLE_ACTIONS),
+    skillId: z.string().min(1).optional(),
+    itemId: z.string().min(1).optional(),
+    /** Bỏ trống thì server tự chọn mục tiêu (con quái đang sống đầu tiên). */
+    targetId: z.string().min(1).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.action === 'skill' && value.skillId === undefined) {
+      ctx.addIssue({ code: 'custom', path: ['skillId'], message: 'dùng chiêu phải kèm skillId' });
+    }
+    if (value.action === 'item' && value.itemId === undefined) {
+      ctx.addIssue({ code: 'custom', path: ['itemId'], message: 'dùng vật phẩm phải kèm itemId' });
+    }
+  });
+export type BattleAction = z.infer<typeof BattleActionSchema>;
+
+export const BATTLE_EVENT_KINDS = [
+  'damage',
+  'heal',
+  'defeat',
+  'flee',
+  'flee_failed',
+  'auto',
+] as const;
+
+/** Một dòng trong nhật ký trận đấu. `text` là câu tiếng Việt client hiện thẳng. */
+export const BattleEventSchema = z.object({
+  kind: z.enum(BATTLE_EVENT_KINDS),
+  actorId: z.string().min(1),
+  targetId: z.string().min(1).optional(),
+  value: z.number().int().optional(),
+  critical: z.boolean().optional(),
+  /** Tên chiêu hoặc vật phẩm vừa dùng, nếu có. */
+  name: z.string().min(1).optional(),
+  text: z.string().min(1),
+});
+export type BattleEvent = z.infer<typeof BattleEventSchema>;
+
+/** Kết quả một hành động, phát cho mọi người trong trận. */
+export const BattleResultSchema = z.object({
+  battleId: z.string().min(1),
+  roundNo: z.number().int().min(1),
+  actorId: z.string().min(1),
+  action: z.enum(['attack', 'skill', 'item', 'flee', 'timeout']),
+  events: z.array(BattleEventSchema),
+  participants: z.array(CombatantSchema).min(1),
+});
+export type BattleResult = z.infer<typeof BattleResultSchema>;
+
+export const BATTLE_OUTCOMES = ['victory', 'defeat', 'fled'] as const;
+
+export const BattleEndSchema = z.object({
+  battleId: z.string().min(1),
+  outcome: z.enum(BATTLE_OUTCOMES),
+  /** Tên quái để client viết câu kết trận. */
+  monsterName: z.string().min(1),
+  /** Phần thưởng của **chính người nhận** gói tin này; `null` khi thua hoặc chạy thoát. */
+  rewards: z
+    .object({
+      exp: z.number().int().min(0),
+      yen: z.number().int().min(0),
+      level: z.number().int().min(1),
+      levelsGained: z.number().int().min(0),
+      drops: z.array(
+        z.object({
+          itemId: z.string().min(1),
+          name: z.string().min(1),
+          qty: z.number().int().min(1),
+        }),
+      ),
+    })
+    .nullable(),
+  participants: z.array(CombatantSchema).min(1),
+});
+export type BattleEnd = z.infer<typeof BattleEndSchema>;
+
 // --------------------------------------------------- bảng schema theo mã gói
 
 /**
@@ -197,6 +427,9 @@ export const CLIENT_PACKETS: PacketSchemaTable = {
   [Opcode.C2S_MOVE]: MoveSchema,
   [Opcode.C2S_CHAT]: ChatSendSchema,
   [Opcode.C2S_NPC_TALK]: NpcTalkSchema,
+  [Opcode.C2S_USE_ITEM]: UseItemSchema,
+  [Opcode.C2S_ATTACK_MOB]: AttackMobSchema,
+  [Opcode.C2S_BATTLE_ACTION]: BattleActionSchema,
 } as const;
 
 /** Gói tin server gửi xuống, dùng cho client kiểm tra và cho kiểm thử. */
@@ -211,6 +444,13 @@ export const SERVER_PACKETS: PacketSchemaTable = {
   [Opcode.S2C_ENTITY_REMOVE]: EntityRemoveSchema,
   [Opcode.S2C_CHAT]: ChatMessageSchema,
   [Opcode.S2C_NPC_DIALOG]: NpcDialogSchema,
+  [Opcode.S2C_CHARACTER]: CharacterStatsSchema,
+  [Opcode.S2C_LEVEL_UP]: LevelUpSchema,
+  [Opcode.S2C_INVENTORY_UPDATE]: InventoryUpdateSchema,
+  [Opcode.S2C_BATTLE_START]: BattleStartSchema,
+  [Opcode.S2C_BATTLE_TURN]: BattleTurnSchema,
+  [Opcode.S2C_BATTLE_RESULT]: BattleResultSchema,
+  [Opcode.S2C_BATTLE_END]: BattleEndSchema,
 } as const;
 
 /** Mã gói tin mà client được phép gửi (theo đúng bảng ở trên). */

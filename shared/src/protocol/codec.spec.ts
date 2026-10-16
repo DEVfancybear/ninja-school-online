@@ -122,10 +122,78 @@ describe('decodeServerPacket', () => {
   it('từ chối mảng moves rỗng', () => {
     expect(decodeServerPacket(Opcode.S2C_ENTITY_MOVE, { moves: [] }).ok).toBe(false);
   });
+
+  it('chấp nhận gói bắt đầu trận với hai người tham gia', () => {
+    const result = decodeServerPacket(Opcode.S2C_BATTLE_START, {
+      battleId: 'btl:lang-khoi-nguon:mob-0',
+      roundNo: 1,
+      actorId: 'char-1',
+      turnMs: 30_000,
+      turnEndsAt: 1_700_000_030_000,
+      participants: [combatant('char-1', 'player'), combatant('mob-0', 'monster')],
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('từ chối gói bắt đầu trận khi chỉ có một người tham gia', () => {
+    const result = decodeServerPacket(Opcode.S2C_BATTLE_START, {
+      battleId: 'btl:1',
+      roundNo: 1,
+      actorId: 'char-1',
+      turnMs: 30_000,
+      turnEndsAt: 1_700_000_030_000,
+      participants: [combatant('char-1', 'player')],
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it('từ chối hành động dùng chiêu mà thiếu skillId', () => {
+    const result = decodeClientPacket(Opcode.C2S_BATTLE_ACTION, {
+      battleId: 'btl:1',
+      action: 'skill',
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toContain('skillId');
+    }
+  });
+
+  it('từ chối hành động dùng vật phẩm mà thiếu itemId', () => {
+    expect(
+      decodeClientPacket(Opcode.C2S_BATTLE_ACTION, { battleId: 'btl:1', action: 'item' }).ok,
+    ).toBe(false);
+  });
+
+  it('chấp nhận đòn đánh thường có mục tiêu', () => {
+    const result = decodeClientPacket(Opcode.C2S_BATTLE_ACTION, {
+      battleId: 'btl:1',
+      action: 'attack',
+      targetId: 'mob-0',
+    });
+    expect(result.ok).toBe(true);
+  });
 });
 
+/** Người tham gia trận tối thiểu, đủ trường để `CombatantSchema` nhận. */
+function combatant(id: string, kind: 'player' | 'monster') {
+  return {
+    id,
+    kind,
+    name: id,
+    level: 1,
+    hp: 10,
+    maxHp: 10,
+    mp: 0,
+    maxMp: 0,
+    attack: 1,
+    defense: 1,
+    speed: 1,
+    alive: true,
+  };
+}
+
 describe('PROTOCOL_VERSION', () => {
-  it('là 2 ở cột mốc M2 (đã thêm khung gói tin WebSocket)', () => {
-    expect(PROTOCOL_VERSION).toBe(2);
+  it('là 3 ở cột mốc M3 (đã thêm chiến đấu theo lượt, quái và túi đồ)', () => {
+    expect(PROTOCOL_VERSION).toBe(3);
   });
 });

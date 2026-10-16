@@ -1,0 +1,25 @@
+{
+  "school": "ookaza",
+  "name": "Trường Ookaza",
+  "baseStats": {
+    "strength": 5,
+    "agility": 7,
+    "spirit": 5,
+    "hp": 56,
+    "mp": 42
+  },
+  "perLevel": {
+    "strength": 1,
+    "agility": 2,
+    "spirit": 2,
+    "hp": 12,
+    "mp": 7
+  },
+  "startingYen": 200,
+  "startingItems": [
+    {
+      "itemId": "item-banh-bao",
+      "qty": 2
+    }
+  ]
+}

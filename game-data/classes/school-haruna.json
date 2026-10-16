@@ -1,0 +1,25 @@
+{
+  "school": "haruna",
+  "name": "Trường Haruna",
+  "baseStats": {
+    "strength": 6,
+    "agility": 5,
+    "spirit": 4,
+    "hp": 60,
+    "mp": 40
+  },
+  "perLevel": {
+    "strength": 2,
+    "agility": 1,
+    "spirit": 1,
+    "hp": 14,
+    "mp": 6
+  },
+  "startingYen": 200,
+  "startingItems": [
+    {
+      "itemId": "item-banh-bao",
+      "qty": 2
+    }
+  ]
+}

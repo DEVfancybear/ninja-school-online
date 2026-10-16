@@ -2210,5 +2210,27 @@
    "toSpawn": "default"
   }
  ],
- "npcs": []
+ "npcs": [],
+ "monsters": [
+  {
+   "id": "mob-bui-nhon",
+   "x": 14,
+   "y": 12
+  },
+  {
+   "id": "mob-bui-nhon",
+   "x": 18,
+   "y": 17
+  },
+  {
+   "id": "mob-bui-nhon",
+   "x": 12,
+   "y": 22
+  },
+  {
+   "id": "mob-bui-nhon",
+   "x": 16,
+   "y": 8
+  }
+ ]
 }

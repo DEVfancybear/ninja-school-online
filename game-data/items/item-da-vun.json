@@ -1,0 +1,9 @@
+{
+  "id": "item-da-vun",
+  "name": "Đá Vụn",
+  "kind": "material",
+  "slot": null,
+  "levelRequired": 1,
+  "price": 5,
+  "description": "Mảnh đá rơi ra từ quái, để dành cho việc cường hóa trang bị ở M4."
+}

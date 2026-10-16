@@ -1,0 +1,13 @@
+{
+  "id": "item-banh-bao",
+  "name": "Bánh Bao Hấp",
+  "kind": "consumable",
+  "slot": null,
+  "levelRequired": 1,
+  "price": 30,
+  "consumable": {
+    "healHp": 40,
+    "healMp": 0
+  },
+  "description": "Bánh bao nóng hổi của làng, ăn vào hồi 40 máu."
+}

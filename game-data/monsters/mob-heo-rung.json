@@ -1,0 +1,35 @@
+{
+  "id": "mob-heo-rung",
+  "name": "Heo Rừng",
+  "shape": "beast",
+  "color": "#6f5a3f",
+  "level": 3,
+  "maxHp": 72,
+  "attack": 11,
+  "defense": 4,
+  "speed": 5,
+  "expReward": 80,
+  "yenMin": 15,
+  "yenMax": 30,
+  "drops": [
+    {
+      "itemId": "item-da-vun",
+      "chance": 0.8,
+      "minQty": 1,
+      "maxQty": 3
+    },
+    {
+      "itemId": "item-tra-rung",
+      "chance": 0.4,
+      "minQty": 1,
+      "maxQty": 1
+    },
+    {
+      "itemId": "item-kiem-go",
+      "chance": 0.05,
+      "minQty": 1,
+      "maxQty": 1
+    }
+  ],
+  "respawnMs": 30000
+}

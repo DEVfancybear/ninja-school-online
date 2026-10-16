@@ -1,0 +1,17 @@
+{
+  "id": "skill-quat-loc",
+  "name": "Quạt Lốc",
+  "school": "haruna",
+  "class": "quat",
+  "type": "active",
+  "levelRequired": 1,
+  "costMp": 6,
+  "cooldownMs": 5000,
+  "targets": 1,
+  "power": 8,
+  "scale": {
+    "stat": "agility",
+    "factor": 1.2
+  },
+  "effects": []
+}

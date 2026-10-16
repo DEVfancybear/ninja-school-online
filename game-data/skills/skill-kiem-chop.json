@@ -1,0 +1,17 @@
+{
+  "id": "skill-kiem-chop",
+  "name": "Kiếm Chớp",
+  "school": "hirosaki",
+  "class": "kiem",
+  "type": "active",
+  "levelRequired": 1,
+  "costMp": 6,
+  "cooldownMs": 5000,
+  "targets": 1,
+  "power": 9,
+  "scale": {
+    "stat": "strength",
+    "factor": 1.1
+  },
+  "effects": []
+}

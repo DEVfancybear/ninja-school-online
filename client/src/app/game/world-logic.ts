@@ -37,6 +37,8 @@ export const ENTITY_STYLES: Record<EntityKind, EntityStyle> = {
   // chút cho dễ chạm trên điện thoại; NPC vẫn cao hơn người chơi.
   player: { width: 26, height: 34, radius: 6 },
   npc: { width: 30, height: 44, radius: 8 },
+  // Quái thấp và bè hơn người để nhìn là biết ngay đâu là thứ đánh được.
+  monster: { width: 34, height: 30, radius: 9 },
 };
 
 /** Vùng bấm rộng hơn hình vẽ một chút cho dễ chạm trên điện thoại. */

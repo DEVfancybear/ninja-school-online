@@ -1,0 +1,29 @@
+{
+  "id": "mob-chuot-dong",
+  "name": "Chuột Đồng",
+  "shape": "rodent",
+  "color": "#8d7f6a",
+  "level": 2,
+  "maxHp": 46,
+  "attack": 7,
+  "defense": 2,
+  "speed": 7,
+  "expReward": 45,
+  "yenMin": 8,
+  "yenMax": 18,
+  "drops": [
+    {
+      "itemId": "item-da-vun",
+      "chance": 0.7,
+      "minQty": 1,
+      "maxQty": 2
+    },
+    {
+      "itemId": "item-banh-bao",
+      "chance": 0.35,
+      "minQty": 1,
+      "maxQty": 1
+    }
+  ],
+  "respawnMs": 20000
+}

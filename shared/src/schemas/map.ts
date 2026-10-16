@@ -40,6 +40,16 @@ export const MapNpcPlacementSchema = z.object({
   y: z.number().int().min(0),
 });
 
+/**
+ * Quái đặt sẵn trên bản đồ; chỉ số nằm trong `game-data/monsters/`. Nhiều chỗ đặt cùng một loại quái
+ * được: mỗi chỗ là một **con** riêng, có máu và thời gian hồi sinh riêng.
+ */
+export const MapMonsterPlacementSchema = z.object({
+  id: z.string().regex(/^mob-[a-z0-9-]+$/, 'id quái phải có dạng mob-ten-quai'),
+  x: z.number().int().min(0),
+  y: z.number().int().min(0),
+});
+
 /** Một bản đồ trong game-data/maps/*.json. */
 export const GameMapSchema = z
   .object({
@@ -54,6 +64,7 @@ export const GameMapSchema = z
     spawns: z.array(MapSpawnSchema).min(1),
     portals: z.array(MapPortalSchema).default([]),
     npcs: z.array(MapNpcPlacementSchema).default([]),
+    monsters: z.array(MapMonsterPlacementSchema).default([]),
   })
   .superRefine((map, ctx) => {
     if (map.ground.length !== map.height) {
@@ -122,6 +133,15 @@ export const GameMapSchema = z
     for (const [index, npc] of map.npcs.entries()) {
       if (npc.x >= map.width || npc.y >= map.height) {
         ctx.addIssue({ code: 'custom', path: ['npcs', index], message: 'NPC nằm ngoài bản đồ' });
+      }
+    }
+    for (const [index, monster] of map.monsters.entries()) {
+      if (monster.x >= map.width || monster.y >= map.height) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['monsters', index],
+          message: 'quái đứng ngoài bản đồ',
+        });
       }
     }
 

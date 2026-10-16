@@ -1,0 +1,17 @@
+{
+  "id": "skill-kunai-bat",
+  "name": "Kunai Bạt",
+  "school": "ookaza",
+  "class": "kunai",
+  "type": "active",
+  "levelRequired": 1,
+  "costMp": 6,
+  "cooldownMs": 5000,
+  "targets": 1,
+  "power": 8,
+  "scale": {
+    "stat": "agility",
+    "factor": 1.2
+  },
+  "effects": []
+}

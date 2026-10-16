@@ -1,0 +1,17 @@
+{
+  "id": "skill-ten-luot",
+  "name": "Tên Lướt",
+  "school": "ookaza",
+  "class": "cung",
+  "type": "active",
+  "levelRequired": 1,
+  "costMp": 6,
+  "cooldownMs": 5000,
+  "targets": 1,
+  "power": 7,
+  "scale": {
+    "stat": "spirit",
+    "factor": 1.4
+  },
+  "effects": []
+}
