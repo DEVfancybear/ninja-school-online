@@ -10,7 +10,11 @@ import {
 } from '@ninja/shared';
 import type { CharacterService } from '../character/service.js';
 import { NO_STATS_BONUS } from '../character/stats.js';
-import { inventoryItemView, type InventoryRow, type InventoryService } from '../inventory/service.js';
+import {
+  inventoryItemView,
+  type InventoryRow,
+  type InventoryService,
+} from '../inventory/service.js';
 import type { GameData } from '../../world/game-data.js';
 
 /** Kết quả một thao tác trang bị: hoặc xong, hoặc bị từ chối kèm mã lỗi và câu tiếng Việt. */

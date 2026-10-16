@@ -124,7 +124,11 @@ export class InventoryService {
   }
 
   /** Đặt món vào một ô (`null` = trả về túi). Chỉ người gọi đã kiểm luật mới được dùng. */
-  async setEquippedSlot(characterId: string, itemId: string, slot: EquipSlot | null): Promise<void> {
+  async setEquippedSlot(
+    characterId: string,
+    itemId: string,
+    slot: EquipSlot | null,
+  ): Promise<void> {
     await this.db
       .update(inventoryItems)
       .set({ equippedSlot: slot })

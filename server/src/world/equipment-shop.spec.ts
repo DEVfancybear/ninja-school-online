@@ -68,11 +68,7 @@ async function openShop(client: TestGameClient): Promise<NpcDialog> {
 }
 
 /** Mua một món và chờ gói túi đồ đã cập nhật. */
-async function buy(
-  client: TestGameClient,
-  itemId: string,
-  quantity = 1,
-): Promise<InventoryUpdate> {
+async function buy(client: TestGameClient, itemId: string, quantity = 1): Promise<InventoryUpdate> {
   client.send(Opcode.C2S_SHOP_BUY, { itemId, quantity });
   return client.waitFor<InventoryUpdate>(Opcode.S2C_INVENTORY_UPDATE);
 }

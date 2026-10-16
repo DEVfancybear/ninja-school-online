@@ -400,7 +400,10 @@ export class WorldService {
 
     // Món vừa cường hóa có thể đang mặc hoặc đang trong túi: gửi lại cả hai gói, cộng chỉ số mới.
     session.send(Opcode.S2C_UPGRADE_RESULT, outcome.result);
-    session.send(Opcode.S2C_INVENTORY_UPDATE, await this.options.inventory.toPacket(located.player.id));
+    session.send(
+      Opcode.S2C_INVENTORY_UPDATE,
+      await this.options.inventory.toPacket(located.player.id),
+    );
     session.send(Opcode.S2C_EQUIPMENT, await this.options.equipment.toPacket(located.player.id));
     await this.sendCharacterStats(session, located.player.id);
   }
@@ -543,7 +546,10 @@ export class WorldService {
     if (!this.battle.isBusy(characterId)) {
       return false;
     }
-    session.sendError(ErrorCode.IN_BATTLE, 'đang trong trận đấu, không đổi trang bị hay mua bán được');
+    session.sendError(
+      ErrorCode.IN_BATTLE,
+      'đang trong trận đấu, không đổi trang bị hay mua bán được',
+    );
     return true;
   }
 

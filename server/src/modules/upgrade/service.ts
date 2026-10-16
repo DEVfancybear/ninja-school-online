@@ -33,7 +33,11 @@ export class UpgradeService {
     private readonly inventory: InventoryService,
   ) {}
 
-  async upgrade(characterId: string, itemId: string, rng: Rng = Math.random): Promise<UpgradeOutcome> {
+  async upgrade(
+    characterId: string,
+    itemId: string,
+    rng: Rng = Math.random,
+  ): Promise<UpgradeOutcome> {
     const row = await this.inventory.findRow(characterId, itemId);
     if (!row) {
       return reject(ErrorCode.ITEM_NOT_OWNED, 'bạn không có món này');

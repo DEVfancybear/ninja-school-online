@@ -68,7 +68,11 @@ interface HookEquipmentSlot {
 
 interface HookShop {
   readonly npcName: string;
-  readonly entries: readonly { readonly name: string; readonly price: number; readonly sellPrice: number }[];
+  readonly entries: readonly {
+    readonly name: string;
+    readonly price: number;
+    readonly sellPrice: number;
+  }[];
 }
 
 function uniqueSuffix(): string {
@@ -197,7 +201,9 @@ test('mua áo vải ở shop, mặc vào thấy chỉ số tăng, tải lại tr
   await page.reload();
   await expect(page.locator('.hud .map-name')).toHaveText(START_MAP_NAME);
   await expect.poll(async () => (await character(page))?.maxHp).toBe(ARMOR_MAX_HP);
-  await expect.poll(async () => (await equipment(page)).find((slot) => slot.slot === 'body')?.name).toBe(ARMOR);
+  await expect
+    .poll(async () => (await equipment(page)).find((slot) => slot.slot === 'body')?.name)
+    .toBe(ARMOR);
   expect((await character(page))?.yen).toBe(START_YEN - ARMOR_PRICE);
   expect((await inventory(page)).some((item) => item.name === ARMOR)).toBe(false);
 });
@@ -210,12 +216,18 @@ test('bán bánh bao cho shop và cường hóa kiếm gỗ +1', async ({ page }
   const yenBeforeSell = (await character(page))?.yen ?? 0;
   const breadBefore = (await inventory(page)).find((item) => item.name === BREAD)?.quantity ?? 0;
   await sellRow(page, BREAD).locator('.shop__sell').click();
-  await expect.poll(async () => (await character(page))?.yen).toBe(yenBeforeSell + BREAD_SELL_PRICE);
-  expect((await inventory(page)).find((item) => item.name === BREAD)?.quantity).toBe(breadBefore - 1);
+  await expect
+    .poll(async () => (await character(page))?.yen)
+    .toBe(yenBeforeSell + BREAD_SELL_PRICE);
+  expect((await inventory(page)).find((item) => item.name === BREAD)?.quantity).toBe(
+    breadBefore - 1,
+  );
 
   // Mua kiếm gỗ (100 yên) rồi cường hóa: cấp 0 → 1 luôn thành công, tốn 50 yên.
   await buyRow(page, SWORD).locator('.shop__buy').click();
-  await expect.poll(async () => (await inventory(page)).some((item) => item.name === SWORD)).toBe(true);
+  await expect
+    .poll(async () => (await inventory(page)).some((item) => item.name === SWORD))
+    .toBe(true);
   const yenBeforeUpgrade = (await character(page))?.yen ?? 0;
 
   await openBag(page);
@@ -230,7 +242,9 @@ test('bán bánh bao cho shop và cường hóa kiếm gỗ +1', async ({ page }
   // Mặc kiếm đã cường hóa: bảng trang bị hiện cấp, chỉ số tấn công tăng theo món.
   const attackBefore = (await character(page))?.attack ?? 0;
   await bagRow(page, SWORD).locator('.bag__equip').click();
-  await expect.poll(async () => (await equipment(page)).find((slot) => slot.slot === 'weapon')?.name).toBe(SWORD);
+  await expect
+    .poll(async () => (await equipment(page)).find((slot) => slot.slot === 'weapon')?.name)
+    .toBe(SWORD);
   expect((await equipment(page)).find((slot) => slot.slot === 'weapon')?.upgradeLevel).toBe(1);
   await expect.poll(async () => (await character(page))?.attack).toBeGreaterThan(attackBefore);
   await openGear(page);
@@ -259,5 +273,7 @@ test('mua lại món trang bị đã có thì bị từ chối', async ({ page }
   await buyRow(page, ARMOR).locator('.shop__buy').click();
   await expect.poll(async () => lastError(page)).not.toBeNull();
   expect((await character(page))?.yen).toBe(START_YEN - ARMOR_PRICE);
-  expect((await inventory(page)).filter((item) => item.name === ARMOR).length).toBeLessThanOrEqual(1);
+  expect((await inventory(page)).filter((item) => item.name === ARMOR).length).toBeLessThanOrEqual(
+    1,
+  );
 });

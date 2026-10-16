@@ -178,9 +178,7 @@ describe('EquipmentService.unequip', () => {
 
     expect(await equipment.unequip(characterId, 'weapon')).toEqual({ ok: true });
 
-    expect((await inventory.list(characterId)).map((row) => row.itemId)).toEqual([
-      'item-kiem-go',
-    ]);
+    expect((await inventory.list(characterId)).map((row) => row.itemId)).toEqual(['item-kiem-go']);
     expect(await statsWithEquipment()).toEqual(before);
     expect(worn.attack).toBeGreaterThan(before.attack);
   });

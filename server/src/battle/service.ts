@@ -170,9 +170,7 @@ export class BattleService {
 
     const record = await this.options.characters.findById(player.id);
     // Ảnh chụp lúc vào trận phải gồm cả trang bị đang mặc, nếu không thì mặc đồ rồi vào trận vẫn yếu.
-    const bonus = record
-      ? await this.options.equipment.bonusFor(record.id)
-      : NO_STATS_BONUS;
+    const bonus = record ? await this.options.equipment.bonusFor(record.id) : NO_STATS_BONUS;
     const combatant = record ? this.playerCombatant(record, bonus) : undefined;
     if (!combatant) {
       session.sendError(ErrorCode.INTERNAL, 'không đọc được nhân vật của bạn, hãy vào lại');

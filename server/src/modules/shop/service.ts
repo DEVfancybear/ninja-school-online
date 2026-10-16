@@ -78,12 +78,7 @@ export class ShopService {
    * `C2S_SHOP_BUY`. Trang bị chỉ giữ **một bản** mỗi món (túi unique theo món), nên mua món đã có —
    * kể cả đang mặc — bị từ chối bằng `already_owned`, và mua trang bị luôn là mua một món.
    */
-  async buy(
-    characterId: string,
-    npc: Npc,
-    itemId: string,
-    quantity: number,
-  ): Promise<ShopOutcome> {
+  async buy(characterId: string, npc: Npc, itemId: string, quantity: number): Promise<ShopOutcome> {
     const item = this.gameData.items.get(itemId);
     if (!item || !npc.shop.includes(itemId)) {
       return reject(ErrorCode.NOT_FOR_SALE, `NPC này không bán ${item?.name ?? itemId}`);
