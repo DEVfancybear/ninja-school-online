@@ -42,6 +42,12 @@
 4. Server tính sát thương, hiệu ứng, hồi máu, cập nhật trạng thái rồi phát kết quả cho mọi người trong trận.
 5. Kết thúc: tính EXP, Yên, bảng rơi đồ, cập nhật nhiệm vụ. Thua thì hồi sinh về điểm lưu (mất một phần EXP/nhỏ).
 
+*Đã cài ở M3 (`docs/02-architecture/network-and-data.md` mục 2c) và khác đề xuất ở mấy chỗ:* mỗi trận
+**một quái** (chưa có 1–3 quái) và **chưa có hành động "phòng thủ"**; chỉ số dùng sức mạnh/nhanh nhẹn/tinh
+thần với `tấn công = 2 × sức mạnh + cấp`; thua **không mất kinh nghiệm** (mất 10% yên và hồi sinh ở làng
+với 50% máu) vì M3 chưa có nhiệm vụ; đường cong kinh nghiệm để trong `shared/src/constants/battle.ts`
+(cấp 4 cần tổng 238 kinh nghiệm) và số liệu quái trong `game-data/monsters/`.
+
 ### 2.2 Tiến trình cấp độ (định hướng nội dung)
 - MVP (M0–M3): cấp 1 → 15 (đánh quái, lên cấp, 1–2 chiêu, dùng vật phẩm rơi).
 - Alpha (M4–M6): cấp 1 → 45 (nhiệm vụ chính tuyến chương 1, trang bị + cường hóa +5, Lôi Đài, chat cộng đồng).
