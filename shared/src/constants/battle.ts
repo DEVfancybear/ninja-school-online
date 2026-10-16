@@ -40,10 +40,16 @@ export const DEFENSE_PER_AGILITY = 0.5;
 export const REVIVE_HP_RATIO = 0.5;
 export const DEFEAT_YEN_LOSS_RATIO = 0.1;
 
-/** Cấp tối đa và đường cong kinh nghiệm: `EXP_BASE × cấp^EXP_EXPONENT`. */
+/**
+ * Cấp tối đa và đường cong kinh nghiệm: `EXP_BASE × cấp^EXP_EXPONENT`.
+ *
+ * Chốt ở M3 sau khi đo: cấp 4 cần tổng 238 kinh nghiệm, tức **ba con bù nhìn ở bãi luyện tập**
+ * (90 kinh nghiệm mỗi con) — đúng mốc "đánh hạ quái, lên ít nhất 3 cấp" của MVP. Đường cong vẫn
+ * dốc dần (cấp 2 cần 30, cấp 10 cần 672) nên về sau phải đánh quái mạnh hơn mới lên tiếp.
+ */
 export const LEVEL_MAX = 60;
-export const EXP_BASE = 50;
-export const EXP_EXPONENT = 1.6;
+export const EXP_BASE = 30;
+export const EXP_EXPONENT = 1.35;
 
 /** Tỉ lệ chạy thoát: 50% cơ bản, mỗi điểm nhanh nhẹn chênh lệch cộng 2%, kẹp trong [10%, 90%]. */
 export const FLEE_BASE_CHANCE = 0.5;

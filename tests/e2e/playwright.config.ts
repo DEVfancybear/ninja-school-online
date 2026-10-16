@@ -1,7 +1,13 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const SERVER_URL = 'http://127.0.0.1:3000';
-const CLIENT_URL = 'http://127.0.0.1:4200';
+/**
+ * Cổng của client khi chạy e2e. Mặc định 4200; đổi bằng `NINJA_E2E_CLIENT_PORT` khi cổng đó đang
+ * bận (ví dụ một dự án khác đang chạy dev server) — `reuseExistingServer` sẽ tưởng nhầm là app của
+ * mình và kiểm thử sẽ chạy trên nhầm trang.
+ */
+const CLIENT_PORT = Number(process.env.NINJA_E2E_CLIENT_PORT ?? 4200);
+const CLIENT_URL = `http://127.0.0.1:${CLIENT_PORT}`;
 
 /**
  * Kiểm thử đầu-cuối bằng trình duyệt thật.
@@ -32,7 +38,7 @@ export default defineConfig({
     },
     {
       // --host 0.0.0.0: mặc định của Angular chỉ bind IPv6 [::1] nên 127.0.0.1 không kết nối được.
-      command: 'pnpm --filter @ninja/client dev --host 0.0.0.0',
+      command: `pnpm --filter @ninja/client dev --host 0.0.0.0 --port ${CLIENT_PORT}`,
       url: CLIENT_URL,
       reuseExistingServer: !process.env.CI,
       timeout: 180_000,

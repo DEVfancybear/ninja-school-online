@@ -15,6 +15,18 @@ Playwright tự chạy server (`pnpm --filter @ninja/server dev`) và client
 `[::1]`, xem `tests/e2e/playwright.config.ts`), nên chỉ cần PostgreSQL đang chạy và database đã migrate.
 Mỗi lần chạy sinh tên tài khoản/nhân vật ngẫu nhiên nên không cần xoá dữ liệu cũ.
 
+Cổng mặc định là 4200 (client) và 3000 (server). Khi cổng 4200 đang bận — ví dụ một dự án khác đang chạy
+dev server — đặt `NINJA_E2E_CLIENT_PORT` để đổi cổng client:
+
+```bash
+NINJA_E2E_CLIENT_PORT=4300 pnpm e2e
+```
+
+**Bẫy đã gặp (tốn thời gian mới tìm ra):** `reuseExistingServer` sẽ **dùng lại** bất cứ thứ gì đang nghe ở
+cổng đó, kể cả app của dự án khác; triệu chứng là mọi kịch bản đều báo "không thấy canvas" dù mã nguồn
+đúng. Và nếu `shared/` vừa đổi mà client báo lỗi kiểu *"does not provide an export named ..."*, hãy xoá
+`client/.angular/cache` rồi chạy lại: Vite giữ bản `@ninja/shared` đã tối ưu hoá từ lần chạy trước.
+
 ### `src/auth-character-flow.spec.ts` (8 kịch bản — M1)
 
 | # | Kịch bản | Thuộc |
@@ -45,10 +57,19 @@ Hai **context trình duyệt riêng biệt** trong cùng một test, mỗi bên 
 |---|---|---|
 | 1 | Đi bộ vào vùng cổng thì tự sang bản đồ bên kia (người ở lại thấy rời đi), đi ngược lại thì về làng | M2 ✅ |
 
-**Tổng: 13 kịch bản.** Các kịch bản dùng hook `window.__ninjaWorld` — hook này **chỉ** được gắn khi
-`isDevMode()`, bản production không phơi nó (xem `client/src/app/game/test-hook.ts`).
+### `src/battle-pve.spec.ts` (4 kịch bản — M3)
 
-Kịch bản thuộc các cột mốc sau (chưa có test): đánh hạ quái theo lượt rồi nhận EXP/rơi đồ/lên cấp (M3).
+| # | Kịch bản | Thuộc |
+|---|---|---|
+| 1 | Đi sang bãi luyện tập, bấm vào bù nhìn: trận mở ra, tới lượt mình, bấm "Đánh thường" theo lượt cho tới khi hạ được quái, nhận kinh nghiệm/yên/bánh bao rơi, xác quái nằm lại với 0 máu | M3 ✅ |
+| 2 | Đánh liên tiếp ba con bù nhìn: lên tới **cấp 4** (ba cấp), thấy thông báo lên cấp, rồi mở túi dùng bánh bao vừa nhặt để hồi máu | M3 ✅ |
+| 3 | Hai người chơi (hai context riêng) cùng bấm vào **một con quái**: vào chung một trận, danh sách có hai người, cả hai cùng thắng và cùng nhận thưởng | M3 ✅ |
+| 4 | Lệnh không hợp lệ: bấm lại con quái vừa gục thì server trả `monster_gone` và client hiện đúng lý do; đang trong trận thì giữ phím di chuyển cũng không nhúc nhích | M3 ✅ |
+
+**Tổng: 17 kịch bản.** Các kịch bản dùng hook `window.__ninjaWorld` — hook này **chỉ** được gắn khi
+`isDevMode()`, bản production không phơi nó (xem `client/src/app/game/test-hook.ts`). Hook M3 có thêm:
+`monsters()`, `attackMonster(name)`, `attackMonsterAt(index)`, `battle()`, `character()`, `inventory()`,
+`useItem(name)`, `toggleInventory(open)`, `inventoryOpen()`, `lastError()`.
 
 ## Dự kiến thêm sau
 

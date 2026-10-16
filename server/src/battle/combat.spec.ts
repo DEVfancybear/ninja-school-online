@@ -182,7 +182,7 @@ describe('vào trận và đánh quái', () => {
     expect(stats.maxHp).toBe(60);
     expect(stats.hp).toBe(60);
     expect(stats.maxMp).toBe(40);
-    expect(stats.expToNext).toBe(50);
+    expect(stats.expToNext).toBe(30);
     expect(stats.skills.map((skill) => skill.skillId)).toEqual(['skill-tram-co-ban']);
 
     const bag = await client.waitFor<InventoryUpdate>(Opcode.S2C_INVENTORY_UPDATE);
@@ -519,8 +519,9 @@ describe('chơi chung và phần thưởng', () => {
   it('đánh hạ quái liên tiếp → lên nhiều cấp trong một trận, và dùng được vật phẩm rơi', async () => {
     // Bù nhìn thưởng nhiều kinh nghiệm để một trận là thấy rõ việc lên cấp (đủ ba cấp).
     const gameDataDir = await copyGameDataDir((files) => {
+      // 300 kinh nghiệm = đúng ba cấp (cần tổng 238 để lên cấp 4), dư 62.
       const monster = files.monsters['monsters/mob-bui-nhon.json'] as { expReward: number };
-      monster.expReward = 500;
+      monster.expReward = 300;
     });
     const levelServer = await startTestServer({ gameDataDir });
     try {
@@ -554,7 +555,7 @@ describe('chơi chung và phần thưởng', () => {
       client.send(Opcode.C2S_ATTACK_MOB, { targetId: SCARECROW_ID });
       const { end } = await fightToTheEnd(client, characterId);
       expect(end.outcome).toBe('victory');
-      expect(end.rewards).toMatchObject({ exp: 500, levelsGained: 3, level: 4 });
+      expect(end.rewards).toMatchObject({ exp: 300, levelsGained: 3, level: 4 });
 
       const levelUp = await client.waitFor<LevelUp>(Opcode.S2C_LEVEL_UP);
       expect(levelUp.levelsGained).toBe(3);

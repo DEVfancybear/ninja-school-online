@@ -1,6 +1,6 @@
 # server/ — Game server
 
-**Trạng thái:** M0 (khung) + M1 (tài khoản & nhân vật) + **M2 (thế giới, di chuyển, chat — phía server)** đã xong.
+**Trạng thái:** M0 (khung) + M1 (tài khoản & nhân vật) + M2 (thế giới, di chuyển, chat) + **M3 (chiến đấu theo lượt, quái, túi đồ, chỉ số nhân vật)** đã xong.
 
 ## Vai trò
 Là **nguồn sự thật** của toàn bộ trò chơi: tài khoản, nhân vật, bản đồ, chiến đấu theo lượt, vật phẩm, nhiệm vụ, bang hội, xếp hạng, sự kiện.
@@ -55,7 +55,7 @@ sự kiện `upgrade`), đường dẫn `/ws` (đường dẫn khác bị trả 
 | `bad_packet` | khung JSON sai, gói đầu tiên không phải `C2S_HELLO`, `characterId` không thuộc tài khoản, hoặc không bắt tay kịp 10 giây |
 | `internal_error` | bản đồ khởi đầu thiếu điểm spawn (lỗi dữ liệu nội dung) |
 
-#### Gói tin trong game (M2)
+#### Gói tin trong game (M2 + M3)
 
 | Opcode | Hướng | Nội dung | Xử lý của server |
 |---|---|---|---|
@@ -70,10 +70,26 @@ sự kiện `upgrade`), đường dẫn `/ws` (đường dẫn khác bị trả 
 | `S2C_ENTITY_ADD` / `S2C_ENTITY_REMOVE` | S→C | `{entity}` / `{id}` | Người vào/ra map; người mới **không** nhận `ADD` của chính mình |
 | `S2C_ERROR` | S→C | `{code, message, fatal}` | `fatal: false` thì kết nối vẫn dùng tiếp bình thường |
 | `S2C_NOTIFY` | S→C | `{message}` | Phiên bị đẩy ra khi cùng nhân vật đăng nhập ở nơi khác |
+| `C2S_ATTACK_MOB` | C→S | `{targetId}` | Quái phải còn sống, cách ≤ 96 px, người chơi chưa ở trận khác; quái đã có trận thì vào chung (tối đa 2 người) |
+| `S2C_BATTLE_START` | S→C | `{battleId, roundNo, participants, actorId, turnMs, turnEndsAt}` | Mở trận, hoặc phát lại cho **mọi người** khi có người vào chung |
+| `S2C_BATTLE_TURN` | S→C | `{battleId, roundNo, actorId, turnMs, turnEndsAt}` | Đổi lượt; lượt người chơi 30 giây, lượt quái ra đòn sau 800 ms |
+| `C2S_BATTLE_ACTION` | C→S | `{battleId, action: 'attack'\|'skill'\|'item'\|'flee', skillId?, itemId?, targetId?}` | Kiểm đúng lượt, chiêu đã học, hồi chiêu, nội lực, quyền sở hữu vật phẩm |
+| `S2C_BATTLE_RESULT` | S→C | `{battleId, roundNo, actorId, action, events, participants}` | Nhật ký từng đòn (câu tiếng Việt) + trạng thái mới của mọi người |
+| `S2C_BATTLE_END` | S→C | `{battleId, outcome, monsterName, rewards, participants}` | `rewards` là **phần thưởng riêng của người nhận** (`null` khi thua/chạy thoát) |
+| `C2S_USE_ITEM` | C→S | `{itemId}` | Ngoài trận; trong trận phải dùng qua `C2S_BATTLE_ACTION` để mất một lượt |
+| `S2C_INVENTORY_UPDATE` | S→C | `{items, capacity}` | Gửi **cả túi** sau mỗi thay đổi (sau bắt tay, khi dùng vật phẩm, khi nhặt đồ) |
+| `S2C_CHARACTER` | S→C | `{id, name, school, class, level, exp, expToNext, yen, hp, maxHp, mp, maxMp, strength…speed, skills}` | Gửi ngay sau `S2C_ENTER_MAP` và mỗi lần chỉ số đổi |
+| `S2C_LEVEL_UP` | S→C | `{character, levelsGained, learnedSkills}` | Kèm chiêu vừa học được ở cấp mới |
 
 Lỗi **không** fatal khi đang chơi: `bad_packet` (lệnh `C2S_MOVE` sai, gói tin sai định dạng),
 `rate_limited` (chat quá nhanh **hoặc** quá dài), `unknown_map` (không đứng ở cổng),
 `unknown_entity` (NPC không có trong map).
+
+Lỗi chiến đấu (M3) — mỗi nguyên nhân một mã riêng để client nói đúng lý do:
+`in_battle` (đang trong trận / di chuyển khi đang đánh), `battle_not_found` (trận đã kết thúc),
+`not_your_turn`, `out_of_range` (quá 96 px), `monster_gone` (quái không có ở đây hoặc đã bị hạ),
+`skill_not_known`, `skill_cooldown`, `not_enough_mp`, `item_not_owned`, `item_not_usable`,
+`item_no_effect` (chỉ số đang đầy), `invalid_target` (trận đã đủ người).
 
 #### Vòng lặp tick
 
@@ -159,10 +175,12 @@ server/src/
 ├── net/                 # WebSocket (M2): gateway /ws, phiên, hàng đợi gói tin, heartbeat
 ├── core/                # (M2) tick.ts — MỘT interval dùng chung; room-manager.ts — room theo map
 ├── world/               # (M2) game-data.ts (nạp + kiểm dữ liệu), map.ts, movement.ts, room.ts, world-service.ts
+├── battle/              # (M3) engine.ts (công thức thuần) + service.ts (luồng trận theo lượt)
 ├── modules/
 │   ├── account/         # service (đăng ký/đăng nhập/làm mới/đăng xuất) + route
-│   ├── character/       # service (tạo/liệt kê, giới hạn, chống trùng tên, chọn nhân vật vào game) + route
+│   ├── character/       # service (tạo/liệt kê, giới hạn, chống trùng tên) + stats.ts (chỉ số theo cấp) + route
 │   ├── chat/            # (M2) giới hạn tần suất + tạo tin nhắn kênh map
+│   ├── inventory/       # (M3) túi đồ: cất/lấy theo số lượng, sức chứa theo số loại
 │   └── npc/             # (M2) hội thoại NPC theo game-data
 ├── http/                # parseRequest (kiểm dữ liệu vào) + authenticate (preHandler)
 ├── security/
@@ -179,6 +197,11 @@ server/src/
 - Tên nhân vật: 3–12 ký tự chữ/số (cho phép tiếng Việt có dấu), duy nhất toàn máy chủ, không phân biệt hoa thường.
 - Phái phải thuộc trường đã chọn (kiểm ở cả `shared` schema và ràng buộc CHECK trong database).
 - Tối đa 4 nhân vật mỗi tài khoản (`MAX_CHARACTERS_PER_ACCOUNT` trong `shared`).
+- Chỉ số nhân vật **suy từ** `game-data/classes/`: `tấn công = 2 × sức mạnh + cấp`, `phòng thủ = nhanh nhẹn / 2`,
+  `tốc độ = nhanh nhẹn + cấp`; máu/nội lực tối đa lấy từ hệ số phái theo cấp.
+- Tạo nhân vật thì nhận luôn yên và đồ khởi đầu của phái (`startingYen`, `startingItems`).
+- Trong trận: sát thương do server tính, hồi chiêu quy ra **vòng** (`ceil(cooldownMs / 30 giây)`), và mọi thay
+  đổi (máu, nội lực, cấp, kinh nghiệm, yên, túi đồ) chỉ ghi database **khi trận kết thúc**.
 
 ## Lệnh
 
@@ -201,7 +224,10 @@ pnpm --filter @ninja/server build && pnpm --filter @ninja/server start
 
 ## Chưa làm (các cột mốc sau)
 
-- Module còn lại: `inventory`, `skill`, `battle`, `quest`, `social`, `guild`, `arena`, `event`, `mail`, `admin`.
+- Module còn lại: `quest`, `social`, `guild`, `arena`, `event`, `mail`, `admin`; trang bị & cường hóa (M4),
+  nhiệm vụ (M5).
+- Chiến đấu: trận nhiều quái (1–3 như thiết kế), hiệu ứng phụ của chiêu (độc/choáng/hồi máu), và việc lưu
+  trạng thái trận xuống database khi chạy nhiều tiến trình.
 - Lưu vị trí nhân vật vào database, chia kênh theo map, pub/sub qua Redis (nhiều tiến trình).
 - Giới hạn tần suất chung cho mọi gói tin, khoá tài khoản sau nhiều lần sai, audit log.
 

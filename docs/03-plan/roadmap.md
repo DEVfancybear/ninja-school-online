@@ -125,9 +125,55 @@ Nội dung: 2 bản đồ đầu tiên (làng khởi nguồn + bãi luyện tậ
 binaries, xem `infra/README.md`); nhiều tiến trình máy chủ (chưa có Redis/pub-sub nên room chỉ nằm trong
 một tiến trình); chưa có test tải 10 Hz.
 
-### M3 — Chiến đấu theo lượt PvE (~2 tuần) — *kết thúc MVP*
+### M3 — Chiến đấu theo lượt PvE (~2 tuần) — ✅ **ĐÃ XONG (2026-10-16)** — *kết thúc MVP*
 Nội dung: chạm quái để vào trận, trận theo lượt có đồng hồ 30 giây/lượt, 1 chiêu đánh thường + 1–2 chiêu thức, máu/sát thương/năng lượng, EXP → lên cấp, rơi Yên/vật phẩm, hồi sinh.
 **Xong khi:** một người chơi đánh hạ quái, lên ít nhất 3 cấp, nhận và sử dụng được vật phẩm rơi; 2 người chơi cùng vào một trận đánh chung một quái; server từ chối lệnh bất hợp lệ (đánh xa, hồi chiêu chưa xong).
+
+**Đã giao:**
+
+- **Hợp đồng (protocol v3)**: gói `C2S_ATTACK_MOB`, `C2S_BATTLE_ACTION`, `C2S_USE_ITEM` và
+  `S2C_BATTLE_START/TURN/RESULT/END`, `S2C_CHARACTER`, `S2C_LEVEL_UP`, `S2C_INVENTORY_UPDATE`; thực thể
+  `monster` có máu và hình dáng; **12 mã lỗi chiến đấu riêng theo từng nguyên nhân** (`out_of_range`,
+  `in_battle`, `not_your_turn`, `skill_cooldown`, `not_enough_mp`, `item_no_effect`…).
+- **Luật chiến đấu (server quyết định hết)**: thứ tự lượt theo tốc độ (hòa thì ngẫu nhiên), đồng hồ 30
+  giây/lượt hết giờ thì tự đánh thường, quái ra đòn sau 800 ms, sát thương dao động ±10% và có 5% chí mạng
+  (×1,5), luôn gây ít nhất 1 sát thương, hồi chiêu tính theo **vòng**, chạy thoát 50% ± 2% mỗi điểm nhanh
+  nhẹn chênh lệch (kẹp 10–90%).
+- **Chỉ số & tiến trình**: `tấn công = 2 × sức mạnh + cấp`, `phòng thủ = nhanh nhẹn / 2`, `tốc độ = nhanh
+  nhẹn + cấp`; đường cong kinh nghiệm `30 × cấp^1,35` (cấp 4 cần tổng 238 kinh nghiệm = **ba con bù nhìn**
+  ở bãi luyện tập); lên cấp thì máu/nội lực tối đa tăng theo và được cộng luôn vào máu hiện tại.
+- **Túi đồ**: bảng `inventory_items`, sức chứa 40 loại, tạo nhân vật nhận yên và đồ khởi đầu của phái;
+  dùng vật phẩm ngoài trận thì tự do, **trong trận là một lượt**.
+- **Quái trên bản đồ**: mỗi chỗ đặt là một con riêng có máu, hồi sinh theo `respawnMs`, thanh máu hiện trên
+  bản đồ; quái còn sống hồi đầy máu khi trận kết thúc (không đánh rồi bỏ chạy để ăn dần).
+- **Giao diện**: bảng trận đấu (thẻ quái + người chơi, dòng lượt kèm đồng hồ đỏ khi còn dưới 5 giây, nút
+  đánh thường/chiêu/vật phẩm/bỏ chạy khoá theo lượt–nội lực–hồi chiêu, nhật ký, bảng kết trận có thưởng),
+  túi đồ, HUD có thanh máu/nội lực/kinh nghiệm và số yên.
+- **Dữ liệu nội dung**: 3 phái (`classes/`), 3 loại quái (`monsters/`), 7 chiêu, 4 vật phẩm, 9 chỗ đặt quái
+  trên 2 bản đồ; `tools/data-validator` và server dùng **chung một bộ luật liên-file** (`checkGameData`).
+
+**Kiểm chứng đã chạy (máy dev, PostgreSQL 16 thật và trình duyệt thật Chromium):**
+
+| Hạng mục | Kết quả |
+|---|---|
+| `pnpm test` | **337 test xanh**: shared 52, server 116, client 159, tools/data-validator 10 |
+| `pnpm e2e` (Playwright) | **17/17 kịch bản xanh** — 13 kịch bản M1–M2 + 4 kịch bản M3 (đánh hạ quái và nhận thưởng, ba con liên tiếp để lên ba cấp rồi dùng vật phẩm rơi, hai người chung một trận, lệnh không hợp lệ bị từ chối) |
+| `pnpm validate:data` | exit 0 — 20 file hợp lệ trong `game-data/` |
+| `pnpm lint`, `pnpm typecheck`, `pnpm build`, `pnpm format:check` | đều exit 0 |
+| Bundle sau M3 | khởi tạo **722,50 kB** (nén 155,18 kB); lazy chunk `play` **1,46 MB** (nén 315,32 kB) |
+| Test chiến đấu qua WebSocket | `server/src/battle/combat.spec.ts`: 16 test trên server thật (vào trận, luật lượt, chơi chung, thưởng, thua, chạy thoát) + 11 test công thức thuần ở `server/src/battle/engine.spec.ts` |
+| Migration | `0001_inventory_and_vitals`: bảng `inventory_items`, cột `characters.hp`/`mp` (`null` = đang đầy) |
+
+**Quyết định thiết kế đã chốt ở M3 (ghi lại vì ảnh hưởng các mốc sau):**
+
+1. **Một trận một con quái.** Bấm vào con quái nào thì mở trận với đúng con đó; người thứ hai bấm cùng con
+   thì **vào chung** trận (tối đa 2 người). Trận nhiều quái để mốc sau.
+2. **Chỉ số chốt lúc vào trận**, không tính lại giữa trận (M3 chưa có trang bị dùng được).
+3. **Học chiêu là hàm của phái và cấp** — không có bảng "chiêu đã học" riêng, nên dữ liệu chiêu là nguồn
+   sự thật duy nhất.
+4. **Thắng thì mỗi người nhận đủ thưởng** (không chia đều) — đơn giản và dễ kiểm chứng; nếu thấy lạm phát
+   thì đổi ở mốc sau.
+5. **Thua thì hồi sinh ở làng với 50% máu, mất 10% yên**, không mất kinh nghiệm (chưa có gì để mất ở M3).
 
 ### M4 — Hành trang & cường hóa (~1,5 tuần)
 Nội dung: túi đồ, trang bị theo ô, mặc/tháo, shop NPC mua/bán bằng Yên, cường hóa +1 → +5 với tỷ lệ thành công, thông báo kết quả, audit log giao dịch.
@@ -195,3 +241,4 @@ M0 đã xong, nên đây là trạng thái các việc chuẩn bị:
 | M1 | Chạy lại cả chuỗi CI trên cây đã xoá sạch artifact + `pnpm e2e` trên trình duyệt thật | CI xanh (run 38689008693); 119 test; 8/8 kịch bản e2e; commit `8a09cf5` |
 | M2 | Chạy cả chuỗi CI + `pnpm e2e` **13 kịch bản** trên cây đã ghép hai phía (server + client) | 281 test; 13/13 kịch bản e2e; commit `c2e3aef` trên `main` |
 | M2 (kiểm chứng độc lập) | Verifier riêng tự viết 6 script dùng `ws` + REST, dựng server trên cổng riêng 3120–3125, kiểm lại từng con số tài liệu và tự dựng lại các tình huống cổng/chat/chống gian lận | **VERDICT: PASS** — 20/20 + 21/21 + 19/19 kiểm tra đạt, không tìm thấy lỗi mã nguồn hay câu tài liệu nào nói sai thực tế |
+| M3 | Chạy cả chuỗi CI + `pnpm e2e` **17 kịch bản** trên trình duyệt thật, có bài kiểm tra ba cấp và trận chung hai người | 337 test; 17/17 kịch bản e2e; commit `2b2ed2d` (client) trên `main` |

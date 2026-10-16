@@ -77,6 +77,34 @@ Phần **server** của M2 đã chạy thật (kiểm thử tích hợp bằng c
   map** với đường đi bộ.
 - **Chưa làm ở M2** (ghi rõ để không hiểu nhầm là đã có): chia kênh theo map, lưu vị trí vào database,
   rate limit chung cho mọi gói tin và "sai quá nhiều thì ngắt kết nối tạm thời", chat thế giới/nhóm.
+### 2c. Hiện trạng đã cài đặt (M3 — chiến đấu theo lượt)
+
+- **Trận đấu nằm hoàn toàn ở server** (`server/src/battle/`): client chỉ gửi ý định và vẽ kết quả.
+  Công thức thuần ở `engine.ts` (thuần nên kiểm thử riêng), luồng trận ở `service.ts`.
+- **Mở trận**: `C2S_ATTACK_MOB` — quái phải còn sống (`monster_gone`), cách ≤ `MONSTER_ENGAGE_RANGE_PX`
+  = 96 px (`out_of_range`), người chơi chưa ở trận khác (`in_battle`). Quái đã có trận thì **vào chung**
+  (tối đa `BATTLE_MAX_PLAYERS` = 2 người, quá thì `invalid_target`); vào trận thì nhân vật đứng yên.
+- **Lượt**: mỗi vòng xếp thứ tự theo tốc độ giảm dần, hòa thì ngẫu nhiên; lượt người chơi kéo dài
+  `BATTLE_TURN_MS` = 30 s, hết giờ thì server tự đánh thường (nhật ký ghi `auto`); quái ra đòn sau
+  `MONSTER_TURN_DELAY_MS` = 800 ms để client kịp thấy lượt của nó.
+- **Sát thương**: `power + hệ số × chỉ số` (đánh thường: `2 + 1 × tấn công`; chiêu: `power + factor ×
+  chỉ số chiêu ăn theo`), dao động ±10%, chí mạng 5% (×1,5), trừ phòng thủ mục tiêu, sàn `MIN_DAMAGE` = 1.
+- **Hồi chiêu tính theo vòng** (`ceil(cooldownMs / 30 s)`) vì trận không có đồng hồ chung để đếm ms.
+- **Chạy thoát**: `50% + 2% × (nhanh nhẹn người chơi − tốc độ quái)`, kẹp 10–90%; thoát thì rời trận ngay,
+  trận còn người khác thì tiếp tục; hết người thì quái **hồi đầy máu** (chống đánh–chạy–đánh).
+- **Kết trận**: thắng thì mỗi người nhận đủ `expReward`, yên ngẫu nhiên trong `[yenMin, yenMax]` và tự
+  gieo từng món quà rơi (túi đầy thì món đó mất); lên cấp cộng thêm phần máu/nội lực tối đa tăng thêm.
+  Thua thì hồi sinh ở làng với 50% máu và mất 10% yên. Mọi thay đổi chỉ ghi database **khi trận kết thúc**
+  (trong trận giữ ở bộ nhớ) — mất kết nối giữa trận thì máu/nội lực đang có được ghi lại và người chơi rời trận.
+- **Quái trên bản đồ** là thực thể `kind: 'monster'` trong room, mỗi chỗ đặt một con riêng có máu và hẹn giờ
+  hồi sinh; máu đổi thì room phát lại `S2C_ENTITY_ADD` cùng id (client thay thế theo id, nên thanh máu trên
+  bản đồ khớp với trận đang đánh).
+- **Chống gian lận ở M3**: mọi con số do server tính; di chuyển bị từ chối khi đang trong trận; dùng vật
+  phẩm trong trận bắt buộc đi qua lượt (không hồi máu miễn phí); quà rơi và kinh nghiệm không bao giờ gửi
+  cho client trước khi trận kết thúc.
+- **Chưa làm ở M3** (ghi rõ): trận nhiều quái (1–3 như thiết kế), hiệu ứng phụ của chiêu (độc/choáng),
+  trang bị ảnh hưởng chỉ số, lưu vị trí vào database, và rate limit chung cho mọi gói tin.
+
 
 ## 3. Định dạng gói tin
 
@@ -125,15 +153,15 @@ Quy ước: `C2S_*` = client → server, `S2C_*` = server → client. Mọi gói
 | `S2C_ERROR` | S→C | Lỗi theo mã kèm `fatal` (M2); mã trong `shared/src/protocol/opcodes.ts` |
 | `C2S_QUEST_ACCEPT/COMPLETE` | C→S | Nhận/trả nhiệm vụ |
 | `S2C_QUEST_UPDATE` | S→C | Cập nhật tiến độ nhiệm vụ |
-| `C2S_ATTACK_MOB` | C→S | Chạm vào quái để bắt đầu trận |
-| `S2C_BATTLE_START` | S→C | Trận bắt đầu: danh sách tham gia, thứ tự lượt |
-| `S2C_BATTLE_TURN` | S→C | Đến lượt ai, đồng hồ bao nhiêu giây |
-| `C2S_BATTLE_ACTION` | C→S | Hành động (đánh thường/dùng chiêu/vật phẩm/chạy) |
-| `S2C_BATTLE_RESULT` | S→C | Kết quả một hành động (sát thương, hiệu ứng) |
-| `S2C_BATTLE_END` | S→C | Kết thúc: EXP, Yên, rơi đồ, thay đổi cấp |
-| `C2S_USE_ITEM` / `S2C_INVENTORY_UPDATE` | 2 chiều | Dùng vật phẩm, cập nhật túi |
+| `C2S_ATTACK_MOB` | C→S | Chạm vào quái để bắt đầu trận (M3: trong tầm 96 px, quái phải còn sống) |
+| `S2C_BATTLE_START` | S→C | Trận bắt đầu: danh sách tham gia, người tới lượt, hạn lượt (M3; phát lại khi có người vào chung) |
+| `S2C_BATTLE_TURN` | S→C | Đến lượt ai, còn bao lâu (M3) |
+| `C2S_BATTLE_ACTION` | C→S | Hành động (đánh thường/dùng chiêu/vật phẩm/chạy) — M3 kiểm lượt, hồi chiêu, nội lực, quyền sở hữu vật phẩm |
+| `S2C_BATTLE_RESULT` | S→C | Kết quả một hành động: nhật ký dạng câu tiếng Việt + trạng thái mới của mọi người (M3) |
+| `S2C_BATTLE_END` | S→C | Kết thúc: thắng/thua/chạy thoát kèm phần thưởng **của riêng người nhận** (M3) |
+| `C2S_USE_ITEM` / `S2C_INVENTORY_UPDATE` | 2 chiều | Dùng vật phẩm ngoài trận (trong trận phải qua lượt), gửi lại cả túi mỗi lần đổi (M3) |
 | `C2S_UPGRADE_ITEM` / `S2C_UPGRADE_RESULT` | 2 chiều | Cường hóa trang bị |
-| `S2C_LEVEL_UP` / `S2C_STATS_UPDATE` | S→C | Lên cấp, cập nhật chỉ số |
+| `S2C_LEVEL_UP` / `S2C_CHARACTER` | S→C | Lên cấp (kèm chiêu mới học) và chỉ số nhân vật — M3 gửi `S2C_CHARACTER` ngay sau bắt tay và mỗi lần chỉ số đổi; chưa có `S2C_STATS_UPDATE` riêng |
 | `S2C_NOTIFY` | S→C | Thông báo hệ thống (thưởng, sự kiện, lỗi) |
 
 ## 4. Vòng lặp server (tick)
@@ -150,9 +178,9 @@ Game gốc xử lý gần hết ở client nên bị chế auto/mod dễ dàng. 
 
 1. **Không tính toán gì quan trọng ở client**: sát thương, rơi đồ, tỷ lệ cường hóa, random → chỉ server tính.
 2. **Kiểm tra di chuyển**: khoảng cách mỗi tick ≤ tốc độ tối đa; từ chối lệnh "tàng hình xuyên tường". M2 cài cụ thể: mỗi lệnh `C2S_MOVE` chỉ được nhắm trong `MAX_MOVE_DISTANCE_PX` (600 px), điểm đích phải nằm trong biên bản đồ và **không** thuộc ô `blocked`; đổi map chỉ hợp lệ khi đang đứng trong vùng cổng và điểm đến lấy từ `portals[].toSpawn` (bỏ qua `spawnId` client gửi).
-3. **Kiểm tra hành động**: hồi chiêu, đủ năng lượng, đúng trạng thái (đang trong trận/không), khoảng cách tới mục tiêu.
+3. **Kiểm tra hành động**: hồi chiêu, đủ năng lượng, đúng trạng thái (đang trong trận/không), khoảng cách tới mục tiêu. M3 cài đủ: `not_your_turn`, `skill_cooldown`, `not_enough_mp`, `out_of_range` (96 px), `in_battle`, `monster_gone`, `item_not_owned`, `item_not_usable`, `item_no_effect`.
 4. **Sở hữu vật phẩm**: mọi thao tác (dùng/bán/cường hóa) kiểm tra vật phẩm thuộc nhân vật đó trong DB.
-5. **Rate limit**: chat 1 tin/giây; hành động chiến đấu tối đa 5 lệnh/giây; sai quá nhiều → ngắt kết nối tạm thời. (M2 mới cài phần chat — 1 tin/giây/người và tối đa `CHAT_MAX_LENGTH` ký tự; chưa đếm số gói sai.)
+5. **Rate limit**: chat 1 tin/giây; hành động chiến đấu tối đa 5 lệnh/giây; sai quá nhiều → ngắt kết nối tạm thời. (M2 mới cài phần chat — 1 tin/giây/người và tối đa `CHAT_MAX_LENGTH` ký tự; M3 chặn ở tầng luật: đúng lượt, đủ nội lực, hồi chiêu đã hết, vật phẩm thuộc túi — nhưng **vẫn chưa đếm số gói sai** để ngắt kết nối.)
 6. **Không gửi dữ liệu bí mật cho client**: bảng rơi đồ, tỷ lệ cường hóa, chỉ số quái, dữ liệu người chơi khác (chỉ gửi phần hiển thị).
 7. **Audit log**: mọi thay đổi Yên/vật phẩm giá trị cao đều ghi log để đối soát.
 
@@ -160,18 +188,20 @@ Game gốc xử lý gần hết ở client nên bị chế auto/mod dễ dàng. 
 
 ### 6.1 Bảng PostgreSQL (dữ liệu chạy)
 
-**Trạng thái: bảng này là thiết kế đích cho cả dự án, không phải danh sách "đã có".** Ở M1/M2 mới chỉ
-tồn tại `accounts`, `characters`, `refresh_tokens` (xem `server/src/db/schema.ts` và migration trong
-`server/drizzle/`); các bảng còn lại sẽ được tạo ở cột mốc tương ứng. Cột `map_id`, `x`, `y`, `stats`,
-`last_login` của `characters` **chưa có**: M2 chưa lưu vị trí vào database (xem 6.3).
+**Trạng thái: bảng này là thiết kế đích cho cả dự án, không phải danh sách "đã có".** Sau M3, database
+có `accounts`, `characters`, `refresh_tokens`, `inventory_items` (xem `server/src/db/schema.ts` và hai
+migration trong `server/drizzle/`); các bảng còn lại sẽ được tạo ở cột mốc tương ứng. Cột `map_id`, `x`,
+`y`, `stats`, `last_login` của `characters` **chưa có** (M2/M3 chưa lưu vị trí — xem 6.3), nhưng đã có
+thêm `hp`/`mp` với quy ước `null` = đang đầy.
 
 | Bảng | Cột chính | Ghi chú | Đã có |
 |---|---|---|---|
 | `accounts` | id, username, password_hash, email, status, created_at | 1 tài khoản nhiều nhân vật | ✅ M1 |
 | `refresh_tokens` | id, account_id, token_hash, expires_at, revoked_at | refresh token xoay vòng, lưu dạng băm | ✅ M1 |
-| `characters` | id, account_id, name, school, class, level, exp, yen, map_id, x, y, stats(jsonb), last_login | `stats` chứa chỉ số đã tính; `map_id/x/y/stats/last_login` **chưa làm** | ✅ M1 (một phần) |
-| `char_skills` | char_id, skill_id, skill_level | chiêu đã học | M3 |
-| `items` | id, owner_id, template_id, qty, upgrade_level, bound, slot, meta(jsonb) | vật phẩm trong túi/kho/trang bị | M4 |
+| `characters` | id, account_id, name, school, class, level, exp, yen, **hp, mp**, map_id, x, y, stats(jsonb), last_login | chỉ số suy từ `game-data/classes/` chứ không lưu; `hp`/`mp` là máu/nội lực **hiện tại**, `null` = đang đầy; `map_id/x/y/stats/last_login` **chưa làm** | ✅ M1 + M3 (hp/mp) |
+| `inventory_items` | id, character_id, item_id, quantity, created_at | **thay cho bảng `items` dự kiến**: một hàng cho mỗi **loại** vật phẩm kèm số lượng (khớp cách túi hiển thị), sức chứa đếm theo số loại | ✅ M3 |
+| `char_skills` | char_id, skill_id, skill_level | **không dùng ở M3**: học chiêu là hàm của phái và cấp, dữ liệu chiêu là nguồn sự thật duy nhất | ❌ chưa có |
+| `items` | id, owner_id, template_id, qty, upgrade_level, bound, slot, meta(jsonb) | vật phẩm có thuộc tính riêng (cường hóa, khóa, ô trang bị) — thay bằng `inventory_items` ở M3, sẽ xem lại khi làm M4 | ❌ chưa có |
 | `quest_progress` | char_id, quest_id, state, progress(jsonb) | nhiệm vụ | M5 |
 | `friends` | char_id, friend_id, status | bạn bè | M6 |
 | `guilds` | id, name, level, exp, notice, created_at | bang hội | M7 |
@@ -181,16 +211,6 @@ tồn tại `accounts`, `characters`, `refresh_tokens` (xem `server/src/db/schem
 | `daily_limits` | char_id, kind, count, day | giới hạn theo ngày (boss, sự kiện) | M7 |
 | `audit_logs` | id, actor, action, meta(jsonb), created_at | đối soát | M4 |
 | `trade_logs` | id, kind, payload(jsonb), created_at | giao dịch quan trọng | M4 |
-| `char_skills` | char_id, skill_id, skill_level | chiêu đã học |
-| `items` | id, owner_id, template_id, qty, upgrade_level, bound, slot, meta(jsonb) | vật phẩm trong túi/kho/trang bị |
-| `quest_progress` | char_id, quest_id, state, progress(jsonb) | nhiệm vụ |
-| `friends` | char_id, friend_id, status | bạn bè |
-| `guilds` | id, name, level, exp, notice, created_at | bang hội |
-| `guild_members` | guild_id, char_id, rank, joined_at | thành viên |
-| `mails` | id, to_char_id, from_name, title, body, attach(jsonb), is_read, expires_at | thư + quà |
-| `arena_rank` | char_id, season, rating, wins, losses | Lôi Đài |
-| `daily_limits` | char_id, kind, count, day | giới hạn theo ngày (boss, sự kiện) |
-| `audit_logs` | id, actor, action, meta(jsonb), created_at | đối soát |
 | `trade_logs` | id, kind, payload(jsonb), created_at | giao dịch quan trọng |
 
 ### 6.2 Dữ liệu nội dung (game-data, JSON)
@@ -199,11 +219,11 @@ tồn tại `accounts`, `characters`, `refresh_tokens` (xem `server/src/db/schem
 |---|---|---|
 | Bản đồ | `maps/lang-khoi-nguon.json`, `maps/bai-luyen-tap.json` (đã có) | kích thước, tileset (id, màu, `blocked`), lớp `ground`/`decor`, cổng dịch chuyển (map + điểm spawn đích), điểm spawn, NPC đặt sẵn |
 | NPC | `npcs/npc-thay-hieu-truong.json` (đã có) | tên, màu, danh sách lời thoại (người nói + nội dung) |
-| Quái | `monsters/mob-quai-xanh.json` (sẽ tạo ở M3) | máu, sát thương, tốc độ, EXP, Yên, bảng rơi đồ, thời gian hồi sinh |
-| Vật phẩm | `items/item-kiem-go.json` (đã có) | loại, ô trang bị, chỉ số, cấp yêu cầu, giá, mốc cường hóa |
+| Quái | `monsters/mob-bui-nhon.json`, `mob-chuot-dong.json`, `mob-heo-rung.json` (đã có ở M3) | hình dáng để vẽ, màu, cấp, máu, tấn công, phòng thủ, tốc độ, kinh nghiệm, khoảng yên, bảng rơi đồ, thời gian hồi sinh |
+| Vật phẩm | `items/item-kiem-go.json`, `item-banh-bao.json`, `item-tra-rung.json`, `item-da-vun.json` (đã có) | loại, ô trang bị, chỉ số, cấp yêu cầu, giá, mốc cường hóa, **hiệu ứng dùng được** (`consumable`: hồi máu/nội lực) |
 | Chiêu thức | `skills/skill-tram-co-ban.json` (đã có) | hệ, sát thương gốc, hệ số, năng lượng, hồi chiêu, hiệu ứng, số mục tiêu |
 | Nhiệm vụ | `quests/quest-chao-lang.json` (sẽ tạo ở M5) | cấp yêu cầu, các bước (nói chuyện/đánh/thu thập), thưởng |
-| Trường/phái | `classes/school-haruna.json` (sẽ tạo ở M3) | danh sách phái, hệ số chỉ số khi lên cấp, trang bị khởi đầu |
+| Trường/phái | `classes/school-haruna.json`, `school-hirosaki.json`, `school-ookaza.json` (đã có ở M3) | chỉ số ở cấp 1, phần tăng mỗi cấp, yên và vật phẩm khởi đầu |
 
 Ví dụ một chiêu (minh họa định dạng, số liệu tự đặt):
 
@@ -230,9 +250,11 @@ Ví dụ một chiêu (minh họa định dạng, số liệu tự đặt):
 2. Flush định kỳ **mỗi 60 giây** và khi thoát; các thao tác quan trọng (giao dịch, cường hóa, trả nhiệm vụ) flush **ngay**.
 3. Giao dịch nhiều bước (mua/bán/đổi) dùng **transaction** của PostgreSQL.
 4. Sao lưu DB định kỳ (pg_dump + lưu trữ ngoài máy chủ).
-5. **M2 chưa lưu vị trí nhân vật**: `characters.map_id/x/y` chưa được ghi — mỗi lần vào game đều bắt đầu ở
-   `lang-khoi-nguon`/`default` và thế giới hiện chỉ sống trong bộ nhớ tiến trình. Bản làm việc + flush 60 giây
-   sẽ áp dụng khi thế giới có trạng thái cần giữ (M3: quái, vật phẩm rơi, trạng thái nhiệm vụ).
+5. **M2/M3 chưa lưu vị trí nhân vật**: `characters.map_id/x/y` chưa được ghi — mỗi lần vào game đều bắt đầu
+   ở `lang-khoi-nguon`/`default`; trạng thái sống của thế giới (máu quái, hồi sinh) chỉ nằm trong bộ nhớ
+   tiến trình, còn thứ phải giữ thì M3 ghi **ngay khi trận kết thúc** (`characters.hp/mp/level/exp/yen` và
+   `inventory_items`) chứ không chờ flush định kỳ. Bản làm việc + flush 60 giây sẽ áp dụng khi thế giới có
+   trạng thái cần giữ lâu dài (vị trí, nhiệm vụ, bang hội).
 
 ## 7. Phiên bản protocol & tương thích
 
@@ -240,4 +262,5 @@ Ví dụ một chiêu (minh họa định dạng, số liệu tự đặt):
 - Bắt tay `C2S_HELLO` gửi phiên bản; lệch → server từ chối kèm thông báo "hãy tải lại trang".
 - Endpoint `GET /version` trả phiên bản server + client mong đợi (dùng cho màn hình bảo trì).
 - Phía server (M2): `C2S_HELLO` lệch `PROTOCOL_VERSION` → `S2C_ERROR` `protocol_mismatch` (`fatal: true`) rồi đóng kết nối, thông báo nhắc tải lại trang.
+- `PROTOCOL_VERSION` hiện là **3** (M3 thêm gói chiến đấu, túi đồ, chỉ số nhân vật).
 - Quy tắc: thay đổi protocol **chỉ** ở server hoặc client đều phải tăng `PROTOCOL_VERSION` trong cùng một lần merge.

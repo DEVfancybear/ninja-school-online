@@ -90,8 +90,13 @@ export interface NinjaWorldTestHook {
   position(name: string): Point | null;
   localPlayerName(): string;
   clickEntity(name: string): void;
-  /** Mô phỏng đúng việc người chơi bấm chuột vào một con quái (đi tới nếu còn xa, vào trận nếu đủ gần). */
+  /**
+   * Mô phỏng việc người chơi bấm vào một con quái: chọn con **còn sống** đầu tiên có tên này (trong
+   * game thì bấm theo vị trí, nhưng nhiều con cùng loại có cùng tên nên kiểm thử cần quy ước này).
+   */
   attackMonster(name: string): void;
+  /** Bấm vào con quái thứ `index` trong danh sách đang vẽ, kể cả con đã gục (bấm theo vị trí). */
+  attackMonsterAt(index: number): void;
   battle(): NinjaTestBattle | null;
   closeBattle(): void;
   character(): NinjaTestCharacter | null;
@@ -107,6 +112,8 @@ export interface NinjaWorldTestActions {
   /** Mô phỏng đúng việc người chơi bấm chuột vào một thực thể. */
   clickEntity(name: string): void;
   attackMonster(name: string): void;
+  /** Bấm vào con quái thứ `index` trong danh sách đang vẽ, kể cả con đã gục (bấm theo vị trí). */
+  attackMonsterAt(index: number): void;
   useItem(itemId: string): void;
   toggleInventory(open: boolean): void;
   inventoryOpen(): boolean;
@@ -151,6 +158,9 @@ export class WorldTestHook {
       },
       attackMonster: (name) => {
         actions.attackMonster(name);
+      },
+      attackMonsterAt: (index) => {
+        actions.attackMonsterAt(index);
       },
       battle: () => this.battle(),
       closeBattle: () => {

@@ -54,7 +54,7 @@ const STATS: CharacterStats = {
   class: 'dao',
   level: 1,
   exp: 0,
-  expToNext: 50,
+  expToNext: 30,
   yen: 200,
   hp: 60,
   maxHp: 60,

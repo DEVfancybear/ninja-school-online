@@ -37,10 +37,13 @@ client/
         │   ├── character/                    # character.service.ts
         │   └── game-labels.ts                # nhãn tiếng Việt cho trường/phái
         ├── net/                              # (M2) game-socket.ts, world-state.ts, world-types.ts, ws-url.ts
+        │                                     # (M3) battle-state.ts (trận theo lượt + đồng hồ lượt)
         ├── input/                            # (M2) key-map.ts, movement-controller.ts
         ├── game/                             # (M0) world-scene, game-config, world-canvas
         │                                     # (M2) world-logic.ts (ô gạch, facing, nội suy), test-hook.ts
+        │                                     # (M3) tile-art vẽ quái theo hình khối + thanh máu
         ├── ui/                               # (M2) hud/, chat-panel/, npc-dialog/, notice-bar/
+        │                                     # (M3) battle-panel/, inventory-panel/ (HUD thêm thanh chỉ số)
         └── pages/
             ├── home/                         # (M0) trang chủ
             ├── login/                        # (M1) đăng nhập / đăng ký trong cùng một trang
@@ -79,6 +82,26 @@ client/
    dẫn người chơi.
 6. Cổng dịch chuyển do **server** phát hiện khi vị trí bước vào vùng cổng — client chỉ nhận
    `S2C_ENTER_MAP` mới và dựng lại bản đồ, nó **không** cần biết vùng cổng nằm ở đâu.
+
+## Luồng M3 (chiến đấu theo lượt PvE)
+
+1. Ngay sau `S2C_ENTER_MAP`, server gửi `S2C_CHARACTER` (máu, nội lực, cấp, kinh nghiệm, yên, chiêu đã
+   học) và `S2C_INVENTORY_UPDATE` (cả túi). HUD vẽ thanh máu/nội lực/kinh nghiệm từ đó.
+2. Quái là thực thể `kind: 'monster'` trong bản đồ, vẽ bằng hình khối theo `shape` (`scarecrow`,
+   `rodent`, `beast`) kèm thanh máu ở trên đầu. Máu đổi thì server phát lại cùng id và client **thay thế**
+   theo id, nên thanh máu khớp với trận đang đánh.
+3. Bấm vào quái: **đủ gần** (≤ `MONSTER_ENGAGE_RANGE_PX` = 96 px, cùng con số server dùng) thì gửi
+   `C2S_ATTACK_MOB`; còn xa thì đi tới trước rồi tự gửi khi vào tầm — người chơi không phải bấm lại.
+4. Trong trận: bảng trận đấu hiện thẻ quái, thẻ từng người chơi, dòng lượt kèm đồng hồ, nút đánh
+   thường/chiêu/vật phẩm/bỏ chạy (khoá theo lượt–nội lực–hồi chiêu), nhật ký đọc thẳng câu server viết.
+   Đồng hồ đếm từ **lúc nhận gói** nên máy lệch giờ cũng hiện đúng.
+5. Client **không** tính sát thương, không quyết định thứ tự lượt, không tự chọn mục tiêu: nút nào bấm
+   được là theo đúng dữ liệu `S2C_BATTLE_START/TURN/RESULT`; mọi lệnh sai đều bị server trả mã lỗi riêng
+   và hiện lên thanh thông báo.
+6. Đang trong trận thì **không** gửi lệnh di chuyển nào (server cũng từ chối), nên nhân vật đứng yên
+   đánh nhau; xong trận thì mở lại điều khiển.
+7. Kết trận: bảng kết quả hiện kinh nghiệm/yên/vật phẩm rơi, có "Lên cấp" khi lên cấp; thua thì server đã
+   đưa nhân vật về làng hồi sinh và gửi lại bản đồ.
 
 ## Lệnh
 
@@ -123,14 +146,14 @@ lại của cảnh (nội suy, camera, bấm chuột) không phải sửa.
 
 ## Ghi chú về kiểm thử
 
-- **137 test / 16 file** (`vitest` qua `ng test`), đếm theo từng file: `game-socket.spec` 17,
-  `world-logic.spec` 20, `world-state.spec` 11, `movement-controller.spec` 10, `key-map.spec` 10,
-  `play.spec` 10, `auth.service.spec` 12, `characters.spec` 9, `api.service.spec` 9, `login.spec` 8,
-  `character.service.spec` 6, `ws-url.spec` 5, `auth.guard.spec` 3, `game-config.spec` 3,
-  `home.spec` 3, `app.spec` 1.
+- **159 test / 17 file** (`vitest` qua `ng test`), đếm theo từng file: `world-logic.spec` 22,
+  `game-socket.spec` 17, `play.spec` 15, `world-state.spec` 15, `auth.service.spec` 12,
+  `battle-state.spec` 11, `movement-controller.spec` 10, `key-map.spec` 10, `api.service.spec` 9,
+  `characters.spec` 9, `login.spec` 8, `character.service.spec` 6, `ws-url.spec` 5,
+  `auth.guard.spec` 3, `game-config.spec` 3, `home.spec` 3, `app.spec` 1.
 - `game-config.spec.ts` **mock Phaser**: jsdom không cài đặt canvas 2D nên không nạp được Phaser thật.
   Vì vậy phần vẽ thật của Phaser chưa được unit test che phủ; nó được phủ bằng **e2e Playwright** trong
-  `tests/e2e` (13 kịch bản, chạy Chromium thật) — xem `tests/README.md`.
+  `tests/e2e` (17 kịch bản, chạy Chromium thật) — xem `tests/README.md`.
 - Hook `window.__ninjaWorld` (dùng cho e2e) **chỉ** gắn khi `isDevMode()`: bản production không phơi nó.
 - `ng serve` mặc định chỉ bind IPv6 `[::1]`. Khi cần gọi từ `127.0.0.1` (ví dụ Playwright) thì chạy
   `pnpm --filter @ninja/client dev --host 0.0.0.0`.

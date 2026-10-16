@@ -236,7 +236,18 @@ export class Play implements OnInit, OnDestroy {
     this.testHook.install({
       clickEntity: (name) => this.clickEntityByName(name),
       attackMonster: (name) => {
-        const monster = this.world.entities().find((entity) => entity.name === name);
+        // Nhiều con quái cùng loại dùng chung một tên, nên chọn con còn sống đầu tiên.
+        const monster = this.world
+          .entities()
+          .find(
+            (entity) => entity.name === name && entity.kind === 'monster' && (entity.hp ?? 1) > 0,
+          );
+        if (monster) {
+          this.onAttackMonster(monster.id);
+        }
+      },
+      attackMonsterAt: (index) => {
+        const monster = this.world.entities().filter((entity) => entity.kind === 'monster')[index];
         if (monster) {
           this.onAttackMonster(monster.id);
         }

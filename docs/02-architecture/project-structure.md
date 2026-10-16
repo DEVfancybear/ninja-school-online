@@ -67,26 +67,34 @@ ninja/
 │       ├── net/                  # (M2) gateway WS gắn vào Fastify (`/ws`), phiên kết nối, bảng phiên theo nhân vật
 │       ├── core/                 # (M2) tick.ts (một interval dùng chung), room-manager.ts
 │       ├── world/                # (M2) game-data.ts (nạp + kiểm), map.ts, movement.ts, room.ts, world-service.ts
+│       │                         # (M3) quái trong room có máu + hồi sinh; gửi chỉ số/túi sau bắt tay
+│       ├── battle/               # (M3) engine.ts (công thức thuần), service.ts (luồng trận theo lượt)
 │       ├── modules/account/      # (M1) đăng ký/đăng nhập/làm mới/đăng xuất
-│       ├── modules/character/    # (M1) tạo/liệt kê nhân vật; (M2) chọn nhân vật để vào game
+│       ├── modules/character/    # (M1) tạo/liệt kê nhân vật; (M2) chọn nhân vật để vào game;
+│       │                         # (M3) stats.ts (chỉ số theo cấp), máu/nội lực, thưởng trận đấu
 │       ├── modules/chat/         # (M2) giới hạn tần suất + tạo tin nhắn kênh map
+│       ├── modules/inventory/    # (M3) túi đồ: cất/lấy theo số lượng, sức chứa theo số loại
 │       ├── modules/npc/          # (M2) hội thoại NPC theo game-data
-│       ├── test/                 # (M1) global-setup + database kiểm thử; (M2) server thật trên cổng 0 + client ws
+│       ├── test/                 # (M1) global-setup + database kiểm thử; (M2) server thật trên cổng 0 + client ws;
+│       │                         # (M3) thư mục game-data tạm để thử dữ liệu sai
 │       # thêm ở cột mốc sau:
-│       #   world/                spawn quái, tầm nhìn (M3)
-│       #   modules/<hệ thống>    inventory, skill, battle, quest, social, guild, arena, event, mail, admin
+│       #   world/                tầm nhìn theo vùng, nhiều kênh mỗi bản đồ
+│       #   modules/<hệ thống>    skill (bảng chiêu đã học), quest, social, guild, arena, event, mail, admin
 │       #   security/             rate-limit chung, chống gian lận, audit log
 │
 ├── shared/                       # HỢP ĐỒNG CHUNG client ↔ server
 │   └── src/
 │       ├── protocol/             # PROTOCOL_VERSION (opcode, gói tin thêm ở cột mốc sau)
-│       ├── constants/            # enum: trường, phái, quan hệ trường–phái
-│       ├── schemas/              # schema zod: skill, item (M0), account, character (M1)
+│       ├── constants/            # enum: trường, phái, quan hệ trường–phái (M0)
+│       │                         # (M1) account, character; (M2) world; (M3) battle (luật trận), stats (chỉ số)
+│       ├── schemas/              # schema zod: skill, item (M0), account, character (M1), map (M2),
+│       │                         # school, monster, game-data (luật liên-file) (M3)
 │       └── index.ts              # điểm xuất chung
 │       # thêm ở cột mốc sau: types/ (DTO), utils/ (toán, RNG xác định)
 │
 ├── game-data/                    # NỘI DUNG GAME (JSON, chỉ server nạp)
-│   ├── maps/ monsters/ items/ skills/ quests/ npcs/ shops/ classes/ events/
+│   ├── maps/ monsters/ items/ skills/ npcs/ classes/   # đã có ở M3 (20 file)
+│   ├── quests/ shops/ events/                          # cột mốc sau (M4–M7)
 │
 ├── assets/                       # TÀI NGUYÊN NGUỒN (hình, âm thanh, font)
 │   ├── art/ (characters, monsters, tilesets, ui, effects)
@@ -117,9 +125,9 @@ ninja/
 | Bản đồ, di chuyển | `world/` | `game/` (Phaser), `input/` | `game-data/maps/` |
 | NPC, hội thoại, shop | `modules/npc` | `ui/npc-dialog/` | `game-data/npcs/`, `game-data/shops/` |
 | Nhiệm vụ | `modules/quest` | `ui/` | `game-data/quests/` |
-| Đấu theo lượt, quái, rơi đồ | `modules/battle`, `world/` | `battle/` | `game-data/monsters/` |
-| Kỹ năng, chiêu thức | `modules/skill` | `battle/`, `ui/` | `game-data/skills/` |
-| Túi đồ, trang bị, cường hóa | `modules/inventory` | `ui/` | `game-data/items/` |
+| Đấu theo lượt, quái, rơi đồ | `battle/` (M3), `world/` | `ui/battle-panel/`, `game/` | `game-data/monsters/` |
+| Kỹ năng, chiêu thức | `modules/character/stats.ts` (M3: học theo phái + cấp) | `ui/battle-panel/` | `game-data/skills/` |
+| Túi đồ, trang bị, cường hóa | `modules/inventory` (M3: túi), trang bị/cường hóa M4 | `ui/inventory-panel/` | `game-data/items/` |
 | Chat, bạn, nhóm | `modules/chat` (chat khu vực — M2) + `modules/social` (bạn/nhóm, mốc sau) | `ui/` (chat) | bảng `friends` |
 | Bang hội | `modules/guild` | `ui/` | bảng `guilds` |
 | Lôi Đài, xếp hạng | `modules/arena` | `scenes/` (lôi đài) | Redis + bảng `arena_rank` |

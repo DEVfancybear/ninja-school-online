@@ -1,6 +1,8 @@
 # shared/ — Thư viện dùng chung client ↔ server
 
-**Trạng thái:** đã có mã nguồn từ M0, mở rộng ở M1 (tài khoản, nhân vật) và M2 (giao thức thế giới, hằng số thế giới, schema bản đồ).
+**Trạng thái:** đã có mã nguồn từ M0, mở rộng ở M1 (tài khoản, nhân vật), M2 (giao thức thế giới, hằng số
+thế giới, schema bản đồ) và M3 (chiến đấu theo lượt: hằng số trận đấu, chỉ số, quái, phái, luật liên-file
+của `game-data`).
 
 ## Vai trò
 Chứa **hợp đồng chung** giữa client và server để hai bên không bao giờ lệch định nghĩa.
@@ -8,23 +10,27 @@ Chứa **hợp đồng chung** giữa client và server để hai bên không ba
 ```text
 shared/
 ├── src/
-│   ├── protocol/    # (M0) version.ts: PROTOCOL_VERSION (= 2 từ M2)
+│   ├── protocol/    # (M0) version.ts: PROTOCOL_VERSION (= 3 từ M3)
 │   │                # (M2) opcodes.ts, packets.ts (schema zod + bảng gói tin), codec.ts (encode/decode)
 │   ├── constants/   # (M0) game.ts: trường, phái, quan hệ trường–phái
 │   │                # (M1) account.ts: quy tắc tên đăng nhập/mật khẩu, giới hạn số nhân vật
 │   │                # (M1) character.ts: quy tắc và mẫu tên nhân vật
 │   │                # (M2) world.ts: nhịp tick, tốc độ người chơi, giới hạn lệnh di chuyển,
 │   │                #      giới hạn chat, nhịp tim, kích thước lịch sử chat, kích thước bản đồ
+│   │                # (M3) battle.ts: 30 giây/lượt, sát thương/chí mạng/chạy thoát, đường cong kinh
+│   │                #      nghiệm, hồi chiêu theo vòng; stats.ts: chỉ số theo cấp, chiêu đã học
 │   ├── schemas/     # (M0) skill.ts, item.ts — dữ liệu game
 │   │                # (M1) common.ts (hình dạng lỗi API), account.ts, character.ts
 │   │                # (M2) map.ts: GameMapSchema, NpcSchema (kiểm game-data/maps, game-data/npcs)
+│   │                # (M3) school.ts (chỉ số phái + đồ khởi đầu), monster.ts (chỉ số quái, quà rơi,
+│   │                #      hồi sinh), game-data.ts (checkGameData: luật liên-file dùng chung với server)
 │   └── index.ts     # điểm xuất chung
 │   # thêm ở cột mốc sau: types/ (DTO), utils/ (toán, RNG xác định, định dạng)
 ├── scripts/         # mark-cjs.mjs: đánh dấu thư mục dist-cjs là CommonJS
 ├── vitest.config.ts # cấu hình vitest
-└── src/**/*.spec.ts # test nằm cạnh mã nguồn — 47 test / 4 file: schemas/game-data.spec.ts (6),
+└── src/**/*.spec.ts # test nằm cạnh mã nguồn — 52 test / 4 file: schemas/game-data.spec.ts (6),
                    #   schemas/account-character.spec.ts (14), schemas/map.spec.ts (13),
-                   #   protocol/codec.spec.ts (14)
+                   #   protocol/codec.spec.ts (19)
 ```
 
 ## Nguyên tắc
