@@ -422,6 +422,9 @@ describe('chat', () => {
     const markB = clientB.mark();
     const before = Date.now();
     clientA.send(Opcode.C2S_CHAT, { channel: 'map', text: 'chào cả làng' });
+    // Gửi luôn tin thứ hai, không chờ gì ở giữa: giãn cách tối thiểu 1 giây tính từ lúc server nhận
+    // tin đầu, nên chỉ khi hai gói đi liền nhau thì mới chắc chắn gói sau bị chặn.
+    clientA.send(Opcode.C2S_CHAT, { channel: 'map', text: 'tin thứ hai' });
 
     const spoken = await clientB.waitFor<ChatMessage>(Opcode.S2C_CHAT);
     expect(spoken).toMatchObject({
@@ -431,16 +434,19 @@ describe('chat', () => {
       text: 'chào cả làng',
     });
     expect(spoken.at).toBeGreaterThanOrEqual(before);
-    // Người gửi cũng thấy tin của mình.
-    expect(clientA.since(markA, Opcode.S2C_CHAT)).toHaveLength(1);
 
-    // Tin thứ hai ngay sau đó: bị chặn vì giãn cách tối thiểu 1 giây.
-    clientA.send(Opcode.C2S_CHAT, { channel: 'map', text: 'tin thứ hai' });
     const limited = await clientA.waitForError();
     expect(limited.code).toBe(ErrorCode.RATE_LIMITED);
     expect(limited.fatal).toBe(false);
 
+    // Người gửi cũng thấy tin của mình. Phải **chờ** gói ấy chứ không đọc ngay: server phát cho từng
+    // người một, nên gói của A có thể tới sau gói của B (máy chậm là thấy ngay).
+    await clientA.waitFor<ChatMessage>(
+      Opcode.S2C_CHAT,
+      (raw) => (raw as ChatMessage).text === 'chào cả làng',
+    );
     await delay(300);
+    expect(clientA.since(markA, Opcode.S2C_CHAT)).toHaveLength(1);
     expect(clientB.since(markB, Opcode.S2C_CHAT)).toHaveLength(1);
 
     // Sau khi hết giãn cách thì gửi lại được.
