@@ -18,6 +18,30 @@
   ],
   "dialog": [
     {
+      "id": "giao-chao-lang",
+      "when": {
+        "questId": "quest-chao-lang",
+        "state": "active"
+      },
+      "lines": [
+        {
+          "speaker": "Thầy Hiệu Trưởng",
+          "text": "Con đã ghé chào Thầy Đồ chưa? Thầy ấy đứng ở phía tây làng."
+        }
+      ],
+      "options": [
+        {
+          "id": "hoi-thay-do",
+          "text": "Thầy Đồ là ai ạ?",
+          "next": "ke-ve-thay-do"
+        },
+        {
+          "id": "di-ngay",
+          "text": "Con đi ngay đây"
+        }
+      ]
+    },
+    {
       "id": "giao-bai-hoc",
       "when": {
         "questId": "quest-bai-hoc-dau-tien",
@@ -27,6 +51,17 @@
         {
           "speaker": "Thầy Hiệu Trưởng",
           "text": "Bãi Luyện Tập ở phía đông làng, qua cổng đá. Đánh hạ hai con bù nhìn rồi về báo thầy."
+        }
+      ],
+      "options": [
+        {
+          "id": "hoi-duong",
+          "text": "Thầy chỉ con đường ra bãi tập",
+          "next": "chi-duong"
+        },
+        {
+          "id": "di-ngay",
+          "text": "Con đi ngay đây"
         }
       ]
     },
@@ -66,6 +101,44 @@
         {
           "speaker": "Thầy Hiệu Trưởng",
           "text": "Con đã đủ tư cách làm đệ tử. Sư Phụ đang đợi con ở phía đông bắc làng."
+        }
+      ]
+    },
+    {
+      "id": "chi-duong",
+      "lines": [
+        {
+          "speaker": "Thầy Hiệu Trưởng",
+          "text": "Con đi về phía đông làng, qua cổng đá là tới Bãi Luyện Tập."
+        },
+        {
+          "speaker": "Thầy Hiệu Trưởng",
+          "text": "Bù Nhìn Tập Luyện đứng đầy ở đó — cứ đánh thoải mái, chúng không đau đâu."
+        }
+      ],
+      "options": [
+        {
+          "id": "cam-on",
+          "text": "Con cảm ơn thầy"
+        }
+      ]
+    },
+    {
+      "id": "ke-ve-thay-do",
+      "lines": [
+        {
+          "speaker": "Thầy Hiệu Trưởng",
+          "text": "Thầy Đồ là người bán đồ cho học viên: kiếm, áo, mũ, phụ kiện đều có."
+        },
+        {
+          "speaker": "Thầy Hiệu Trưởng",
+          "text": "Cứ bấm vào thầy ấy là mở quầy hàng."
+        }
+      ],
+      "options": [
+        {
+          "id": "cam-on",
+          "text": "Con cảm ơn thầy"
         }
       ]
     }
