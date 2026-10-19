@@ -126,7 +126,8 @@ export class TestGameClient {
           reject(
             new Error(
               `không nhận được gói ${OPCODE_NAMES[op] ?? op} trong ${timeoutMs} ms ` +
-                `(đã nhận: ${this.received.map((packet) => OPCODE_NAMES[packet.op] ?? packet.op).join(', ') || 'không có gì'})`,
+                `(đã nhận: ${this.received.map((packet) => OPCODE_NAMES[packet.op] ?? packet.op).join(', ') || 'không có gì'})` +
+                this.errorSummary(),
             ),
           );
         }, timeoutMs),
@@ -134,6 +135,17 @@ export class TestGameClient {
       this.waiters.push(waiter);
       this.flush();
     });
+  }
+
+  /**
+   * Câu tóm tắt các `S2C_ERROR` đã nhận, nối vào thông báo hết giờ chờ gói: khi server từ chối
+   * lệnh thì nguyên nhân nằm ở gói lỗi, không phải ở gói đang chờ.
+   */
+  private errorSummary(): string {
+    const errors = this.received
+      .filter((packet) => packet.op === Opcode.S2C_ERROR)
+      .map((packet) => (packet.payload as ServerError).code);
+    return errors.length > 0 ? ` — lỗi đã nhận: ${errors.join(', ')}` : '';
   }
 
   /** Chờ `S2C_ERROR` (lọc theo mã nếu truyền vào). */
