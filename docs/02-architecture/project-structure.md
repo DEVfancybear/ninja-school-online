@@ -45,13 +45,14 @@ ninja/
 │           ├── pages/home/       # (M0) trang chủ
 │           ├── pages/login/      # (M1) đăng nhập + đăng ký
 │           ├── pages/characters/ # (M1) danh sách + tạo nhân vật; (M2) lối vào thế giới
-│           ├── pages/play/       # (M2) trang /play: nối WebSocket, nạp bản đồ, HUD, chat; (M3) sàn đấu, (M4) bảng túi/trang bị/shop
+│           ├── pages/play/       # (M2) trang /play: nối WebSocket, nạp bản đồ, HUD, chat; (M3) sàn đấu, (M4) bảng túi/trang bị/shop; (M5) nhật ký nhiệm vụ
 │           ├── net/              # (M2) game-socket.ts (WebSocket, nối lại, ping), world-state.ts (signals;
-│           │                     # (M4) thêm trạng thái trang bị), ws-url.ts
+│           │                     # (M4) thêm trạng thái trang bị, (M5) trạng thái nhiệm vụ), ws-url.ts
 │           ├── input/            # (M2) key-map.ts (bàn phím), movement-controller.ts (gửi đích mỗi 100 ms)
 │           ├── game/             # (M0) world-canvas/, game-config; (M2) world-scene.ts, world-logic.ts, test-hook.ts
+│           │                     # (M5) hook nhiệm vụ (questState, openQuestLog) cho e2e
 │           ├── ui/               # (M2) hud/, chat-panel/, npc-dialog/, notice-bar/; (M3) battle-panel/;
-│           │                     # (M4) inventory-panel/, equipment-panel/, shop-panel/
+│           │                     # (M4) inventory-panel/, equipment-panel/, shop-panel/; (M5) quest-log/
 │           └── # các thư mục thêm ở cột mốc sau (đặt trong src/app/):
 │               #   i18n/     tách chuỗi giao diện (hiện đang viết trực tiếp trong template)
 │
@@ -79,12 +80,13 @@ ninja/
 │       ├── modules/equipment/    # (M4) mặc/tháo 4 ô trang bị, cộng chỉ số vào nhân vật
 │       ├── modules/shop/         # (M4) quầy NPC: mua/bán, ghi sổ giao dịch
 │       ├── modules/upgrade/      # (M4) cường hóa: yên + đá vụn, tỉ lệ theo cấp
-│       ├── modules/npc/          # (M2) hội thoại NPC theo game-data (M4: trả thêm quầy hàng)
+│       ├── modules/npc/          # (M2) hội thoại NPC theo game-data (M4: trả thêm quầy hàng; M5: nhánh theo nhiệm vụ)
+│       ├── modules/quest/        # (M5) nhiệm vụ chính tuyến: nhận/trả, tiến độ, thưởng, cờ mở khoá; chọn nhánh hội thoại
 │       ├── test/                 # (M1) global-setup + database kiểm thử; (M2) server thật trên cổng 0 + client ws;
 │       │                         # (M3) thư mục game-data tạm để thử dữ liệu sai
 │       # thêm ở cột mốc sau:
 │       #   world/                tầm nhìn theo vùng, nhiều kênh mỗi bản đồ
-│       #   modules/<hệ thống>    skill (bảng chiêu đã học), quest, social, guild, arena, event, mail, admin
+│       #   modules/<hệ thống>    skill (bảng chiêu đã học), social, guild, arena, event, mail, admin
 │       #   security/             rate-limit chung, chống gian lận, audit log
 │
 ├── shared/                       # HỢP ĐỒNG CHUNG client ↔ server
@@ -92,10 +94,12 @@ ninja/
 │       ├── protocol/             # PROTOCOL_VERSION (opcode, gói tin thêm ở cột mốc sau)
 │       ├── constants/            # enum: trường, phái, quan hệ trường–phái (M0)
 │       │                         # (M1) account, character; (M2) world; (M3) battle (luật trận), stats (chỉ số);
-│       │                         # (M4) equipment (4 ô, giá bán, tỉ lệ cường hóa)
+│       │                         # (M4) equipment (4 ô, giá bán, tỉ lệ cường hóa);
+│       │                         # (M5) quest (loại mục tiêu, trạng thái nhiệm vụ, cờ mở khoá)
 │       ├── schemas/              # schema zod: skill, item (M0), account, character (M1), map (M2),
 │       │                         # school, monster, game-data (luật liên-file) (M3);
-│       │                         # (M4) item thêm trường trang bị (ô, cấp cường hóa, giá)
+│       │                         # (M4) item thêm trường trang bị (ô, cấp cường hóa, giá);
+│       │                         # (M5) quest (nhiệm vụ, mục tiêu, thưởng), map thêm cây hội thoại NPC
 │       └── index.ts              # điểm xuất chung
 │       # thêm ở cột mốc sau: types/ (DTO), utils/ (toán, RNG xác định)
 │
@@ -132,7 +136,7 @@ ninja/
 | Nhân vật & chỉ số | `modules/character` | `pages/characters/`, `core/character/` | `game-data/classes/` |
 | Bản đồ, di chuyển | `world/` | `game/` (Phaser), `input/` | `game-data/maps/` |
 | NPC, hội thoại, shop | `modules/npc` | `ui/npc-dialog/` | `game-data/npcs/`, `game-data/shops/` |
-| Nhiệm vụ | `modules/quest` | `ui/` | `game-data/quests/` |
+| Nhiệm vụ | `modules/quest` | `ui/quest-log/`, `ui/npc-dialog/` | `game-data/quests/` |
 | Đấu theo lượt, quái, rơi đồ | `battle/` (M3), `world/` | `ui/battle-panel/`, `game/` | `game-data/monsters/` |
 | Kỹ năng, chiêu thức | `modules/character/stats.ts` (M3: học theo phái + cấp) | `ui/battle-panel/` | `game-data/skills/` |
 | Túi đồ, trang bị, cường hóa | `modules/inventory` (M3: túi), trang bị/cường hóa M4 | `ui/inventory-panel/` | `game-data/items/` |

@@ -143,6 +143,9 @@ Phần **server** của M2 đã chạy thật (kiểm thử tích hợp bằng c
   phải trỏ tới nhánh có thật của **cùng NPC**.
 - **Bảng mới:** `character_quests` (`character_id`, `quest_id`, `status`, `progress` jsonb, `accepted_at`,
   `completed_at`; unique theo cặp) và `character_features` (`character_id`, `feature`, `unlocked_at`).
+  `progress` là **mảng số theo thứ tự mục tiêu** của nhiệm vụ, và chỉ lưu tiến độ của `talk`/`kill`/`reach`:
+  `collect` luôn được đếm lại từ túi lúc đọc và lúc trả nên không có số nào để lưu (nhặt thêm hay tiêu bớt
+  là thấy ngay).
   Tiến độ nằm trong database nên **thoát giữa chừng rồi đăng nhập lại vẫn còn nguyên** — `S2C_QUEST_UPDATE`
   được gửi ngay sau bắt tay, cùng lúc với `S2C_CHARACTER`/`S2C_INVENTORY_UPDATE`/`S2C_EQUIPMENT`.
 - **Luật nhận/trả:** phải **đang nói chuyện với đúng NPC** (người giao khi nhận, người nhận trả khi trả) và
