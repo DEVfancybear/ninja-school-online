@@ -136,7 +136,7 @@ ninja/
 | Tài khoản, đăng nhập | `modules/account` (+ `net/` cho WebSocket) | `pages/login/`, `core/auth/` | bảng `accounts` |
 | Nhân vật & chỉ số | `modules/character` | `pages/characters/`, `core/character/` | `game-data/classes/` |
 | Bản đồ, di chuyển | `world/` | `game/` (Phaser), `input/` | `game-data/maps/` |
-| NPC, hội thoại, shop | `modules/npc` | `ui/npc-dialog/` | `game-data/npcs/`, `game-data/shops/` |
+| NPC, hội thoại, shop | `modules/npc` | `ui/npc-dialog/` | `game-data/npcs/` (quầy bán khai ngay trong NPC, M4) |
 | Nhiệm vụ | `modules/quest` | `ui/quest-log/`, `ui/npc-dialog/` | `game-data/quests/` |
 | Đấu theo lượt, quái, rơi đồ | `battle/` (M3), `world/` | `ui/battle-panel/`, `game/` | `game-data/monsters/` |
 | Kỹ năng, chiêu thức | `modules/character/stats.ts` (M3: học theo phái + cấp) | `ui/battle-panel/` | `game-data/skills/` |

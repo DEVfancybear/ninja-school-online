@@ -150,7 +150,10 @@ Phần **server** của M2 đã chạy thật (kiểm thử tích hợp bằng c
   được gửi ngay sau bắt tay, cùng lúc với `S2C_CHARACTER`/`S2C_INVENTORY_UPDATE`/`S2C_EQUIPMENT`.
 - **Luật nhận/trả:** phải **đang nói chuyện với đúng NPC** (người giao khi nhận, người nhận trả khi trả) và
   NPC đó phải ở bản đồ hiện tại; nhiệm vụ phải trước đã trả xong, đủ cấp, chưa nhận và chưa trả; tối đa
-  `MAX_ACTIVE_QUESTS` = 5 nhiệm vụ cùng lúc; mọi thao tác bị chặn khi đang trong trận (`in_battle`).
+  `MAX_ACTIVE_QUESTS` = 5 nhiệm vụ cùng lúc; mọi thao tác bị chặn khi đang trong trận (`in_battle`, chặn
+  **trước** mọi kiểm tra nhiệm vụ nên lỗi nhận được luôn là `in_battle`). Chưa nói chuyện với NPC nào thì
+  `C2S_QUEST_ACCEPT`/`C2S_QUEST_COMPLETE` trả `quest_wrong_npc` (không có NPC đang mở hội thoại để so);
+  `dialog_not_open` chỉ dành cho `optionId` gửi lúc hội thoại đã đóng.
 - **Mục tiêu:** `talk` (nói chuyện NPC), `kill` (đánh hạ quái, tính cho **mọi người** trong trận thắng),
   `reach` (đặt chân tới bản đồ), `collect` (số món **đang có trong túi**). Ba loại đầu cộng dồn vào
   `progress` khi nhiệm vụ **đang làm**; `collect` được đếm lại lúc mở hội thoại và lúc trả, và **không tiêu**

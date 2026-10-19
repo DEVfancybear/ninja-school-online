@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
+  ErrorCode,
   MAX_MOVE_DISTANCE_PX,
   MONSTER_ENGAGE_RANGE_PX,
   Opcode,
@@ -648,6 +649,51 @@ describe('nhiệm vụ qua WebSocket', () => {
     world.client.send(Opcode.C2S_NPC_TALK, { npcId: MASTER, optionId: 'khong-co-lua-chon-nay' });
     const error = await world.client.waitForError();
     expect(error.code).toBe('dialog_not_open');
+  });
+
+  it('đang trong trận thì nhận hay trả nhiệm vụ đều bị chặn bằng `in_battle`', async () => {
+    const world = await enterWorld();
+
+    const inTraining = await crossPortal(world, TRAINING_PORTAL_POS, TRAINING);
+    const target = inTraining.enterMap.entities
+      .filter((entity) => entity.kind === 'monster')
+      .map((entity) => ({ id: entity.id, pos: { x: entity.x, y: entity.y } }))
+      .sort(
+        (left, right) =>
+          Math.hypot(left.pos.x - inTraining.position.x, left.pos.y - inTraining.position.y) -
+          Math.hypot(right.pos.x - inTraining.position.x, right.pos.y - inTraining.position.y),
+      )[0];
+    expect(target).toBeDefined();
+    await walkTo(
+      world.client,
+      world.characterId,
+      target?.pos ?? SCARECROW_ONE.pos,
+      inTraining.position,
+      NEAR_MONSTER,
+    );
+    await stopMoving(world.client, world.characterId);
+
+    const battleMark = world.client.mark();
+    world.client.send(Opcode.C2S_ATTACK_MOB, { targetId: String(target?.id) });
+    const start = await world.client.waitFor<BattleTurn>(Opcode.S2C_BATTLE_START);
+    expect(start.battleId).toBeTruthy();
+
+    // Lúc này nhân vật **chưa** nói chuyện với NPC nào, nên nếu không có chặn `in_battle` thì lỗi sẽ là
+    // `quest_wrong_npc`; nhận được `in_battle` chứng minh trần chặn chạy trước mọi kiểm tra nhiệm vụ.
+    const acceptMark = world.client.mark();
+    world.client.send(Opcode.C2S_QUEST_ACCEPT, { questId: CHAO_LANG });
+    const acceptError = await world.client.waitForError();
+    expect(acceptError.code).toBe(ErrorCode.IN_BATTLE);
+    expect(acceptError.fatal).toBe(false);
+
+    world.client.send(Opcode.C2S_QUEST_COMPLETE, { questId: CHAO_LANG });
+    const completeError = await world.client.waitForError();
+    expect(completeError.code).toBe(ErrorCode.IN_BATTLE);
+    expect(completeError.fatal).toBe(false);
+
+    // Không nhật ký nào bị gửi nhầm: cả hai lệnh đều bị chặn trước khi chạm tới nhiệm vụ.
+    expect(world.client.since(acceptMark, Opcode.S2C_QUEST_UPDATE)).toEqual([]);
+    expect(world.client.since(battleMark, Opcode.S2C_QUEST_UPDATE)).toEqual([]);
   });
 });
 
