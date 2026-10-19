@@ -9,6 +9,12 @@ import { expect, test, type Page } from '@playwright/test';
  */
 
 const PASSWORD = 'matkhau123';
+/**
+ * Bốn kịch bản ở đây đều là luồng dài (đăng ký, đi bộ qua cổng, đánh nhiều trận, tải lại trang), nên
+ * hạn 60 giây mặc định của Playwright không đủ. Một bài dài nhất (nhánh Thầy Đồ, 5 trận) mất khoảng
+ * hai phút trên máy dev.
+ */
+test.describe.configure({ timeout: 420_000 });
 const START_MAP_NAME = 'Làng Khởi Nguồn';
 const TRAINING_MAP_NAME = 'Bãi Luyện Tập';
 const HEADMASTER = 'Thầy Hiệu Trưởng';
@@ -18,6 +24,15 @@ const SCARECROW = 'Bù Nhìn Tập Luyện';
 const QUEST_CHAO_LANG = 'quest-chao-lang';
 const QUEST_DUONG_TOI_BAI_TAP = 'quest-duong-toi-bai-tap';
 const QUEST_BAI_HOC_DAU_TIEN = 'quest-bai-hoc-dau-tien';
+const QUEST_NHAT_DA_VUN = 'quest-nhat-da-vun';
+const QUEST_CHUOT_DONG = 'quest-chuot-dong-quanh-lang';
+
+/** Thưởng của nhiệm vụ đầu tiên (xem `game-data/quests/quest-chao-lang.json`). */
+const CHAO_LANG_YEN = 50;
+
+/** Quái trong làng và món nhặt được (xem `game-data/monsters/`). */
+const VILLAGE_MOUSE = 'Chuột Đồng';
+const MATERIAL = 'Đá Vụn';
 
 interface HookObjective {
   readonly kind: string;
@@ -63,14 +78,22 @@ interface HookBattle {
   readonly outcome: string | null;
 }
 
+interface HookItem {
+  readonly name: string;
+  readonly quantity: number;
+}
+
 interface HookApi {
   readonly character: () => HookCharacter | null;
+  readonly inventory: () => readonly HookItem[];
   readonly battle: () => HookBattle | null;
   readonly attackMonster: (name: string) => void;
   readonly clickEntity: (name: string) => void;
   readonly monsters: () => readonly HookMonster[];
   readonly questState: () => HookQuestState;
   readonly questLogOpen: () => boolean;
+  /** Câu thông báo cuối client đang hiện (server từ chối lệnh chẳng hạn). */
+  readonly lastError: () => string | null;
 }
 
 function uniqueSuffix(): string {
@@ -124,6 +147,40 @@ async function questState(page: Page): Promise<HookQuestState> {
   });
 }
 
+/** Số món `name` đang có trong túi (cộng dồn mọi dòng cùng tên). */
+async function bagCount(page: Page, name: string): Promise<number> {
+  return page.evaluate((itemName) => {
+    const api = (globalThis as unknown as { __ninjaWorld?: HookApi }).__ninjaWorld;
+    if (!api) {
+      return 0;
+    }
+    return api
+      .inventory()
+      .filter((item) => item.name === itemName)
+      .reduce((total, item) => total + item.quantity, 0);
+  }, name);
+}
+
+/** Đánh quái trong làng cho tới khi túi có đủ `wanted` món; quá `maxKills` trận thì báo lỗi. */
+async function farmUntil(
+  page: Page,
+  monsterName: string,
+  itemName: string,
+  wanted: number,
+): Promise<void> {
+  const maxKills = 12;
+  for (let kills = 0; kills < maxKills; kills += 1) {
+    if ((await bagCount(page, itemName)) >= wanted) {
+      return;
+    }
+    await killOneMonster(page, monsterName);
+  }
+  expect(
+    await bagCount(page, itemName),
+    `không nhặt đủ ${wanted} ${itemName} sau ${maxKills} trận`,
+  ).toBeGreaterThanOrEqual(wanted);
+}
+
 async function monsters(page: Page): Promise<readonly HookMonster[]> {
   return page.evaluate(() => {
     const api = (globalThis as unknown as { __ninjaWorld?: HookApi }).__ninjaWorld;
@@ -158,19 +215,70 @@ async function attackMonster(page: Page, name: string): Promise<void> {
   }, name);
 }
 
-async function waitForBattle(page: Page, timeoutMs = 25_000): Promise<void> {
-  await expect
-    .poll(async () => (await battle(page)) !== null, {
-      message: 'chờ trận đấu mở ra',
-      timeout: timeoutMs,
-    })
-    .toBe(true);
+/**
+ * Xin vào trận và chờ trận mở ra. Bấm lại được vài lần: lần bấm trước có thể bị server từ chối
+ * (`out_of_range` khi client và server lệch nhau vài pixel do nội suy, hoặc `monster_gone` khi con
+ * quái vừa gục đúng lúc) — người chơi thật cũng bấm lại. Hết lượt thử thì báo lỗi kèm thông báo cuối
+ * mà client đang hiện, để biết server từ chối vì lý do gì.
+ */
+/** Các hướng lách khi đường đi thẳng tới con quái bị chặn. */
+const NUDGE_KEYS = ['ArrowUp', 'ArrowRight', 'ArrowDown', 'ArrowLeft'] as const;
+
+/**
+ * Nhích nhân vật một quãng ngắn bằng phím. Client chỉ xin chặng đi mới khi nhân vật nhích được khỏi
+ * chỗ cũ, nên một cú lách là đủ để nó tính lại đường tới con quái.
+ */
+async function nudge(page: Page, key: string): Promise<void> {
+  await page.keyboard.down(key);
+  await page.waitForTimeout(700);
+  await page.keyboard.up(key);
+  await page.waitForTimeout(200);
+}
+
+/** Chờ trận mở ra trong `timeoutMs`; trả về `false` thay vì ném lỗi để gọi lại được. */
+async function battleOpened(page: Page, timeoutMs: number): Promise<boolean> {
+  try {
+    await expect
+      .poll(async () => (await battle(page)) !== null, {
+        timeout: timeoutMs,
+        intervals: [200, 400],
+      })
+      .toBe(true);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function enterBattle(page: Page, name: string): Promise<void> {
+  const attempts = 6;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    await attackMonster(page, name);
+    if (await battleOpened(page, 6_000)) {
+      return;
+    }
+    // Chưa mở được trận: hoặc server từ chối một nhịp, hoặc nhân vật đứng chắn trước gốc cây (client
+    // đi thẳng tới quái nên đâm vào vật cản rồi đứng im). Lách một hướng rồi bấm lại như người chơi.
+    if (attempt < attempts - 1) {
+      await nudge(page, NUDGE_KEYS[attempt % NUDGE_KEYS.length] ?? 'ArrowDown');
+    }
+  }
+  const notice = await page.evaluate(() => {
+    const api = (globalThis as unknown as { __ninjaWorld?: HookApi }).__ninjaWorld;
+    return api ? api.lastError() : null;
+  });
+  throw new Error(
+    `không mở được trận với ${name} sau ${attempts} lần bấm` +
+      ` (thông báo cuối: ${notice ?? 'không có'})`,
+  );
 }
 
 /** Đánh tới khi trận kết thúc: chỉ bấm khi đang tới lượt, chờ tới khi có kết quả. */
 async function fightToTheEnd(page: Page): Promise<HookBattle> {
   const deadline = Date.now() + 60_000;
-  const attackButton = page.locator('.battle-panel').getByRole('button', { name: 'Đánh thường' });
+  // Bảng trận đấu có lớp gốc `.battle` (xem `ui/battle-panel/battle-panel.html`); bấm hụt thì server
+  // chỉ tự đánh sau 30 giây hết lượt, nên bài kiểm thử sẽ chậm và hết giờ.
+  const attackButton = page.getByRole('button', { name: 'Đánh thường' });
   while (Date.now() < deadline) {
     const current = await battle(page);
     if (!current || current.outcome) {
@@ -187,12 +295,18 @@ async function fightToTheEnd(page: Page): Promise<HookBattle> {
 
 /** Đánh hạ một con quái rồi đóng bảng kết trận. */
 async function killOneMonster(page: Page, name: string): Promise<void> {
-  await attackMonster(page, name);
-  await waitForBattle(page);
+  await enterBattle(page, name);
   await fightToTheEnd(page);
   // Chỉ bấm nút trong bảng kết trận: túi đồ cũng có nút đóng (aria-label "Đóng túi đồ").
   await page.locator('.result').getByRole('button', { name: 'Đóng' }).click();
   await expect.poll(async () => (await battle(page)) === null, { timeout: 10_000 }).toBe(true);
+}
+
+/** Đánh hạ `count` con quái cùng loại (chờ con mới hồi sinh khi bãi tạm hết con sống). */
+async function killMonsters(page: Page, name: string, count: number): Promise<void> {
+  for (let killed = 0; killed < count; killed += 1) {
+    await killOneMonster(page, name);
+  }
 }
 
 /** Nói chuyện với NPC rồi chờ bảng hội thoại hiện ra. */
@@ -304,12 +418,15 @@ test.describe('nhiệm vụ chính tuyến chương 1', () => {
       .toContain(QUEST_CHAO_LANG);
 
     // Thưởng đi kèm `S2C_CHARACTER` gửi sau `S2C_QUEST_UPDATE`, nên chờ chỉ số đổi chứ không đọc ngay.
+    // "Chào làng" thưởng 30 kinh nghiệm — đúng bằng mốc lên cấp 2 (`expToNextLevel(1)` = 30), nên
+    // kinh nghiệm đang giữ về 0 và cấp lên 2; kinh nghiệm ấy không mất, nó thành cấp. Vì vậy kiểm
+    // "được thưởng" bằng cấp tăng và yên tăng đúng 50, không phải bằng exp tăng.
     await expect
-      .poll(async () => (await character(page))?.exp ?? 0, { message: 'chờ nhận kinh nghiệm' })
-      .toBeGreaterThan(before?.exp ?? 0);
+      .poll(async () => (await character(page))?.level ?? 0, { message: 'chờ lên cấp' })
+      .toBeGreaterThan(before?.level ?? 0);
     await expect
       .poll(async () => (await character(page))?.yen ?? 0, { message: 'chờ nhận yên' })
-      .toBeGreaterThan(before?.yen ?? 0);
+      .toBe((before?.yen ?? 0) + CHAO_LANG_YEN);
     // Hộp thoại đang mở phải tự đổi sang nhiệm vụ kế tiếp, không phải bấm lại NPC.
     await expect(page.locator('.npc-quest__name')).toHaveText('Đường tới bãi tập');
 
@@ -406,5 +523,96 @@ test.describe('nhiệm vụ chính tuyến chương 1', () => {
     await expect(page.locator('.quest-log__available-item')).toHaveCount(0);
     await expect(page.locator('.quest-log__quest')).toHaveCount(1);
     await expect(page.locator('.quest-log')).not.toContainText('Bái sư');
+  });
+
+  test('nhánh Thầy Đồ: mục tiêu đếm túi không tiêu món, trả xong mở khoá tính năng', async ({
+    page,
+  }) => {
+    await enterWorld(page);
+
+    await finishChaoLang(page);
+    await finishDuongToiBaiTap(page);
+
+    // Nhiệm vụ "Bài học đầu tiên" vẫn ở thầy Hiệu Trưởng: hạ 2 bù nhìn rồi về trả.
+    await page.locator('.npc-quest__accept').click();
+    await expect
+      .poll(async () => (await questState(page)).active[0]?.questId)
+      .toBe(QUEST_BAI_HOC_DAU_TIEN);
+    await page.locator('.npc-close').click();
+    await walkUntilMap(page, 'ArrowRight', TRAINING_MAP_NAME);
+    await killMonsters(page, SCARECROW, 2);
+    await expect
+      .poll(async () => (await questState(page)).active[0]?.objectives[0]?.done, {
+        timeout: 20_000,
+      })
+      .toBe(true);
+
+    // Về làng bằng cách đăng nhập lại. Hai lý do: (1) server chưa lưu vị trí nên mỗi lần kết nối đều
+    // vào bản đồ khởi đầu ở điểm spawn `default` (`world-service.ts`); (2) đi bộ về thì tuỳ chỗ đứng
+    // sau trận — hàng của con bù nhìn thứ hai có cây chắn ngang, giữ phím sang trái là đâm vào cây.
+    // Đây cũng đúng là đường người chơi đi khi mất kết nối giữa chuỗi nhiệm vụ.
+    await page.reload();
+    await expect(page.locator('canvas')).toBeVisible();
+    await expect(page.locator('.hud .map-name')).toHaveText(START_MAP_NAME);
+    const resumed = await questState(page);
+    expect(resumed.active[0]?.questId).toBe(QUEST_BAI_HOC_DAU_TIEN);
+    // Vừa đủ 2 bù nhìn là sẵn sàng trả; thoát ra vào lại không làm mất tiến độ vừa đạt.
+    expect(resumed.active[0]?.state).toBe('ready');
+
+    await talkTo(page, HEADMASTER);
+    await page.locator('.npc-quest__complete').click();
+    await expect
+      .poll(async () => (await questState(page)).completed, { timeout: 10_000 })
+      .toContain(QUEST_BAI_HOC_DAU_TIEN);
+
+    // Thầy Đồ giờ giao "Nhặt đá vụn": mục tiêu đếm món trong túi, nên nhận trước rồi đi nhặt.
+    await page.locator('.npc-close').click();
+    await talkTo(page, SHOP_TEACHER);
+    await expect(page.locator('.npc-quest__name')).toHaveText('Nhặt đá vụn');
+    await page.locator('.npc-quest__accept').click();
+    await expect
+      .poll(async () => (await questState(page)).active[0]?.questId)
+      .toBe(QUEST_NHAT_DA_VUN);
+    await page.locator('.npc-close').click();
+
+    // Nhặt đủ 2 đá vụn từ chuột đồng trong làng; mục tiêu đếm lại lúc mở hội thoại nên chỉ cần
+    // nói lại với thầy là thấy nút trả.
+    await farmUntil(page, VILLAGE_MOUSE, MATERIAL, 2);
+    await talkTo(page, SHOP_TEACHER);
+    await expect(page.locator('.npc-quest[data-state=ready] .npc-quest__complete')).toBeVisible();
+    await page.locator('.npc-quest__complete').click();
+    await expect
+      .poll(async () => (await questState(page)).completed, { timeout: 10_000 })
+      .toContain(QUEST_NHAT_DA_VUN);
+    // Mục tiêu `collect` chỉ đếm: trả xong đá vụn vẫn còn nguyên trong túi.
+    expect(await bagCount(page, MATERIAL)).toBeGreaterThanOrEqual(2);
+
+    // Nhiệm vụ kế tiếp của thầy: hạ 3 chuột đồng; trả xong mở khoá tính năng "Lập nhóm".
+    await expect(page.locator('.npc-quest__name')).toHaveText('Chuột đồng quanh làng');
+    await page.locator('.npc-quest__accept').click();
+    await expect
+      .poll(async () => (await questState(page)).active[0]?.questId)
+      .toBe(QUEST_CHUOT_DONG);
+    await page.locator('.npc-close').click();
+    await killMonsters(page, VILLAGE_MOUSE, 3);
+    await expect
+      .poll(async () => (await questState(page)).active[0]?.objectives[0]?.done, {
+        timeout: 20_000,
+      })
+      .toBe(true);
+    await talkTo(page, SHOP_TEACHER);
+    await page.locator('.npc-quest__complete').click();
+    await expect
+      .poll(async () => (await questState(page)).completed, { timeout: 10_000 })
+      .toContain(QUEST_CHUOT_DONG);
+    await expect
+      .poll(async () => (await questState(page)).unlockedFeatures, { timeout: 10_000 })
+      .toContain('party');
+
+    // Nhật ký nhiệm vụ nói rõ tính năng vừa mở, bằng nhãn tiếng Việt của `@ninja/shared`.
+    await page.locator('.npc-close').click();
+    await toggleQuestLog(page, true);
+    await expect(page.locator('.quest-log__features')).toContainText('Lập nhóm');
+    await expect(page.locator('.quest-log__count')).toContainText('Đã xong 5 nhiệm vụ');
   });
 });
