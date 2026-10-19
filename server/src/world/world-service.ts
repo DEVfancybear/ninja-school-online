@@ -11,10 +11,13 @@ import {
   type ClientHello,
   type EnterMap,
   type Equip,
+  type LevelUp,
   type Move,
   type NpcTalk,
   type Notify,
   type Ping,
+  type QuestAccept,
+  type QuestComplete,
   type ServerEnterMap,
   type ServerHello,
   type ShopBuy,
@@ -28,10 +31,12 @@ import type { RoomManager } from '../core/room-manager.js';
 import type { TickScheduler } from '../core/tick.js';
 import type { ChatService } from '../modules/chat/service.js';
 import type { CharacterService } from '../modules/character/service.js';
-import { characterStatsPayload } from '../modules/character/stats.js';
+import { characterStatsPayload, skillsOf } from '../modules/character/stats.js';
 import type { EquipmentService } from '../modules/equipment/service.js';
 import type { InventoryService } from '../modules/inventory/service.js';
 import type { NpcService } from '../modules/npc/service.js';
+import { lostItemsMessage, type QuestService } from '../modules/quest/service.js';
+import { pickDialogNode } from '../modules/quest/dialog.js';
 import type { ShopService } from '../modules/shop/service.js';
 import type { UpgradeService } from '../modules/upgrade/service.js';
 import type { GameSession } from '../net/session.js';
@@ -60,6 +65,8 @@ export interface WorldServiceOptions {
   equipment: EquipmentService;
   shop: ShopService;
   upgrade: UpgradeService;
+  /** Nhiệm vụ (M5): luật nhận/trả, tiến độ và thưởng đều nằm trong service này. */
+  quests: QuestService;
   /** Nhịp dùng chung: trận đấu đếm lượt và hết giờ trên cùng nhịp với phần còn lại của server. */
   tick: TickScheduler;
   /** Xác thực access token (dùng `app.jwt`); trả `undefined` nếu token sai hoặc hết hạn. */
@@ -89,6 +96,13 @@ export class WorldService {
    * giới hoặc đổi bản đồ — quầy thuộc về một NPC đang đứng trong map hiện tại.
    */
   private readonly openShops = new Map<string, string>();
+  /**
+   * Hội thoại đang mở của từng nhân vật: NPC đang nói chuyện và nhánh đang đứng (`nodeId` là `null`
+   * khi NPC trả lời bằng `lines` mặc định). `C2S_NPC_TALK` kèm `optionId` phải khớp đúng cặp này,
+   * nếu không client đang gửi lựa chọn của một bảng hội thoại đã cũ (`dialog_not_open`). Quên đi khi
+   * rời thế giới hoặc đổi bản đồ, cùng lúc với quầy hàng.
+   */
+  private readonly openDialogs = new Map<string, { npcId: string; nodeId: string | null }>();
 
   constructor(private readonly options: WorldServiceOptions) {
     this.now = options.now ?? (() => Date.now());
@@ -102,6 +116,11 @@ export class WorldService {
       tick: options.tick,
       onDefeat: (characterId) => {
         this.respawnAtStart(characterId);
+      },
+      // Hạ quái xong mới cộng tiến độ nhiệm vụ: id ở đây là id **dữ liệu** (`mob-…`), không phải id
+      // thực thể trong room nên nhiệm vụ sống sót qua mọi lần quái hồi sinh.
+      onMonsterKilled: (characterId, monsterId) => {
+        void this.noteKill(characterId, monsterId);
       },
       now: this.now,
     });
@@ -178,6 +197,9 @@ export class WorldService {
     // đọc database: chờ đọc xong mới báo thì người vào sau kịp nhận gói ADD của người vào trước
     // (gói trễ, trùng với danh sách `entities` nó vừa nhận trong `S2C_ENTER_MAP`).
     room.broadcast(Opcode.S2C_ENTITY_ADD, { entity: playerView(player) }, player.id);
+    // Bản đồ khởi đầu cũng tính là "đã tới": nhiệm vụ `reach` nhắm ngay làng xong lúc vào game.
+    // Không gửi gói riêng ở đây vì `sendCharacterState` ngay dưới gửi cả trạng thái nhiệm vụ.
+    await this.options.quests.progressReach(character.id, room.map.id);
     // Chỉ số và túi đồ gửi ngay sau bản đồ: HUD cần chúng trước khi người chơi kịp đánh con quái nào.
     await this.sendCharacterState(session, character.id);
   }
@@ -269,8 +291,18 @@ export class WorldService {
     room.sendChat(this.options.chat.mapMessage(player, chat.text, this.now()));
   }
 
-  /** `C2S_NPC_TALK`: chỉ trả lời NPC đang có trong bản đồ hiện tại. */
-  talkToNpc(session: GameSession, talk: NpcTalk): void {
+  /**
+   * `C2S_NPC_TALK`: chỉ trả lời NPC đang có trong bản đồ hiện tại.
+   *
+   * Không có `optionId` → **bắt đầu** nói chuyện: cộng tiến độ nhiệm vụ `talk` trước, rồi mới chọn
+   * nhánh hội thoại. Nhờ thứ tự đó, nhiệm vụ vừa xong mục tiêu ngay trong lần nói chuyện này đã thấy
+   * nhánh "đã xong" và danh sách nhiệm vụ mới (nút "Trả nhiệm vụ" hiện ngay).
+   *
+   * Có `optionId` → người chơi đang bấm một lựa chọn của bảng hội thoại đang mở: chỉ nhánh đang mở
+   * mới được phép; lựa chọn **không** có `next` là kết thúc hội thoại, server quên nhánh và **không**
+   * gửi gì (client tự đóng bảng), lựa chọn có `next` thì mở nhánh đó.
+   */
+  async talkToNpc(session: GameSession, talk: NpcTalk): Promise<void> {
     const located = this.locate(session);
     if (!located) {
       this.rejectNotInWorld(session);
@@ -285,7 +317,252 @@ export class WorldService {
 
     // Bấm vào NPC bán hàng là mở quầy của NPC đó: các gói mua/bán sau không mang `npcId`.
     this.openShops.set(located.player.id, npc.id);
-    session.send(Opcode.S2C_NPC_DIALOG, this.options.npcs.dialog(npc));
+
+    if (talk.optionId !== undefined) {
+      await this.pickDialogOption(session, located.player.id, npc, talk.optionId);
+      return;
+    }
+
+    if (await this.options.quests.progressTalk(located.player.id, npc.id)) {
+      await this.sendQuestUpdate(session, located.player.id);
+    }
+    await this.sendDialog(session, located.player.id, npc);
+  }
+
+  /** `C2S_QUEST_ACCEPT` (0x0601): nhận nhiệm vụ ở NPC đang mở hội thoại. */
+  async questAccept(session: GameSession, accept: QuestAccept): Promise<void> {
+    const located = this.locate(session);
+    if (!located) {
+      this.rejectNotInWorld(session);
+      return;
+    }
+    if (this.rejectWhileDoingQuest(session, located.player.id)) {
+      return;
+    }
+
+    const outcome = await this.options.quests.accept(
+      located.player.id,
+      accept.questId,
+      this.openDialogNpcId(located.player.id),
+      located.room.map.id,
+    );
+    if (!outcome.ok) {
+      session.sendError(outcome.code, outcome.message);
+      return;
+    }
+
+    session.send(Opcode.S2C_NOTIFY, { message: outcome.message } satisfies Notify);
+    await this.refreshAfterQuest(session, located.room, located.player.id, 0);
+  }
+
+  /** `C2S_QUEST_COMPLETE` (0x0602): trả nhiệm vụ ở NPC đang mở hội thoại, cộng thưởng. */
+  async questComplete(session: GameSession, request: QuestComplete): Promise<void> {
+    const located = this.locate(session);
+    if (!located) {
+      this.rejectNotInWorld(session);
+      return;
+    }
+    if (this.rejectWhileDoingQuest(session, located.player.id)) {
+      return;
+    }
+
+    const outcome = await this.options.quests.complete(
+      located.player.id,
+      request.questId,
+      this.openDialogNpcId(located.player.id),
+    );
+    if (!outcome.ok) {
+      session.sendError(outcome.code, outcome.message);
+      return;
+    }
+
+    session.send(Opcode.S2C_NOTIFY, { message: outcome.message } satisfies Notify);
+    if (outcome.lostItems.length > 0) {
+      // Nhiệm vụ vẫn trả xong; nói rõ món nào không cất được để người chơi không tưởng là mất oan.
+      session.send(Opcode.S2C_NOTIFY, {
+        message: lostItemsMessage(outcome.lostItems),
+      } satisfies Notify);
+    }
+    await this.refreshAfterQuest(
+      session,
+      located.room,
+      located.player.id,
+      outcome.levelsGained,
+      outcome.levelBefore,
+    );
+  }
+
+  /**
+   * Sau khi nhận/trả nhiệm vụ: gửi lại chỉ số, túi đồ, nhật ký nhiệm vụ, gói lên cấp và **bảng hội
+   * thoại đang mở**. Gói hội thoại là phần không được quên: `S2C_NPC_DIALOG.quests` mới là thứ client
+   * vẽ nút "Nhận nhiệm vụ"/"Trả nhiệm vụ", nên hộp thoại còn mở mà không gửi lại thì người chơi vẫn
+   * thấy nhiệm vụ vừa trả và không thấy nhiệm vụ kế tiếp.
+   */
+  private async refreshAfterQuest(
+    session: GameSession,
+    room: Room,
+    characterId: string,
+    levelsGained: number,
+    levelBefore = 0,
+  ): Promise<void> {
+    await this.sendCharacterStats(session, characterId);
+    if (levelsGained > 0) {
+      await this.sendLevelUp(session, characterId, levelsGained, levelBefore);
+    }
+    await this.sendInventory(session, characterId);
+    await this.sendQuestUpdate(session, characterId);
+    await this.resendOpenDialog(session, room, characterId);
+  }
+
+  /** `S2C_LEVEL_UP` sau khi lên cấp vì thưởng nhiệm vụ — cùng nội dung với đường thắng trận. */
+  private async sendLevelUp(
+    session: GameSession,
+    characterId: string,
+    levelsGained: number,
+    levelBefore: number,
+  ): Promise<void> {
+    const record = await this.options.characters.findById(characterId);
+    if (!record || session.closed) {
+      return;
+    }
+    const bonus = await this.options.equipment.bonusFor(characterId);
+    const learned = skillsOf(this.options.gameData, {
+      class: record.class,
+      level: record.level,
+    }).filter((skill) => skill.levelRequired > levelBefore);
+    const payload: LevelUp = {
+      character: characterStatsPayload({ record, data: this.options.gameData, bonus }),
+      levelsGained,
+      learnedSkills: learned.map((skill) => ({ skillId: skill.id, name: skill.name })),
+    };
+    session.send(Opcode.S2C_LEVEL_UP, payload);
+  }
+
+  /**
+   * Chọn nhánh hội thoại theo trạng thái **hiện tại** rồi gửi `S2C_NPC_DIALOG` kèm nhiệm vụ làm được
+   * ngay tại NPC này; nhớ lại nhánh vừa mở để lựa chọn sau (`optionId`) phải khớp.
+   */
+  private async sendDialog(session: GameSession, characterId: string, npc: RoomNpc): Promise<void> {
+    const [questStates, level, quests] = await Promise.all([
+      this.options.quests.dialogStates(characterId),
+      this.options.characters.findById(characterId),
+      this.options.quests.offersFor(characterId, npc.id),
+    ]);
+    const node = pickDialogNode(npc.data, { questStates, level: level?.level ?? 1 });
+    this.openDialogs.set(characterId, { npcId: npc.id, nodeId: node?.id ?? null });
+    session.send(Opcode.S2C_NPC_DIALOG, this.options.npcs.dialog(npc, { node, quests }));
+  }
+
+  /** Gửi lại bảng hội thoại đang mở (nếu có) sau khi nhận/trả nhiệm vụ làm trạng thái đổi. */
+  private async resendOpenDialog(
+    session: GameSession,
+    room: Room,
+    characterId: string,
+  ): Promise<void> {
+    const open = this.openDialogs.get(characterId);
+    if (open === undefined) {
+      return;
+    }
+    const npc = room.getNpc(open.npcId);
+    if (npc === undefined) {
+      this.openDialogs.delete(characterId);
+      return;
+    }
+    await this.sendDialog(session, characterId, npc);
+  }
+
+  /**
+   * Người chơi bấm một lựa chọn hội thoại. Chỉ nhận khi hội thoại của **chính NPC này** đang mở và
+   * lựa chọn thuộc nhánh đang mở; sai thì `dialog_not_open` để client bấm lại vào NPC.
+   */
+  private async pickDialogOption(
+    session: GameSession,
+    characterId: string,
+    npc: RoomNpc,
+    optionId: string,
+  ): Promise<void> {
+    const open = this.openDialogs.get(characterId);
+    if (open === undefined || open.npcId !== npc.id) {
+      session.sendError(
+        ErrorCode.DIALOG_NOT_OPEN,
+        'hội thoại này không còn mở, hãy bấm lại vào NPC',
+      );
+      return;
+    }
+
+    const node =
+      open.nodeId === null
+        ? undefined
+        : npc.data.dialog.find((branch) => branch.id === open.nodeId);
+    const option = node?.options.find((candidate) => candidate.id === optionId);
+    if (option === undefined) {
+      session.sendError(ErrorCode.DIALOG_NOT_OPEN, 'lựa chọn này không có trong hội thoại đang mở');
+      return;
+    }
+
+    if (option.next === undefined) {
+      // Lựa chọn kết thúc hội thoại: quên nhánh đang mở và không gửi gì — client tự đóng bảng.
+      this.openDialogs.delete(characterId);
+      return;
+    }
+
+    const next = npc.data.dialog.find((branch) => branch.id === option.next);
+    if (next === undefined) {
+      // `checkGameData` bảo đảm `next` trỏ tới nhánh có thật; tới đây nghĩa là file đổi giữa chừng.
+      this.openDialogs.delete(characterId);
+      session.sendError(
+        ErrorCode.INTERNAL,
+        'hội thoại của NPC này bị lỗi dữ liệu, hãy bấm lại vào NPC',
+      );
+      return;
+    }
+
+    this.openDialogs.set(characterId, { npcId: npc.id, nodeId: next.id });
+    const quests = await this.options.quests.offersFor(characterId, npc.id);
+    session.send(Opcode.S2C_NPC_DIALOG, this.options.npcs.dialog(npc, { node: next, quests }));
+  }
+
+  /** Nhận/trả nhiệm vụ khi đang đánh nhau là không được: hội thoại đã đóng lúc vào trận. */
+  private rejectWhileDoingQuest(session: GameSession, characterId: string): boolean {
+    if (!this.battle.isBusy(characterId)) {
+      return false;
+    }
+    session.sendError(ErrorCode.IN_BATTLE, 'đang trong trận đấu, không nhận hay trả nhiệm vụ được');
+    return true;
+  }
+
+  /** NPC của hội thoại đang mở — nguồn duy nhất để biết người chơi đang nói chuyện với ai. */
+  private openDialogNpcId(characterId: string): string | undefined {
+    return this.openDialogs.get(characterId)?.npcId;
+  }
+
+  /** Nhật ký nhiệm vụ của nhân vật — gửi sau bắt tay và mỗi khi tiến độ đổi. */
+  private async sendQuestUpdate(session: GameSession, characterId: string): Promise<void> {
+    if (session.closed) {
+      return;
+    }
+    session.send(Opcode.S2C_QUEST_UPDATE, await this.options.quests.state(characterId));
+  }
+
+  /**
+   * Hạ quái xong: cộng tiến độ rồi báo cho người chơi nếu còn online. Gọi từ trận đấu (đường bất
+   * đồng bộ) nên không được để lỗi database làm sập nhịp tick.
+   */
+  private async noteKill(characterId: string, monsterId: string): Promise<void> {
+    if (!(await this.options.quests.progressKill(characterId, monsterId))) {
+      return;
+    }
+    const session = this.options.sessions.get(characterId);
+    if (session !== undefined) {
+      await this.sendQuestUpdate(session, characterId);
+    }
+  }
+
+  /** Tới bản đồ mới: cộng tiến độ `reach` rồi báo ngay nếu có gì đổi. */
+  private async noteReach(session: GameSession, characterId: string, mapId: string): Promise<void> {
+    if (await this.options.quests.progressReach(characterId, mapId)) {
+      await this.sendQuestUpdate(session, characterId);
+    }
   }
 
   /** `C2S_EQUIP`: mặc một món trong túi vào ô của nó (món đang ở ô đó tự về túi). */
@@ -457,6 +734,7 @@ export class WorldService {
     from.broadcast(Opcode.S2C_ENTITY_REMOVE, { id: player.id });
     this.options.rooms.dropIfEmpty(from);
     this.openShops.delete(characterId);
+    this.openDialogs.delete(characterId);
 
     player.x = spawn.x;
     player.y = spawn.y;
@@ -467,6 +745,9 @@ export class WorldService {
 
     this.sendEnterMap(session, target, player);
     target.broadcast(Opcode.S2C_ENTITY_ADD, { entity: playerView(player) }, player.id);
+    // Hồi sinh về làng khởi đầu: nhiệm vụ `reach` nhắm làng cũng tính là đã tới (không gửi gói riêng,
+    // `sendCharacterState` ngay dưới đã gửi kèm nhật ký nhiệm vụ).
+    void this.options.quests.progressReach(characterId, target.map.id);
     void this.sendCharacterState(session, characterId);
   }
 
@@ -489,6 +770,7 @@ export class WorldService {
     }
 
     this.openShops.delete(characterId);
+    this.openDialogs.delete(characterId);
     this.options.chat.forget(characterId);
     // Rời trận trước khi rời bản đồ: người chơi biến khỏi trận, quái còn sống thì hồi đầy máu.
     this.battle.leave(characterId);
@@ -518,6 +800,8 @@ export class WorldService {
     );
     session.send(Opcode.S2C_INVENTORY_UPDATE, await this.options.inventory.toPacket(characterId));
     session.send(Opcode.S2C_EQUIPMENT, await this.options.equipment.toPacket(characterId));
+    // Nhật ký nhiệm vụ đi cùng trạng thái nhân vật: vào lại giữa chừng thì nhiệm vụ đang làm vẫn còn.
+    await this.sendQuestUpdate(session, characterId);
   }
 
   /** `S2C_CHARACTER` với chỉ số đã cộng trang bị đang mặc — HUD thấy ngay sau khi mặc/tháo/cường hóa. */
@@ -597,6 +881,7 @@ export class WorldService {
     room.broadcast(Opcode.S2C_ENTITY_REMOVE, { id: player.id });
     this.options.rooms.dropIfEmpty(room);
     this.openShops.delete(player.id);
+    this.openDialogs.delete(player.id);
 
     player.x = spawn.x;
     player.y = spawn.y;
@@ -607,6 +892,8 @@ export class WorldService {
 
     this.sendEnterMap(session, target, player);
     target.broadcast(Opcode.S2C_ENTITY_ADD, { entity: playerView(player) }, player.id);
+    // Bản đồ mới có thể là đích của một nhiệm vụ `reach` đang làm — báo sau khi client đã nhận bản đồ.
+    void this.noteReach(session, player.id, target.map.id);
   }
 
   private sendEnterMap(session: GameSession, room: Room, player: RoomPlayer): void {

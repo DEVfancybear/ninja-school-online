@@ -3,6 +3,7 @@ import {
   check,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -10,7 +11,14 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
-import { CLASSES, EQUIP_SLOTS, SCHOOLS, type EquipSlot } from '@ninja/shared';
+import {
+  CLASSES,
+  EQUIP_SLOTS,
+  QUEST_STATUSES,
+  SCHOOLS,
+  type EquipSlot,
+  type QuestStatus,
+} from '@ninja/shared';
 
 const schoolValues = sql.raw(SCHOOLS.map((s) => `'${s}'`).join(', '));
 const classValues = sql.raw(CLASSES.map((c) => `'${c}'`).join(', '));
@@ -164,3 +172,64 @@ export const transactions = pgTable(
 
 export type InventoryRow = typeof inventoryItems.$inferSelect;
 export type TransactionRow = typeof transactions.$inferSelect;
+
+const questStatusValues = sql.raw(QUEST_STATUSES.map((status) => `'${status}'`).join(', '));
+
+/**
+ * Nhiệm vụ nhân vật **đã nhận** — một hàng cho mỗi nhiệm vụ, không phải một hàng cho mỗi mục tiêu.
+ *
+ * `progress` giữ số đếm của các mục tiêu `talk`/`kill`/`reach`, xếp đúng thứ tự trong file nhiệm vụ
+ * (mục tiêu thứ i ↔ phần tử thứ i). Mục tiêu `collect` **không** lưu ở đây vì nó luôn được đếm lại
+ * từ túi: người chơi nhặt thêm hay tiêu bớt món thì nhiệm vụ phải thấy ngay, không cần ghi lại.
+ * Nhờ tiến độ nằm trong database, thoát giữa chừng rồi vào lại vẫn còn nguyên.
+ */
+export const characterQuests = pgTable(
+  'character_quests',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    characterId: uuid('character_id')
+      .notNull()
+      .references(() => characters.id, { onDelete: 'cascade' }),
+    questId: varchar('quest_id', { length: 64 }).notNull(),
+    status: varchar('status', { length: 16 }).$type<QuestStatus>().notNull().default('active'),
+    progress: jsonb('progress')
+      .$type<number[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    acceptedAt: timestamp('accepted_at', { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex('character_quests_character_quest_unique').on(table.characterId, table.questId),
+    index('character_quests_character_status_idx').on(table.characterId, table.status),
+    check('character_quests_status_valid', sql`${table.status} in (${questStatusValues})`),
+    // Nhiệm vụ đang làm thì chưa có mốc trả; nhiệm vụ đã trả thì phải có mốc trả.
+    check(
+      'character_quests_completed_at_matches_status',
+      sql`(${table.status} = 'completed') = (${table.completedAt} is not null)`,
+    ),
+  ],
+);
+
+/**
+ * Cờ tính năng mở khóa bằng nhiệm vụ (`unlocks`). Một hàng cho mỗi cờ, ghi lúc trả nhiệm vụ; cờ đã
+ * có thì không ghi lại, nên trả lại nhiệm vụ (nếu có) cũng không sinh hàng thứ hai.
+ */
+export const characterFeatures = pgTable(
+  'character_features',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    characterId: uuid('character_id')
+      .notNull()
+      .references(() => characters.id, { onDelete: 'cascade' }),
+    feature: varchar('feature', { length: 32 }).notNull(),
+    unlockedAt: timestamp('unlocked_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('character_features_character_feature_unique').on(table.characterId, table.feature),
+    index('character_features_character_idx').on(table.characterId),
+  ],
+);
+
+export type CharacterQuestRow = typeof characterQuests.$inferSelect;
+export type CharacterFeatureRow = typeof characterFeatures.$inferSelect;

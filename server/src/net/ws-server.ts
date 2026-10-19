@@ -19,6 +19,8 @@ import {
   type Move,
   type NpcTalk,
   type Ping,
+  type QuestAccept,
+  type QuestComplete,
   type ShopBuy,
   type ShopSell,
   type Unequip,
@@ -363,7 +365,21 @@ export class WebSocketGateway {
       case Opcode.C2S_NPC_TALK: {
         const talk = this.decode<NpcTalk>(session, op, payload);
         if (talk) {
-          world.talkToNpc(session, talk);
+          await world.talkToNpc(session, talk);
+        }
+        return;
+      }
+      case Opcode.C2S_QUEST_ACCEPT: {
+        const request = this.decode<QuestAccept>(session, op, payload);
+        if (request) {
+          await world.questAccept(session, request);
+        }
+        return;
+      }
+      case Opcode.C2S_QUEST_COMPLETE: {
+        const request = this.decode<QuestComplete>(session, op, payload);
+        if (request) {
+          await world.questComplete(session, request);
         }
         return;
       }

@@ -15,6 +15,7 @@ import { ChatService } from './modules/chat/service.js';
 import { EquipmentService } from './modules/equipment/service.js';
 import { InventoryService } from './modules/inventory/service.js';
 import { NpcService } from './modules/npc/service.js';
+import { QuestService } from './modules/quest/service.js';
 import { ShopService } from './modules/shop/service.js';
 import { UpgradeService } from './modules/upgrade/service.js';
 import { RoomManager } from './core/room-manager.js';
@@ -89,6 +90,8 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
   const equipmentService = new EquipmentService(gameData, characterService, inventoryService);
   const shopService = new ShopService(db, gameData, characterService, inventoryService);
   const upgradeService = new UpgradeService(db, gameData, characterService, inventoryService);
+  // Nhiệm vụ cần cả nhân vật (kinh nghiệm/cấp) lẫn túi đồ (quà và mục tiêu `collect`) để trả thưởng.
+  const questService = new QuestService(db, gameData, characterService, inventoryService);
   const tick = new TickScheduler();
   const rooms = new RoomManager({
     gameData,
@@ -122,6 +125,7 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
     equipment: equipmentService,
     shop: shopService,
     upgrade: upgradeService,
+    quests: questService,
     tick,
     verifyToken: verifyAccessToken,
   });
