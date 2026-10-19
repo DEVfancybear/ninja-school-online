@@ -106,7 +106,8 @@ ninja/
 ├── game-data/                    # NỘI DUNG GAME (JSON, chỉ server nạp)
 │   ├── maps/ monsters/ items/ skills/ npcs/ classes/   # đã có ở M4 (26 file);
 │   │                                                   # (M4) quầy hàng khai ngay trong npcs/npc-thay-do.json
-│   ├── quests/ events/                                 # cột mốc sau (M5–M7)
+│   ├── quests/                                         # (M5) 12 nhiệm vụ chương 1; cả thư mục là 39 file hợp lệ
+│   ├── events/                                         # cột mốc sau (M7)
 │
 ├── assets/                       # TÀI NGUYÊN NGUỒN (hình, âm thanh, font)
 │   ├── art/ (characters, monsters, tilesets, ui, effects)
