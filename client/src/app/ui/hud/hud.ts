@@ -22,10 +22,12 @@ export class Hud {
   readonly bagCount = input(0);
   readonly bagOpen = input(false);
   readonly equipmentOpen = input(false);
+  readonly questOpen = input(false);
 
   readonly toggleChat = output<void>();
   readonly toggleInventory = output<void>();
   readonly toggleEquipment = output<void>();
+  readonly toggleQuest = output<void>();
 
   readonly statusLabel = computed(() => CONNECTION_LABELS[this.status()]);
   readonly online = computed(() => this.status() === 'ready');

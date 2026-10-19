@@ -119,6 +119,49 @@ export interface NinjaTestShop {
   }[];
 }
 
+/** Một mục tiêu nhiệm vụ kèm tiến độ server đã tính sẵn (client không tự đếm). */
+export interface NinjaTestQuestObjective {
+  readonly kind: string;
+  readonly targetId: string;
+  /** Chữ server soạn sẵn, ví dụ "Đánh hạ 2 Bù Nhìn Tập Luyện"; tiến độ nằm ở hai trường dưới. */
+  readonly description: string;
+  readonly count: number;
+  readonly progress: number;
+  readonly done: boolean;
+}
+
+/** Một nhiệm vụ đang làm, kèm tiến độ từng mục tiêu. */
+export interface NinjaTestQuest {
+  readonly questId: string;
+  readonly name: string;
+  /** `active` (đang làm) hoặc `ready` (xong mục tiêu, chờ trả). */
+  readonly state: string;
+  readonly giverName: string;
+  readonly turnInName: string;
+  readonly objectives: readonly NinjaTestQuestObjective[];
+}
+
+/** Một nhiệm vụ đủ điều kiện nhận mà người chơi chưa nhận. */
+export interface NinjaTestQuestAvailable {
+  readonly questId: string;
+  readonly name: string;
+  readonly giverName: string;
+  readonly turnInName: string;
+  readonly levelRequired: number;
+}
+
+/**
+ * Trạng thái nhiệm vụ client đang vẽ: nhiệm vụ đang làm, loại có thể nhận, id đã trả xong và cờ
+ * tính năng đã mở khóa (cờ ở đây là id trong hợp đồng, ví dụ `party`).
+ */
+export interface NinjaTestQuestState {
+  readonly active: readonly NinjaTestQuest[];
+  readonly available: readonly NinjaTestQuestAvailable[];
+  readonly completed: readonly string[];
+  readonly unlockedFeatures: readonly string[];
+  readonly maxActive: number;
+}
+
 /** Cầu nối cho e2e: đọc trạng thái client đang vẽ và mô phỏng hành động của người chơi. */
 export interface NinjaWorldTestHook {
   /** Tên mọi thực thể đang vẽ, kể cả nhân vật của mình. */
@@ -150,6 +193,11 @@ export interface NinjaWorldTestHook {
   shop(): NinjaTestShop | null;
   toggleEquipment(open?: boolean): void;
   equipmentOpen(): boolean;
+  /** Trạng thái nhiệm vụ: đang làm, có thể nhận, đã xong, cờ mở khóa. */
+  questState(): NinjaTestQuestState;
+  /** Mở/đóng nhật ký nhiệm vụ; không truyền tham số thì mở. */
+  openQuestLog(open?: boolean): void;
+  questLogOpen(): boolean;
   /** Câu lỗi gần nhất đang hiện trên thanh thông báo (server từ chối lệnh chẳng hạn). */
   lastError(): string | null;
 }
@@ -165,6 +213,8 @@ export interface NinjaWorldTestActions {
   inventoryOpen(): boolean;
   toggleEquipment(open: boolean): void;
   equipmentOpen(): boolean;
+  openQuestLog(open: boolean): void;
+  questLogOpen(): boolean;
   closeBattle(): void;
   lastError(): string | null;
 }
@@ -261,6 +311,11 @@ export class WorldTestHook {
         actions.toggleEquipment(open ?? true);
       },
       equipmentOpen: () => actions.equipmentOpen(),
+      questState: () => this.questState(),
+      openQuestLog: (open) => {
+        actions.openQuestLog(open ?? true);
+      },
+      questLogOpen: () => actions.questLogOpen(),
       lastError: () => actions.lastError(),
     };
   }
@@ -305,6 +360,38 @@ export class WorldTestHook {
         name: skill.name,
         costMp: skill.costMp,
       })),
+    };
+  }
+
+  /** Trạng thái nhiệm vụ e2e đọc được, đúng những gì nhật ký nhiệm vụ đang vẽ. */
+  private questState(): NinjaTestQuestState {
+    const quests = this.world.quests();
+    return {
+      active: quests.active.map((quest) => ({
+        questId: quest.questId,
+        name: quest.name,
+        state: quest.state,
+        giverName: quest.giverName,
+        turnInName: quest.turnInName,
+        objectives: quest.objectives.map((objective) => ({
+          kind: objective.kind,
+          targetId: objective.targetId,
+          description: objective.description,
+          count: objective.count,
+          progress: objective.progress,
+          done: objective.done,
+        })),
+      })),
+      available: quests.available.map((quest) => ({
+        questId: quest.questId,
+        name: quest.name,
+        giverName: quest.giverName,
+        turnInName: quest.turnInName,
+        levelRequired: quest.levelRequired,
+      })),
+      completed: [...quests.completed],
+      unlockedFeatures: [...quests.unlockedFeatures],
+      maxActive: quests.maxActive,
     };
   }
 

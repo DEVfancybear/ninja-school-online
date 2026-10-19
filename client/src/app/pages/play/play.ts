@@ -20,6 +20,7 @@ import {
   MONSTER_ENGAGE_RANGE_PX,
   Opcode,
   TICK_RATE_MS,
+  questFeatureLabel,
   type BattleAction,
   type Character,
   type EquipSlot,
@@ -44,7 +45,8 @@ import { EquipmentPanel } from '../../ui/equipment-panel/equipment-panel';
 import { Hud } from '../../ui/hud/hud';
 import { InventoryPanel } from '../../ui/inventory-panel/inventory-panel';
 import { NoticeBar } from '../../ui/notice-bar/notice-bar';
-import { NpcDialogPanel } from '../../ui/npc-dialog/npc-dialog';
+import { NpcDialogPanel, type NpcDialogOption } from '../../ui/npc-dialog/npc-dialog';
+import { QuestLog } from '../../ui/quest-log/quest-log';
 import { ShopPanel } from '../../ui/shop-panel/shop-panel';
 
 /** Thời gian thanh thông báo tự ẩn. */
@@ -90,6 +92,7 @@ export const SNAPSHOT_FALLBACK_DELAY = new InjectionToken<number>('ninja.snapsho
     BattlePanel,
     InventoryPanel,
     EquipmentPanel,
+    QuestLog,
     ShopPanel,
   ],
   templateUrl: './play.html',
@@ -119,6 +122,8 @@ export class Play implements OnInit, OnDestroy {
   readonly bagOpen = signal(false);
   /** Mở/đóng bảng trang bị; mặc và tháo đều không tự đóng bảng để còn mặc tiếp món khác. */
   readonly equipmentOpen = signal(false);
+  /** Mở/đóng nhật ký nhiệm vụ; nhật ký chỉ để xem nên mở ra cũng không sợ lỡ tay. */
+  readonly questOpen = signal(false);
   readonly notice = signal<string | null>(null);
   readonly chatNotice = signal<string | null>(null);
   readonly localFacing = signal<Facing | null>(null);
@@ -139,6 +144,8 @@ export class Play implements OnInit, OnDestroy {
   readonly inventory = this.world.inventory;
   readonly bagCapacity = this.world.inventoryCapacity;
   readonly equipment = this.world.equipment;
+  /** Trạng thái nhiệm vụ của nhân vật: đang làm, có thể nhận, đã xong, cờ mở khóa. */
+  readonly quests = this.world.quests;
   readonly battle = this.battleState.battle;
   readonly battleLog = this.battleState.log;
   readonly battleOutcome = this.battleState.outcome;
@@ -206,6 +213,13 @@ export class Play implements OnInit, OnDestroy {
   /** Chặng đang đi khi đuổi theo con quái ở xa; `null` khi không đuổi theo con nào. */
   private approachLeg: { from: Point; to: Point } | null = null;
 
+  /**
+   * Cờ tính năng đã báo cho người chơi trong phiên này. `S2C_QUEST_UPDATE` gửi lại **toàn bộ**
+   * trạng thái nên cờ cũ vẫn nằm trong gói; giữ danh sách đã báo để chỉ hiện thông báo cho cờ
+   * **mới**. Xoá khi mất kết nối để lần vào sau còn nhắc lại được.
+   */
+  private readonly announcedFeatures = new Set<string>();
+
   constructor() {
     // Rời khỏi `ready` (mất mạng, chưa nối được) là bỏ ngay dữ liệu thế giới cũ. Xoá ở đây,
     // lúc trạng thái đổi, chứ không xoá lúc bắt tay xong — làm vậy sẽ xoá nhầm bản đồ vừa nhận.
@@ -224,6 +238,8 @@ export class Play implements OnInit, OnDestroy {
         this.approachLeg = null;
         this.bagOpen.set(false);
         this.equipmentOpen.set(false);
+        this.questOpen.set(false);
+        this.announcedFeatures.clear();
         this.clearSnapshotTimer();
       });
     });
@@ -250,6 +266,23 @@ export class Play implements OnInit, OnDestroy {
         return;
       }
       untracked(() => this.onHandshake(epoch));
+    });
+
+    // Nhiệm vụ vừa trả xong có thể mở khóa tính năng: báo bằng nhãn tiếng Việt của `@ninja/shared`
+    // (client không tự đặt tên riêng cho cờ). So với danh sách đã báo để gói gửi lại toàn bộ trạng
+    // thái không làm thông báo cũ hiện lại.
+    effect(() => {
+      const features = this.world.quests().unlockedFeatures;
+      untracked(() => {
+        const fresh = features.filter((feature) => !this.announcedFeatures.has(feature));
+        if (fresh.length === 0) {
+          return;
+        }
+        for (const feature of fresh) {
+          this.announcedFeatures.add(feature);
+        }
+        this.showNotice(`Mở khóa tính năng: ${fresh.map(questFeatureLabel).join(', ')}.`);
+      });
     });
 
     // Lỗi mức kết nối: thanh thông báo + hướng dẫn theo mã lỗi.
@@ -287,6 +320,8 @@ export class Play implements OnInit, OnDestroy {
       inventoryOpen: () => this.bagOpen(),
       toggleEquipment: (open) => this.setEquipmentOpen(open),
       equipmentOpen: () => this.equipmentOpen(),
+      openQuestLog: (open) => this.setQuestOpen(open),
+      questLogOpen: () => this.questOpen(),
       closeBattle: () => this.dismissBattleOutcome(),
       lastError: () => this.notice(),
     });
@@ -349,6 +384,29 @@ export class Play implements OnInit, OnDestroy {
 
   closeDialog(): void {
     this.world.closeDialog();
+  }
+
+  /**
+   * Người chơi bấm một lựa chọn trong cây hội thoại: gửi đúng `optionId` để server mở nhánh kế
+   * tiếp. Việc đóng hộp thoại khi `next` là `null` do component hội thoại tự làm (nó biết lựa chọn
+   * đó kết thúc cuộc nói chuyện) nên ở đây chỉ gửi gói tin.
+   */
+  onDialogOption(option: NpcDialogOption): void {
+    const dialog = this.dialog();
+    if (!dialog) {
+      return;
+    }
+    this.socket.send(Opcode.C2S_NPC_TALK, { npcId: dialog.npcId, optionId: option.id });
+  }
+
+  /** Nhận một nhiệm vụ đang hiện ở NPC đang nói chuyện; server trả lại `S2C_QUEST_UPDATE` mới. */
+  onQuestAccept(questId: string): void {
+    this.socket.send(Opcode.C2S_QUEST_ACCEPT, { questId });
+  }
+
+  /** Trả một nhiệm vụ đã xong mục tiêu; server trả lại `S2C_QUEST_UPDATE` mới kèm phần thưởng. */
+  onQuestComplete(questId: string): void {
+    this.socket.send(Opcode.C2S_QUEST_COMPLETE, { questId });
   }
 
   /** Bấm vào một ô trên bản đồ (từ canvas Phaser). */
@@ -420,6 +478,14 @@ export class Play implements OnInit, OnDestroy {
 
   setEquipmentOpen(open: boolean): void {
     this.equipmentOpen.set(open);
+  }
+
+  toggleQuest(): void {
+    this.questOpen.update((open) => !open);
+  }
+
+  setQuestOpen(open: boolean): void {
+    this.questOpen.set(open);
   }
 
   /** Dùng một vật phẩm ngoài trận (trong trận phải dùng qua lượt của mình). */
