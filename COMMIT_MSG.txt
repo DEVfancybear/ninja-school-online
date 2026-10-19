@@ -1,4 +1,0 @@
-fix(m5): hợp đồng nói rõ `next` của lựa chọn hội thoại (null = kết thúc hội thoại)
-
-Client cần biết lựa chọn nào đóng hộp thoại; hợp đồng bổ sung `next` vào
-`S2C_NPC_DIALOG.options` và ghi luật đó vào tài liệu mục 2e.
