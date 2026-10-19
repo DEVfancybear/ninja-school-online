@@ -161,6 +161,8 @@ Phần **server** của M2 đã chạy thật (kiểm thử tích hợp bằng c
   `levelAtLeast`). Khi bắt đầu nói chuyện, server chọn **nhánh đầu tiên có `when` và khớp** theo thứ tự
   trong file; không nhánh nào khớp thì dùng `lines` mặc định (giữ nguyên hành vi M2). Nhánh **không có
   `when`** chỉ tới được bằng lựa chọn `next` ở nhánh trước — dùng cho đoạn nói tiếp trong cùng cuộc hội thoại.
+  Gói `S2C_NPC_DIALOG.options` mang `next` của từng lựa chọn; `next: null` là **kết thúc hội thoại**, client
+  đóng hộp thoại ngay sau khi gửi lựa chọn đó và server chỉ quên nhánh đang mở.
 - **Nội dung chương 1:** 12 nhiệm vụ nối nhau từ *Chào làng* → *Bài học đầu tiên* → *Bái sư*, có nhánh song
   song (Thầy Đồ và thầy Hiệu Trưởng) hội tụ ở *Bái sư*; NPC mới `npc-su-phu` (Sư Phụ) ở làng; hội thoại của
   ba NPC đổi nhánh theo trạng thái nhiệm vụ.

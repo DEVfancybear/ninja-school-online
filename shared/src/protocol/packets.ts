@@ -340,8 +340,19 @@ export const NpcDialogSchema = z.object({
   lines: z.array(z.object({ speaker: z.string().min(1), text: z.string().min(1) })),
   /** Nhánh hội thoại đang mở trong cây; `null` là hội thoại mặc định (không có nhánh nào khớp). */
   nodeId: z.string().min(1).nullable().default(null),
-  /** Lựa chọn người chơi bấm được ở nhánh này; rỗng là hội thoại một chiều. */
-  options: z.array(z.object({ id: z.string().min(1), text: z.string().min(1) })).default([]),
+  /**
+   * Lựa chọn người chơi bấm được ở nhánh này; rỗng là hội thoại một chiều. `next` là nhánh sẽ mở
+   * khi bấm, `null` nghĩa là **kết thúc hội thoại** (client đóng hộp thoại).
+   */
+  options: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        text: z.string().min(1),
+        next: z.string().min(1).nullable(),
+      }),
+    )
+    .default([]),
   /** Quầy hàng của NPC này; `null` là NPC thường, chỉ nói chuyện. */
   shop: ShopSchema.nullable().default(null),
   /**
