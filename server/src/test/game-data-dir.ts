@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { DEFAULT_GAME_DATA_DIR } from '../world/game-data.js';
 
-/** Sáu thư mục con của game-data; bản sao dùng cho kiểm thử phải có **đủ cả sáu**. */
+/** Bảy thư mục con của game-data; bản sao dùng cho kiểm thử phải có **đủ cả bảy**. */
 export const GAME_DATA_COLLECTIONS = [
   'maps',
   'npcs',
@@ -11,6 +11,7 @@ export const GAME_DATA_COLLECTIONS = [
   'skills',
   'items',
   'classes',
+  'quests',
 ] as const;
 export type CollectionDir = (typeof GAME_DATA_COLLECTIONS)[number];
 
@@ -52,6 +53,7 @@ export async function copyGameDataDir(mutate: (files: GameDataFiles) => void): P
     skills: {},
     items: {},
     classes: {},
+    quests: {},
   } as GameDataFiles;
 
   for (const dir of GAME_DATA_COLLECTIONS) {
