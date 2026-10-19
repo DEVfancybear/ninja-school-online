@@ -152,7 +152,9 @@ Phần **server** của M2 đã chạy thật (kiểm thử tích hợp bằng c
   `reach` (đặt chân tới bản đồ), `collect` (số món **đang có trong túi**). Ba loại đầu cộng dồn vào
   `progress` khi nhiệm vụ **đang làm**; `collect` được đếm lại lúc mở hội thoại và lúc trả, và **không tiêu**
   món khi trả. Tiến độ nhiệm vụ được cập nhật **trước** khi server chọn nhánh hội thoại, nên NPC phản ứng
-  đúng với việc người chơi vừa làm.
+  đúng với việc người chơi vừa làm. Nhận/trả xong trong lúc hội thoại đang mở thì server chọn lại nhánh và
+  **gửi lại `S2C_NPC_DIALOG`** ngay: hộp thoại đổi lời theo trạng thái mới và nhiệm vụ kế tiếp hiện ra, người
+  chơi không phải đóng rồi bấm lại NPC.
 - **Thưởng:** exp (lên cấp thì gửi `S2C_LEVEL_UP`), yên và vật phẩm; túi đầy thì nhiệm vụ vẫn trả xong, phần
   vật phẩm không cất được **mất** kèm một dòng `S2C_NOTIFY` nói rõ — người chơi không bao giờ bị kẹt.
   `unlocks` ghi cờ vào `character_features`; chương 1 mở `party` (M6) và `arena` (M6) và **chưa chặn** tính
