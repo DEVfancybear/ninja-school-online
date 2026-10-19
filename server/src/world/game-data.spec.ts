@@ -22,7 +22,11 @@ describe('nạp game-data', () => {
     const data = await loadGameData();
 
     expect([...data.maps.keys()].sort()).toEqual(['bai-luyen-tap', 'lang-khoi-nguon']);
-    expect([...data.npcs.keys()].sort()).toEqual(['npc-thay-do', 'npc-thay-hieu-truong']);
+    expect([...data.npcs.keys()].sort()).toEqual([
+      'npc-su-phu',
+      'npc-thay-do',
+      'npc-thay-hieu-truong',
+    ]);
     expect([...data.monsters.keys()].sort()).toEqual([
       'mob-bui-nhon',
       'mob-chuot-dong',
@@ -31,6 +35,9 @@ describe('nạp game-data', () => {
     expect([...data.classes.keys()].sort()).toEqual(['haruna', 'hirosaki', 'ookaza']);
     expect(data.items.size).toBeGreaterThan(0);
     expect(data.skills.size).toBeGreaterThan(0);
+    // Chương 1 của chính tuyến: mở đầu ở làng và kết thúc bằng lễ bái sư.
+    expect([...data.quests.keys()]).toContain('quest-chao-lang');
+    expect([...data.quests.keys()]).toContain('quest-bai-su');
 
     const village = data.maps.get('lang-khoi-nguon');
     expect(village?.width).toBe(40);
