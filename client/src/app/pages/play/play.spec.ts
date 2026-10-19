@@ -5,6 +5,7 @@ import { provideRouter } from '@angular/router';
 import {
   CHAT_MAX_LENGTH,
   ErrorCode,
+  MAX_ACTIVE_QUESTS,
   Opcode,
   PROTOCOL_VERSION,
   TICK_RATE_MS,
@@ -285,6 +286,73 @@ function npcShopDialogFrame(seq: number): string {
           },
         ],
       },
+    },
+    seq,
+  );
+}
+
+/** Nhiệm vụ "Bài học đầu tiên" đúng như `game-data/quests/quest-bai-hoc-dau-tien.json`. */
+function questViewFixture(
+  state: 'available' | 'active' | 'ready',
+  progress = 0,
+): Record<string, unknown> {
+  return {
+    questId: 'quest-bai-hoc-dau-tien',
+    name: 'Bài học đầu tiên',
+    summary: 'Bù Nhìn Tập Luyện ở Bãi Luyện Tập là thầy dạy đầu tiên: đánh hạ hai con.',
+    chapter: 1,
+    state,
+    giverNpcId: 'npc1',
+    giverName: 'Thầy Hiệu Trưởng',
+    turnInNpcId: 'npc1',
+    turnInName: 'Thầy Hiệu Trưởng',
+    levelRequired: 2,
+    objectives: [
+      {
+        kind: 'kill',
+        targetId: 'mob-bui-nhon',
+        description: 'Đánh hạ 2 Bù Nhìn Tập Luyện',
+        count: 2,
+        progress,
+        done: progress >= 2,
+      },
+    ],
+    rewards: { exp: 60, yen: 80, items: [] },
+    unlocks: [],
+  };
+}
+
+/** Trạng thái nhiệm vụ đầy đủ, mặc định là "chưa có gì" như lúc mới vào game. */
+function questUpdateFrame(overrides: Record<string, unknown> = {}, seq = 11): string {
+  return encodePacket(
+    Opcode.S2C_QUEST_UPDATE,
+    {
+      active: [],
+      available: [],
+      completed: [],
+      unlockedFeatures: [],
+      maxActive: MAX_ACTIVE_QUESTS,
+      ...overrides,
+    },
+    seq,
+  );
+}
+
+/** Hội thoại của NPC giao nhiệm vụ: có cây lựa chọn và một khối nhiệm vụ theo `state`. */
+function npcQuestDialogFrame(seq: number, state: 'available' | 'ready' | 'active'): string {
+  return encodePacket(
+    Opcode.S2C_NPC_DIALOG,
+    {
+      npcId: 'npc1',
+      npcName: 'Thầy Hiệu Trưởng',
+      lines: [{ speaker: 'Thầy Hiệu Trưởng', text: 'Con tới bãi tập luyện đi.' }],
+      nodeId: 'node-goc',
+      options: [
+        { id: 'opt-nhan', text: 'Con muốn nhận nhiệm vụ', next: 'node-nhan' },
+        { id: 'opt-thoi', text: 'Để con suy nghĩ thêm', next: null },
+      ],
+      shop: null,
+      quests: [questViewFixture(state, state === 'ready' ? 2 : 0)],
     },
     seq,
   );
@@ -1037,5 +1105,187 @@ describe('Play', () => {
     const sent = webSocket.lastPacket();
     expect(sent.op).toBe(Opcode.C2S_MOVE);
     expect(payloadOf(sent)).toEqual({ x: 160, y: 64 });
+  });
+
+  it('nhật ký nhiệm vụ mở từ HUD: hiện tiến độ, chỗ trả nhiệm vụ, danh sách có thể nhận rồi đóng lại', async () => {
+    fixture = await setup();
+    const webSocket = await joinWorld(fixture, { map: false });
+    webSocket.deliver(enterMapWithMonstersFrame());
+    webSocket.deliver(
+      questUpdateFrame({
+        active: [questViewFixture('active', 1)],
+        available: [
+          {
+            questId: 'quest-thu-suc-bai-tap',
+            name: 'Thử sức ở bãi tập',
+            giverNpcId: 'npc1',
+            giverName: 'Thầy Hiệu Trưởng',
+            turnInNpcId: 'npc1',
+            turnInName: 'Thầy Hiệu Trưởng',
+            levelRequired: 3,
+          },
+        ],
+        completed: ['quest-duong-toi-bai-tap'],
+        unlockedFeatures: ['party'],
+      }),
+    );
+    await render(fixture);
+
+    // Chưa bấm gì thì nhật ký đóng, nhưng hook đã đọc được trạng thái nhiệm vụ.
+    expect(element(fixture).querySelector('.quest-log')).toBeNull();
+    expect(window.__ninjaWorld?.questLogOpen()).toBe(false);
+    expect(window.__ninjaWorld?.questState()).toMatchObject({
+      completed: ['quest-duong-toi-bai-tap'],
+      unlockedFeatures: ['party'],
+      maxActive: MAX_ACTIVE_QUESTS,
+      active: [
+        {
+          questId: 'quest-bai-hoc-dau-tien',
+          name: 'Bài học đầu tiên',
+          state: 'active',
+          turnInName: 'Thầy Hiệu Trưởng',
+          objectives: [
+            {
+              targetId: 'mob-bui-nhon',
+              description: 'Đánh hạ 2 Bù Nhìn Tập Luyện',
+              count: 2,
+              progress: 1,
+              done: false,
+            },
+          ],
+        },
+      ],
+    });
+
+    const questButton = element(fixture).querySelector('.hud__quest');
+    expect(questButton?.textContent?.trim()).toBe('Nhiệm vụ');
+    (questButton as HTMLElement).click();
+    await render(fixture);
+
+    expect(window.__ninjaWorld?.questLogOpen()).toBe(true);
+    const log = element(fixture).querySelector('.quest-log');
+    expect(log?.querySelector('.quest-log__name')?.textContent?.trim()).toBe('Bài học đầu tiên');
+    expect(log?.querySelector('.quest-log__objective')?.textContent?.trim()).toBe(
+      'Đánh hạ 2 Bù Nhìn Tập Luyện (1/2)',
+    );
+    expect(log?.querySelector('.quest-log__ready')).toBeNull();
+    expect(log?.querySelector('.quest-log__available-item')?.textContent?.trim()).toBe(
+      'Thử sức ở bãi tập — gặp Thầy Hiệu Trưởng',
+    );
+    expect(log?.querySelector('.quest-log__count')?.textContent).toContain('Đã xong 1 nhiệm vụ');
+    expect(log?.querySelector('.quest-log__features')?.textContent).toContain('Lập nhóm');
+
+    (element(fixture).querySelector('.quest-log__close') as HTMLElement).click();
+    await render(fixture);
+
+    expect(window.__ninjaWorld?.questLogOpen()).toBe(false);
+    expect(element(fixture).querySelector('.quest-log')).toBeNull();
+  });
+
+  it('xong mục tiêu thì nhật ký chỉ chỗ trả nhiệm vụ', async () => {
+    fixture = await setup();
+    const webSocket = await joinWorld(fixture, { map: false });
+    webSocket.deliver(enterMapWithMonstersFrame());
+    webSocket.deliver(questUpdateFrame({ active: [questViewFixture('ready', 2)] }));
+    await render(fixture);
+
+    window.__ninjaWorld?.openQuestLog();
+    await render(fixture);
+
+    const log = element(fixture).querySelector('.quest-log');
+    expect(log?.querySelector('.quest-log__objective')?.textContent?.trim()).toBe(
+      'Đánh hạ 2 Bù Nhìn Tập Luyện (2/2)',
+    );
+    expect(log?.querySelector('.quest-log__ready')?.textContent?.trim()).toBe(
+      'về trả nhiệm vụ cho Thầy Hiệu Trưởng',
+    );
+  });
+
+  it('nhận và trả nhiệm vụ ở NPC gửi đúng gói tin', async () => {
+    fixture = await setup();
+    const webSocket = await joinWorld(fixture, { map: false });
+    webSocket.deliver(enterMapWithMonstersFrame());
+    webSocket.deliver(npcQuestDialogFrame(11, 'available'));
+    await render(fixture);
+
+    const accept = element(fixture).querySelector<HTMLElement>('.npc-quest__accept');
+    expect(accept?.textContent?.trim()).toBe('Nhận nhiệm vụ');
+    accept?.click();
+    await render(fixture);
+
+    expect(payloadOf(webSocket.lastPacket())).toEqual({ questId: 'quest-bai-hoc-dau-tien' });
+    expect(webSocket.lastPacket().op).toBe(Opcode.C2S_QUEST_ACCEPT);
+
+    // Nhận xong server gửi hội thoại mới: nhiệm vụ chuyển sang đang làm nên chỉ còn lời nhắc.
+    webSocket.deliver(npcQuestDialogFrame(12, 'active'));
+    await render(fixture);
+
+    expect(element(fixture).querySelector('.npc-quest__accept')).toBeNull();
+    expect(element(fixture).querySelector('.npc-quest__complete')).toBeNull();
+    expect(element(fixture).querySelector('.npc-quest__hint')?.textContent?.trim()).toBe(
+      'Chưa xong mục tiêu',
+    );
+
+    // Xong mục tiêu rồi thì cùng NPC đó đổi sang nút trả nhiệm vụ.
+    webSocket.deliver(npcQuestDialogFrame(13, 'ready'));
+    await render(fixture);
+
+    const complete = element(fixture).querySelector<HTMLElement>('.npc-quest__complete');
+    expect(complete?.textContent?.trim()).toBe('Trả nhiệm vụ');
+    complete?.click();
+    await render(fixture);
+
+    expect(webSocket.lastPacket().op).toBe(Opcode.C2S_QUEST_COMPLETE);
+    expect(payloadOf(webSocket.lastPacket())).toEqual({ questId: 'quest-bai-hoc-dau-tien' });
+  });
+
+  it('lựa chọn hội thoại gửi optionId; lựa chọn kết thúc thì đóng hộp thoại', async () => {
+    fixture = await setup();
+    const webSocket = await joinWorld(fixture, { map: false });
+    webSocket.deliver(enterMapWithMonstersFrame());
+    webSocket.deliver(npcQuestDialogFrame(11, 'available'));
+    await render(fixture);
+
+    const options = [...element(fixture).querySelectorAll<HTMLElement>('.npc-option')];
+    expect(options.map((button) => button.textContent?.trim())).toEqual([
+      'Con muốn nhận nhiệm vụ',
+      'Để con suy nghĩ thêm',
+    ]);
+
+    options[0]?.click();
+    await render(fixture);
+
+    expect(webSocket.lastPacket().op).toBe(Opcode.C2S_NPC_TALK);
+    expect(payloadOf(webSocket.lastPacket())).toEqual({ npcId: 'npc1', optionId: 'opt-nhan' });
+    // Nhánh còn tiếp thì hộp thoại ở lại cho người chơi đọc lời đáp.
+    expect(element(fixture).querySelector('.npc-dialog')).not.toBeNull();
+
+    [...element(fixture).querySelectorAll<HTMLElement>('.npc-option')][1]?.click();
+    await render(fixture);
+
+    expect(payloadOf(webSocket.lastPacket())).toEqual({ npcId: 'npc1', optionId: 'opt-thoi' });
+    expect(element(fixture).querySelector('.npc-dialog')).toBeNull();
+  });
+
+  it('mở khóa tính năng bằng nhiệm vụ thì hiện nhãn tiếng Việt trên thanh thông báo', async () => {
+    fixture = await setup();
+    const webSocket = await joinWorld(fixture, { map: false });
+    webSocket.deliver(enterMapWithMonstersFrame());
+    webSocket.deliver(
+      questUpdateFrame({ completed: ['quest-chao-lang'], unlockedFeatures: ['party'] }),
+    );
+    await render(fixture);
+
+    expect(element(fixture).querySelector('.notice-bar')?.textContent).toContain(
+      'Mở khóa tính năng: Lập nhóm.',
+    );
+
+    // Gói nhiệm vụ gửi lại **toàn bộ** trạng thái: cờ cũ không được nhắc lại, chỉ cờ mới.
+    webSocket.deliver(questUpdateFrame({ unlockedFeatures: ['party', 'arena'] }, 12));
+    await render(fixture);
+
+    const notice = element(fixture).querySelector('.notice-bar')?.textContent ?? '';
+    expect(notice).toContain('Mở khóa tính năng: Lôi Đài.');
+    expect(notice).not.toContain('Lập nhóm');
   });
 });

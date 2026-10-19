@@ -66,3 +66,79 @@
 .npc-text {
   word-break: break-word;
 }
+
+/* Cây lựa chọn của nhánh đang mở: mỗi lựa chọn một nút cho dễ bấm bằng chuột lẫn bàn phím. */
+.npc-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0 0.7rem 0.6rem;
+}
+
+.npc-option {
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.4rem;
+  background: rgba(127, 209, 255, 0.08);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.npc-option:hover {
+  background: rgba(127, 209, 255, 0.2);
+}
+
+/* Khối nhiệm vụ làm được ngay ở NPC này: viền riêng để không lẫn với lời thoại. */
+.npc-quest {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0 0.7rem 0.6rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid rgba(134, 239, 172, 0.35);
+  border-radius: 0.5rem;
+  background: rgba(21, 94, 55, 0.18);
+}
+
+.npc-quest__name {
+  color: #86efac;
+}
+
+.npc-quest__objectives {
+  margin: 0;
+  padding: 0 0 0 1rem;
+  list-style: disc;
+  font-size: 0.8rem;
+  color: #cbd5e1;
+}
+
+.npc-quest__rewards {
+  font-size: 0.8rem;
+  color: #fbbf24;
+}
+
+.npc-quest__hint {
+  font-size: 0.8rem;
+  color: #9fb3c8;
+}
+
+.npc-quest__accept,
+.npc-quest__complete {
+  align-self: flex-start;
+  padding: 0.25rem 0.7rem;
+  border: 1px solid rgba(74, 222, 128, 0.5);
+  border-radius: 999px;
+  background: rgba(21, 94, 55, 0.85);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+/* Trả nhiệm vụ là việc khác với nhận: tô màu vàng để không bấm nhầm hai nút giống nhau. */
+.npc-quest__complete {
+  border-color: rgba(251, 191, 36, 0.55);
+  background: rgba(90, 62, 16, 0.85);
+}

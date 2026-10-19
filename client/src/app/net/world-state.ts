@@ -1,6 +1,7 @@
 import { Injectable, computed, signal } from '@angular/core';
 import {
   EQUIP_SLOTS,
+  MAX_ACTIVE_QUESTS,
   Opcode,
   TICK_RATE_MS,
   type CharacterStats,
@@ -15,6 +16,7 @@ import {
   type InventoryUpdate,
   type LevelUp,
   type NpcDialog,
+  type QuestUpdate,
   type ServerEnterMap,
 } from '@ninja/shared';
 import {
@@ -62,6 +64,23 @@ export function normalizeEquipment(slots: readonly EquipmentSlot[]): EquipmentSl
 }
 
 /**
+ * Trạng thái nhiệm vụ rỗng: chưa làm gì, chưa có gì để nhận, chưa mở khóa tính năng nào.
+ *
+ * Nhật ký nhiệm vụ luôn vẽ được ngay từ lúc mới vào game, trước cả `S2C_QUEST_UPDATE` đầu tiên,
+ * nên client tự dựng sẵn thay vì để giao diện phải chịu `null`. Trần `MAX_ACTIVE_QUESTS` lấy từ
+ * `@ninja/shared` — client không tự đặt lại con số của luật.
+ */
+export function emptyQuestState(): QuestUpdate {
+  return {
+    active: [],
+    available: [],
+    completed: [],
+    unlockedFeatures: [],
+    maxActive: MAX_ACTIVE_QUESTS,
+  };
+}
+
+/**
  * Trạng thái thế giới mà client nhìn thấy, giữ bằng signals.
  *
  * Service chỉ tiêu thụ gói tin **đã** được `GameSocket` kiểm bằng `decodeServerPacket`, nên
@@ -81,6 +100,7 @@ export class WorldState {
   private readonly inventoryCapacitySignal = signal(0);
   private readonly equipmentSignal = signal<readonly EquipmentSlot[]>(emptyEquipment());
   private readonly levelUpSignal = signal<LevelUp | null>(null);
+  private readonly questSignal = signal<QuestUpdate>(emptyQuestState());
 
   readonly map = this.mapSignal.asReadonly();
   readonly entities = this.entitiesSignal.asReadonly();
@@ -93,6 +113,13 @@ export class WorldState {
   readonly inventoryCapacity = this.inventoryCapacitySignal.asReadonly();
   /** Bốn ô trang bị theo thứ tự `EQUIP_SLOTS`; ô trống là `item: null`. */
   readonly equipment = this.equipmentSignal.asReadonly();
+  /**
+   * Trạng thái nhiệm vụ: nhiệm vụ đang làm (`active`, kể cả loại đã xong mục tiêu chờ trả),
+   * loại đủ điều kiện nhận (`available`), id các nhiệm vụ đã trả (`completed`), cờ tính năng đã
+   * mở khóa và trần số nhiệm vụ nhận cùng lúc. Server gửi cả gói trong `S2C_QUEST_UPDATE` nên
+   * client giữ nguyên gói, không tự tính lại tiến độ.
+   */
+  readonly quests = this.questSignal.asReadonly();
   /**
    * Lần lên cấp gần nhất, để trang `/play` báo cho người chơi biết vừa học được chiêu gì.
    * Trang gọi `clearLevelUp()` sau khi báo xong.
@@ -162,6 +189,10 @@ export class WorldState {
       case Opcode.S2C_EQUIPMENT:
         this.equipmentSignal.set(normalizeEquipment((payload as EquipmentUpdate).slots));
         return true;
+      case Opcode.S2C_QUEST_UPDATE:
+        // Gói mang **toàn bộ** trạng thái nhiệm vụ nên thay cả cục; không cộng dồn từng nhiệm vụ.
+        this.questSignal.set(payload as QuestUpdate);
+        return true;
       default:
         return false;
     }
@@ -179,6 +210,7 @@ export class WorldState {
     this.inventoryCapacitySignal.set(0);
     this.equipmentSignal.set(emptyEquipment());
     this.levelUpSignal.set(null);
+    this.questSignal.set(emptyQuestState());
   }
 
   closeDialog(): void {

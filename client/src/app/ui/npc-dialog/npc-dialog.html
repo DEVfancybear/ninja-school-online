@@ -12,4 +12,55 @@
       </li>
     }
   </ul>
+
+  @if (dialog().options.length > 0) {
+    <div class="npc-options">
+      @for (option of dialog().options; track option.id) {
+        <button class="npc-option" type="button" (click)="onOption(option)">
+          {{ option.text }}
+        </button>
+      }
+    </div>
+  }
+
+  @for (card of quests(); track card.quest.questId) {
+    <div class="npc-quest" [attr.data-state]="card.quest.state">
+      <span class="npc-quest__name">{{ card.quest.name }}</span>
+      <ul class="npc-quest__objectives">
+        @for (objective of card.objectives; track $index) {
+          <li class="npc-quest__objective">{{ objective }}</li>
+        }
+      </ul>
+      <span class="npc-quest__rewards">Thưởng: {{ card.rewards || 'không có' }}</span>
+
+      @switch (card.quest.state) {
+        @case ('available') {
+          <button
+            class="npc-quest__accept"
+            type="button"
+            (click)="accept.emit(card.quest.questId)"
+            [title]="'Nhận nhiệm vụ ' + card.quest.name"
+          >
+            Nhận nhiệm vụ
+          </button>
+        }
+        @case ('ready') {
+          <button
+            class="npc-quest__complete"
+            type="button"
+            (click)="complete.emit(card.quest.questId)"
+            [title]="'Trả nhiệm vụ ' + card.quest.name"
+          >
+            Trả nhiệm vụ
+          </button>
+        }
+        @case ('active') {
+          <span class="npc-quest__hint">Chưa xong mục tiêu</span>
+        }
+        @default {
+          <span class="npc-quest__hint">Đã trả nhiệm vụ</span>
+        }
+      }
+    </div>
+  }
 </section>

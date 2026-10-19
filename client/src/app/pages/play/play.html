@@ -52,9 +52,11 @@
         [bagCount]="inventory().length"
         [bagOpen]="bagOpen()"
         [equipmentOpen]="equipmentOpen()"
+        [questOpen]="questOpen()"
         (toggleChat)="toggleChat()"
         (toggleInventory)="toggleInventory()"
         (toggleEquipment)="toggleEquipment()"
+        (toggleQuest)="toggleQuest()"
       />
 
       @if (chatVisible()) {
@@ -87,8 +89,18 @@
         />
       }
 
+      @if (questOpen()) {
+        <app-quest-log [quests]="quests()" (closed)="setQuestOpen(false)" />
+      }
+
       @if (dialog(); as npcDialog) {
-        <app-npc-dialog [dialog]="npcDialog" (closed)="closeDialog()" />
+        <app-npc-dialog
+          [dialog]="npcDialog"
+          (closed)="closeDialog()"
+          (optionChosen)="onDialogOption($event)"
+          (accept)="onQuestAccept($event)"
+          (complete)="onQuestComplete($event)"
+        />
       }
 
       @if (shopCounter(); as counter) {

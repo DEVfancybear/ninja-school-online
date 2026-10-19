@@ -1,0 +1,56 @@
+<aside class="quest-log">
+  <header class="quest-log__head">
+    <h2 class="quest-log__title">Nhật ký nhiệm vụ</h2>
+    <button
+      type="button"
+      class="quest-log__close"
+      (click)="closed.emit()"
+      aria-label="Đóng nhật ký nhiệm vụ"
+    >
+      ×
+    </button>
+  </header>
+
+  <section class="quest-log__section">
+    <h3 class="quest-log__heading">Đang làm</h3>
+    @if (active().length === 0) {
+      <p class="quest-log__empty">Chưa nhận nhiệm vụ nào. Hãy tới gặp NPC có dấu chấm than.</p>
+    }
+    <ul class="quest-log__list">
+      @for (row of active(); track row.questId) {
+        <li class="quest-log__quest" [class.quest-log__quest--ready]="row.ready">
+          <span class="quest-log__name">{{ row.name }}</span>
+          <ul class="quest-log__objectives">
+            @for (objective of row.objectives; track $index) {
+              <li class="quest-log__objective">{{ objective }}</li>
+            }
+          </ul>
+          @if (row.ready) {
+            <p class="quest-log__ready">về trả nhiệm vụ cho {{ row.turnInName }}</p>
+          }
+        </li>
+      }
+    </ul>
+  </section>
+
+  <section class="quest-log__section">
+    <h3 class="quest-log__heading">Có thể nhận</h3>
+    @if (available().length === 0) {
+      <p class="quest-log__empty">Chưa có nhiệm vụ nào để nhận thêm.</p>
+    }
+    <ul class="quest-log__available">
+      @for (row of available(); track row.questId) {
+        <li class="quest-log__available-item">{{ row.text }}</li>
+      }
+    </ul>
+  </section>
+
+  <footer class="quest-log__summary">
+    <p class="quest-log__count">
+      Đã xong {{ completedCount() }} nhiệm vụ · Đang làm {{ activeCount() }}/{{ maxActive() }}
+    </p>
+    @if (features().length > 0) {
+      <p class="quest-log__features">Mở khóa: {{ features().join(', ') }}</p>
+    }
+  </footer>
+</aside>

@@ -1,0 +1,124 @@
+/* Bên trái, dưới thanh HUD: chỗ này không đụng túi đồ (trên phải) và quầy hàng (dưới trái). */
+:host {
+  position: absolute;
+  top: 64px;
+  left: 12px;
+  z-index: 6;
+  display: block;
+}
+
+.quest-log {
+  width: min(340px, 88vw);
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(134, 239, 172, 0.35);
+  background: rgba(8, 14, 20, 0.94);
+  color: #e8f1f8;
+  overflow-y: auto;
+}
+
+.quest-log__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quest-log__title {
+  margin: 0;
+  font-size: 15px;
+}
+
+.quest-log__close {
+  width: 24px;
+  height: 24px;
+  margin-left: auto;
+  border-radius: 7px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: transparent;
+  color: inherit;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.quest-log__section {
+  margin-top: 2px;
+}
+
+.quest-log__heading {
+  margin: 6px 0 2px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #86efac;
+}
+
+.quest-log__empty {
+  margin: 0;
+  font-size: 12px;
+  color: #9fb3c8;
+}
+
+.quest-log__list,
+.quest-log__objectives,
+.quest-log__available {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.quest-log__quest {
+  padding: 6px 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.quest-log__name {
+  font-size: 13px;
+}
+
+.quest-log__objective {
+  padding-left: 12px;
+  font-size: 11px;
+  color: #9fb3c8;
+}
+
+/* Mục tiêu xong rồi vẫn hiện tiến độ, nhưng mờ đi để mắt tập vào việc còn lại. */
+.quest-log__quest--ready .quest-log__objective {
+  color: #64748b;
+}
+
+.quest-log__ready {
+  margin: 4px 0 0;
+  padding-left: 12px;
+  font-size: 12px;
+  color: #86efac;
+}
+
+.quest-log__available-item {
+  padding: 4px 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.quest-log__summary {
+  margin-top: 6px;
+  border-top: 1px solid rgba(148, 163, 184, 0.25);
+  padding-top: 4px;
+}
+
+.quest-log__count {
+  margin: 0;
+  font-size: 12px;
+  color: #9fb3c8;
+}
+
+.quest-log__features {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #fbbf24;
+}

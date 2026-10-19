@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import {
   EQUIP_SLOTS,
+  MAX_ACTIVE_QUESTS,
   Opcode,
   TICK_RATE_MS,
   type CharacterStats,
@@ -10,6 +11,7 @@ import {
   type InventoryUpdate,
   type LevelUp,
   type MapSnapshot,
+  type QuestUpdate,
   type ServerEnterMap,
 } from '@ninja/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -372,6 +374,59 @@ describe('WorldState', () => {
     expect(world.inventory()).toEqual([]);
     expect(world.equipment().map((entry) => entry.item)).toEqual([null, null, null, null]);
     expect(world.lastLevelUp()).toBeNull();
+    expect(world.quests().active).toEqual([]);
+    expect(world.quests().available).toEqual([]);
+    expect(world.quests().completed).toEqual([]);
+    expect(world.quests().unlockedFeatures).toEqual([]);
+  });
+
+  it('S2C_QUEST_UPDATE thay cả cục trạng thái nhiệm vụ, không cộng dồn', () => {
+    const update: QuestUpdate = {
+      active: [
+        {
+          questId: 'quest-bai-hoc-dau-tien',
+          name: 'Bài học đầu tiên',
+          summary: 'Bù Nhìn Tập Luyện ở Bãi Luyện Tập là thầy dạy đầu tiên.',
+          chapter: 1,
+          state: 'active',
+          giverNpcId: 'npc-thay-hieu-truong',
+          giverName: 'Thầy Hiệu Trưởng',
+          turnInNpcId: 'npc-thay-hieu-truong',
+          turnInName: 'Thầy Hiệu Trưởng',
+          levelRequired: 2,
+          objectives: [
+            {
+              kind: 'kill',
+              targetId: 'mob-bui-nhon',
+              description: 'Đánh hạ 2 Bù Nhìn Tập Luyện',
+              count: 2,
+              progress: 1,
+              done: false,
+            },
+          ],
+          rewards: { exp: 60, yen: 80, items: [] },
+          unlocks: [],
+        },
+      ],
+      available: [],
+      completed: ['quest-chao-lang'],
+      unlockedFeatures: ['party'],
+      maxActive: MAX_ACTIVE_QUESTS,
+    };
+
+    expect(world.applyPacket(Opcode.S2C_QUEST_UPDATE, update)).toBe(true);
+    expect(world.quests()).toEqual(update);
+
+    // Gói sau khi trả nhiệm vụ: nhiệm vụ rời khỏi `active` chứ không nằm lại trong danh sách cũ.
+    const afterTurnIn: QuestUpdate = {
+      active: [],
+      available: [],
+      completed: ['quest-chao-lang', 'quest-bai-hoc-dau-tien'],
+      unlockedFeatures: ['party', 'arena'],
+      maxActive: MAX_ACTIVE_QUESTS,
+    };
+    expect(world.applyPacket(Opcode.S2C_QUEST_UPDATE, afterTurnIn)).toBe(true);
+    expect(world.quests()).toEqual(afterTurnIn);
   });
 
   it('bỏ qua gói không thuộc phần thế giới và nhận nhịp tick từ S2C_HELLO', () => {
