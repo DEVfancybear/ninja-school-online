@@ -1,0 +1,20 @@
+feat(m5): hợp đồng nhiệm vụ chính tuyến — protocol v5, cây hội thoại NPC, 12 nhiệm vụ chương 1
+
+Chốt hợp đồng trước khi chia việc server/client, như mọi cột mốc trước.
+
+- `shared`: `PROTOCOL_VERSION` 5; opcode `C2S_QUEST_ACCEPT` 0x0601, `C2S_QUEST_COMPLETE` 0x0602,
+  `S2C_QUEST_UPDATE` 0x0603; `C2S_NPC_TALK` thêm `optionId`; `S2C_NPC_DIALOG` thêm `nodeId`,
+  `options`, `quests`; tám mã lỗi nhiệm vụ riêng theo nguyên nhân; hằng số `QUEST_OBJECTIVE_KINDS`
+  (`talk`/`kill`/`reach`/`collect`), `QUEST_VIEW_STATES`, `MAX_ACTIVE_QUESTS` = 5, nhãn cờ mở khóa.
+- `shared/schemas`: `QuestSchema` (người giao, người nhận trả, cấp, nhiệm vụ phải trước, mục tiêu,
+  thưởng, `unlocks`), cây hội thoại NPC (`NpcDialogNodeSchema` chọn nhánh theo trạng thái nhiệm vụ);
+  `checkGameData` kiểm liên-file mới: NPC/quái/bản đồ/vật phẩm được nhắc tới phải có thật, không có
+  vòng `requiresQuests`, `next` phải trỏ tới nhánh có thật của cùng NPC.
+- `game-data`: 12 nhiệm vụ chương 1 (Chào làng → Bài học đầu tiên → Bái sư) có nhánh song song và hội
+  tụ; NPC mới `npc-su-phu` (Sư Phụ) ở làng; hội thoại của ba NPC đổi nhánh theo trạng thái nhiệm vụ.
+- `tools/data-validator` và server cùng nạp/kiểm `game-data/quests/` bằng chung một bộ luật.
+- `docs/02-architecture/network-and-data.md`: mục 2e (luật nhiệm vụ, bảng mới, cây hội thoại), cập
+  nhật bảng gói tin 3.2, mục 6.1/6.2 và phiên bản protocol; sửa luôn ô trang bị `feet` → `head`.
+
+Test: shared 92 bài (thêm 16 bài schema nhiệm vụ + 4 bài gói tin M5), tools 14 bài, typecheck và lint
+toàn monorepo xanh.

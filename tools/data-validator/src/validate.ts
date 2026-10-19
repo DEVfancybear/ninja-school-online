@@ -7,6 +7,7 @@ import {
   ItemSchema,
   MonsterSchema,
   NpcSchema,
+  QuestSchema,
   SkillSchema,
   type ClassDefinition,
   type GameDataSet,
@@ -15,6 +16,7 @@ import {
   type Item,
   type Monster,
   type Npc,
+  type Quest,
   type Skill,
 } from '@ninja/shared';
 import type { ZodType } from 'zod';
@@ -34,6 +36,7 @@ interface WritableGameDataSet {
   skills: Skill[];
   items: Item[];
   classes: ClassDefinition[];
+  quests: Quest[];
 }
 
 /** Một bộ sưu tập dữ liệu: thư mục con của game-data, schema và chỗ đổ giá trị đã kiểm. */
@@ -70,6 +73,11 @@ function collections(target: WritableGameDataSet): readonly Collection[] {
       dir: 'classes',
       schema: ClassDefinitionSchema as ZodType<unknown>,
       push: (v) => target.classes.push(v as ClassDefinition),
+    },
+    {
+      dir: 'quests',
+      schema: QuestSchema as ZodType<unknown>,
+      push: (v) => target.quests.push(v as Quest),
     },
   ];
 }
@@ -129,6 +137,7 @@ export async function validateGameData(gameDataDir: string): Promise<ValidationR
     skills: [],
     items: [],
     classes: [],
+    quests: [],
   };
   const errors: ValidationError[] = [];
   let checked = 0;

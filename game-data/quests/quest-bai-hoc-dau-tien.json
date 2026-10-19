@@ -1,0 +1,29 @@
+{
+  "id": "quest-bai-hoc-dau-tien",
+  "name": "Bài học đầu tiên",
+  "chapter": 1,
+  "summary": "Bù Nhìn Tập Luyện ở Bãi Luyện Tập là thầy dạy đầu tiên: đánh hạ hai con để làm quen tay.",
+  "giverNpcId": "npc-thay-hieu-truong",
+  "turnInNpcId": "npc-thay-hieu-truong",
+  "requiresQuests": [
+    "quest-duong-toi-bai-tap"
+  ],
+  "objectives": [
+    {
+      "kind": "kill",
+      "targetId": "mob-bui-nhon",
+      "count": 2,
+      "description": "Đánh hạ 2 Bù Nhìn Tập Luyện"
+    }
+  ],
+  "rewards": {
+    "exp": 60,
+    "yen": 80,
+    "items": [
+      {
+        "itemId": "item-banh-bao",
+        "quantity": 1
+      }
+    ]
+  }
+}

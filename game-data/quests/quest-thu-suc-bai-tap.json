@@ -1,0 +1,25 @@
+{
+  "id": "quest-thu-suc-bai-tap",
+  "name": "Thử sức ở bãi tập",
+  "chapter": 1,
+  "levelRequired": 2,
+  "summary": "Bốn con bù nhìn liên tiếp là bài kiểm tra thân thủ trước khi thầy nhận con làm đệ tử.",
+  "giverNpcId": "npc-thay-hieu-truong",
+  "turnInNpcId": "npc-thay-hieu-truong",
+  "requiresQuests": [
+    "quest-heo-rung-hung-han"
+  ],
+  "objectives": [
+    {
+      "kind": "kill",
+      "targetId": "mob-bui-nhon",
+      "count": 4,
+      "description": "Đánh hạ 4 Bù Nhìn Tập Luyện"
+    }
+  ],
+  "rewards": {
+    "exp": 150,
+    "yen": 180,
+    "items": []
+  }
+}

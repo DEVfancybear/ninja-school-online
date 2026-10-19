@@ -5,3 +5,4 @@ export * from './world.js';
 export * from './battle.js';
 export * from './stats.js';
 export * from './equipment.js';
+export * from './quest.js';

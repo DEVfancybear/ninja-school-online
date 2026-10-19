@@ -1,0 +1,29 @@
+{
+  "id": "quest-do-nghe-cua-thay",
+  "name": "Đồ nghề của thầy",
+  "chapter": 1,
+  "summary": "Thầy Đồ đổi cho con một tấm Áo Vải nếu con mang tới năm viên đá vụn.",
+  "giverNpcId": "npc-thay-do",
+  "turnInNpcId": "npc-thay-do",
+  "requiresQuests": [
+    "quest-chuot-dong-quanh-lang"
+  ],
+  "objectives": [
+    {
+      "kind": "collect",
+      "targetId": "item-da-vun",
+      "count": 5,
+      "description": "Có 5 Đá Vụn trong túi"
+    }
+  ],
+  "rewards": {
+    "exp": 100,
+    "yen": 140,
+    "items": [
+      {
+        "itemId": "item-ao-vai",
+        "quantity": 1
+      }
+    ]
+  }
+}

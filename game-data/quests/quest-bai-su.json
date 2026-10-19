@@ -1,0 +1,34 @@
+{
+  "id": "quest-bai-su",
+  "name": "Bái sư",
+  "chapter": 1,
+  "levelRequired": 3,
+  "summary": "Con đã đủ tư cách: tới gặp Sư Phụ ở làng để chính thức thành đệ tử.",
+  "giverNpcId": "npc-thay-hieu-truong",
+  "turnInNpcId": "npc-su-phu",
+  "requiresQuests": [
+    "quest-bao-boi-dau-tien",
+    "quest-loi-thay-day"
+  ],
+  "objectives": [
+    {
+      "kind": "talk",
+      "targetId": "npc-su-phu",
+      "count": 1,
+      "description": "Bái kiến Sư Phụ"
+    }
+  ],
+  "rewards": {
+    "exp": 200,
+    "yen": 300,
+    "items": [
+      {
+        "itemId": "item-tra-rung",
+        "quantity": 1
+      }
+    ]
+  },
+  "unlocks": [
+    "arena"
+  ]
+}

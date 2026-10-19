@@ -2,6 +2,7 @@ import { SCHOOLS, SCHOOL_CLASSES } from '../constants/game.js';
 import type { Item } from './item.js';
 import type { GameMap, Npc } from './map.js';
 import type { Monster } from './monster.js';
+import type { Quest } from './quest.js';
 import type { ClassDefinition } from './school.js';
 import type { Skill } from './skill.js';
 
@@ -22,6 +23,7 @@ export interface GameDataSet {
   readonly skills: readonly Skill[];
   readonly items: readonly Item[];
   readonly classes: readonly ClassDefinition[];
+  readonly quests: readonly Quest[];
 }
 
 /** Hai file cùng `id` sẽ ghi đè nhau âm thầm khi nạp theo id, nên phải là lỗi. */
@@ -33,6 +35,7 @@ function checkUniqueIds(data: GameDataSet): GameDataIssue[] {
     ['monsters', 'quái', data.monsters],
     ['skills', 'chiêu', data.skills],
     ['items', 'vật phẩm', data.items],
+    ['quests', 'nhiệm vụ', data.quests],
   ];
   for (const [dir, kind, values] of collections) {
     const seen = new Set<string>();
@@ -268,8 +271,186 @@ function checkClassCoverage(data: GameDataSet): GameDataIssue[] {
 }
 
 /**
+ * Nhiệm vụ phải trỏ tới thứ có thật: NPC giao/trả, quái phải đánh, bản đồ phải tới, vật phẩm phải
+ * có trong túi, quà thưởng phải có file dữ liệu, và các nhiệm vụ phải trước phải tồn tại.
+ */
+function checkQuests(
+  data: GameDataSet,
+  npcs: ReadonlySet<string>,
+  monsters: ReadonlySet<string>,
+  maps: ReadonlyMap<string, GameMap>,
+  items: ReadonlySet<string>,
+): GameDataIssue[] {
+  const issues: GameDataIssue[] = [];
+  const quests = new Set(data.quests.map((quest) => quest.id));
+
+  for (const quest of data.quests) {
+    const file = `quests/${quest.id}.json`;
+
+    for (const [field, npcId] of [
+      ['giverNpcId', quest.giverNpcId],
+      ['turnInNpcId', quest.turnInNpcId],
+    ] as const) {
+      if (!npcs.has(npcId)) {
+        issues.push({
+          file,
+          path: field,
+          message: `nhiệm vụ trỏ tới NPC "${npcId}" nhưng không có file trong game-data/npcs/`,
+        });
+      }
+    }
+
+    for (const [index, objective] of quest.objectives.entries()) {
+      const path = `objectives.${index}.targetId`;
+      if (objective.kind === 'talk' && !npcs.has(objective.targetId)) {
+        issues.push({
+          file,
+          path,
+          message: `mục tiêu nói chuyện với NPC "${objective.targetId}" không tồn tại`,
+        });
+      }
+      if (objective.kind === 'kill' && !monsters.has(objective.targetId)) {
+        issues.push({
+          file,
+          path,
+          message: `mục tiêu đánh hạ quái "${objective.targetId}" không tồn tại`,
+        });
+      }
+      if (objective.kind === 'reach' && !maps.has(objective.targetId)) {
+        issues.push({
+          file,
+          path,
+          message: `mục tiêu tới bản đồ "${objective.targetId}" không tồn tại`,
+        });
+      }
+      if (objective.kind === 'collect' && !items.has(objective.targetId)) {
+        issues.push({
+          file,
+          path,
+          message: `mục tiêu thu thập vật phẩm "${objective.targetId}" không tồn tại`,
+        });
+      }
+    }
+
+    for (const [index, reward] of quest.rewards.items.entries()) {
+      if (!items.has(reward.itemId)) {
+        issues.push({
+          file,
+          path: `rewards.items.${index}.itemId`,
+          message: `quà thưởng "${reward.itemId}" không có file trong game-data/items/`,
+        });
+      }
+    }
+
+    for (const [index, required] of quest.requiresQuests.entries()) {
+      if (required === quest.id) {
+        issues.push({
+          file,
+          path: `requiresQuests.${index}`,
+          message: 'nhiệm vụ không thể yêu cầu chính nó',
+        });
+        continue;
+      }
+      if (!quests.has(required)) {
+        issues.push({
+          file,
+          path: `requiresQuests.${index}`,
+          message: `nhiệm vụ phải trước "${required}" không tồn tại`,
+        });
+      }
+    }
+  }
+
+  issues.push(...checkQuestCycles(data.quests));
+  return issues;
+}
+
+/** Vòng yêu cầu nhiệm vụ làm chuỗi không bao giờ nhận được — phải là lỗi dữ liệu. */
+function checkQuestCycles(quests: readonly Quest[]): GameDataIssue[] {
+  const issues: GameDataIssue[] = [];
+  const requires = new Map(quests.map((quest) => [quest.id, quest.requiresQuests]));
+  const state = new Map<string, 'visiting' | 'done'>();
+
+  const visit = (id: string, trail: readonly string[]): void => {
+    if (state.get(id) === 'done') {
+      return;
+    }
+    if (state.get(id) === 'visiting') {
+      const cycle = [...trail.slice(trail.indexOf(id)), id].join(' → ');
+      issues.push({ file: 'quests/', path: 'requiresQuests', message: `vòng nhiệm vụ: ${cycle}` });
+      return;
+    }
+    state.set(id, 'visiting');
+    for (const next of requires.get(id) ?? []) {
+      if (requires.has(next)) {
+        visit(next, [...trail, id]);
+      }
+    }
+    state.set(id, 'done');
+  };
+
+  for (const quest of quests) {
+    visit(quest.id, []);
+  }
+  return issues;
+}
+
+/**
+ * Cây hội thoại NPC: `next` phải trỏ tới nhánh có thật của **cùng NPC**, id nhánh và id lựa chọn
+ * không được trùng, và điều kiện `questId` phải là nhiệm vụ có thật.
+ */
+function checkNpcDialogs(npcs: readonly Npc[], quests: ReadonlySet<string>): GameDataIssue[] {
+  const issues: GameDataIssue[] = [];
+  for (const npc of npcs) {
+    const file = `npcs/${npc.id}.json`;
+    const nodeIds = new Set(npc.dialog.map((node) => node.id));
+    const seenNodes = new Set<string>();
+
+    for (const [index, node] of npc.dialog.entries()) {
+      if (seenNodes.has(node.id)) {
+        issues.push({
+          file,
+          path: `dialog.${index}.id`,
+          message: `nhánh "${node.id}" khai báo hai lần`,
+        });
+      }
+      seenNodes.add(node.id);
+
+      if (node.when?.questId && !quests.has(node.when.questId)) {
+        issues.push({
+          file,
+          path: `dialog.${index}.when.questId`,
+          message: `nhánh nói về nhiệm vụ "${node.when.questId}" nhưng nhiệm vụ đó không tồn tại`,
+        });
+      }
+
+      const seenOptions = new Set<string>();
+      for (const [optionIndex, option] of node.options.entries()) {
+        if (seenOptions.has(option.id)) {
+          issues.push({
+            file,
+            path: `dialog.${index}.options.${optionIndex}.id`,
+            message: `lựa chọn "${option.id}" khai báo hai lần trong cùng nhánh`,
+          });
+        }
+        seenOptions.add(option.id);
+
+        if (option.next && !nodeIds.has(option.next)) {
+          issues.push({
+            file,
+            path: `dialog.${index}.options.${optionIndex}.next`,
+            message: `lựa chọn dẫn tới nhánh "${option.next}" không có trong hội thoại của NPC này`,
+          });
+        }
+      }
+    }
+  }
+  return issues;
+}
+
+/**
  * Kiểm tra liên-file của game-data: id trùng, cổng và chỗ đặt NPC/quái, vật phẩm được nhắc tới,
- * shop của NPC, chiêu thức và độ phủ nội dung của từng phái.
+ * shop của NPC, chiêu thức và độ phủ nội dung của từng phái, nhiệm vụ và cây hội thoại.
  *
  * Hàm thuần (không đọc file) nên cả `tools/data-validator` và server dùng chung đúng một bộ luật;
  * hai nơi chỉ khác nhau ở cách đọc file và cách báo lỗi.
@@ -286,6 +467,7 @@ export function checkGameData(data: GameDataSet): GameDataIssue[] {
   const monsters = new Set(data.monsters.map((monster) => monster.id));
   const items = new Set(data.items.map((item) => item.id));
   const itemsById = new Map(data.items.map((item) => [item.id, item]));
+  const quests = new Set(data.quests.map((quest) => quest.id));
 
   return [
     ...checkPortals(maps),
@@ -294,5 +476,7 @@ export function checkGameData(data: GameDataSet): GameDataIssue[] {
     ...checkShops(data.npcs, itemsById),
     ...checkSkills(data.skills),
     ...checkClassCoverage(data),
+    ...checkQuests(data, npcs, monsters, maps, items),
+    ...checkNpcDialogs(data.npcs, quests),
   ];
 }

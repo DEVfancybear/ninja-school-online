@@ -195,8 +195,32 @@ function combatant(id: string, kind: 'player' | 'monster') {
 }
 
 describe('PROTOCOL_VERSION', () => {
-  it('là 4 ở cột mốc M4 (đã thêm trang bị theo ô, shop và cường hóa)', () => {
-    expect(PROTOCOL_VERSION).toBe(4);
+  it('là 5 ở cột mốc M5 (đã thêm nhiệm vụ chính tuyến và cây hội thoại NPC)', () => {
+    expect(PROTOCOL_VERSION).toBe(5);
+  });
+});
+
+describe('gói tin M5 (nhiệm vụ)', () => {
+  it('chấp nhận lệnh nhận nhiệm vụ theo questId', () => {
+    const result = decodeClientPacket(Opcode.C2S_QUEST_ACCEPT, { questId: 'quest-chao-lang' });
+    expect(result.ok).toBe(true);
+  });
+
+  it('chấp nhận lệnh trả nhiệm vụ theo questId', () => {
+    const result = decodeClientPacket(Opcode.C2S_QUEST_COMPLETE, { questId: 'quest-chao-lang' });
+    expect(result.ok).toBe(true);
+  });
+
+  it('từ chối lệnh nhận nhiệm vụ thiếu questId', () => {
+    expect(decodeClientPacket(Opcode.C2S_QUEST_ACCEPT, {}).ok).toBe(false);
+  });
+
+  it('chấp nhận lựa chọn trong cây hội thoại', () => {
+    const result = decodeClientPacket(Opcode.C2S_NPC_TALK, {
+      npcId: 'npc-su-phu',
+      optionId: 'xin-bai-su',
+    });
+    expect(result.ok).toBe(true);
   });
 });
 

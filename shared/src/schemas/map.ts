@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { QUEST_VIEW_STATES } from '../constants/quest.js';
 import {
   CHAT_MAX_LENGTH,
   DEFAULT_TILE_SIZE,
@@ -165,12 +166,54 @@ export const NpcLineSchema = z.object({
   text: z.string().min(1).max(CHAT_MAX_LENGTH),
 });
 
+/** Điều kiện để một nhánh hội thoại được chọn; mọi điều kiện ghi ra đều phải đúng. */
+export const NpcDialogConditionSchema = z.object({
+  /** Nhánh chỉ dùng khi người chơi đang ở trạng thái này của nhiệm vụ. */
+  questId: z
+    .string()
+    .regex(/^quest-[a-z0-9-]+$/)
+    .optional(),
+  state: z.enum(QUEST_VIEW_STATES).optional(),
+  levelAtLeast: z.number().int().min(1).optional(),
+});
+
+/** Một lựa chọn người chơi bấm trong hội thoại; `next` bỏ trống là kết thúc hội thoại. */
+export const NpcDialogOptionSchema = z.object({
+  id: z.string().regex(/^[a-z0-9-]+$/, 'id lựa chọn chỉ gồm chữ thường, chữ số và gạch ngang'),
+  text: z.string().min(1).max(CHAT_MAX_LENGTH),
+  next: z
+    .string()
+    .regex(/^[a-z0-9-]+$/, 'id nhánh chỉ gồm chữ thường, chữ số và gạch ngang')
+    .optional(),
+});
+
+/**
+ * Một nhánh hội thoại. Khi bắt đầu nói chuyện, server chọn **nhánh đầu tiên có `when` và khớp**
+ * theo thứ tự trong file — thứ tự khai báo là thứ tự ưu tiên; không nhánh nào khớp thì dùng
+ * `lines` mặc định. Nhánh **không có `when`** chỉ tới được bằng lựa chọn `next` ở nhánh trước,
+ * nên dùng nó cho đoạn nói tiếp trong cùng một cuộc hội thoại.
+ */
+export const NpcDialogNodeSchema = z.object({
+  id: z.string().regex(/^[a-z0-9-]+$/, 'id nhánh chỉ gồm chữ thường, chữ số và gạch ngang'),
+  when: NpcDialogConditionSchema.optional(),
+  lines: z.array(NpcLineSchema).min(1),
+  options: z.array(NpcDialogOptionSchema).default([]),
+});
+
 /** Một NPC trong game-data/npcs/*.json. */
 export const NpcSchema = z.object({
   id: z.string().regex(/^npc-[a-z0-9-]+$/),
   name: z.string().min(1),
   color: z.string().regex(/^#[0-9a-f]{6}$/i, 'màu phải ở dạng #rrggbb'),
+  /**
+   * Hội thoại mặc định: dùng khi NPC không có nhánh nào trong `dialog` khớp trạng thái người chơi.
+   */
   lines: z.array(NpcLineSchema).min(1),
+  /**
+   * Cây hội thoại theo trạng thái nhiệm vụ và cấp. Rỗng là NPC chỉ có một đoạn nói cố định.
+   * `checkGameData` kiểm `next` trỏ tới nhánh có thật của **cùng NPC** và `questId` có thật.
+   */
+  dialog: z.array(NpcDialogNodeSchema).default([]),
   /**
    * Vật phẩm NPC này bán, theo `itemId` trong `game-data/items/`. Rỗng là NPC thường, bấm vào chỉ
    * có hội thoại. `checkGameData` kiểm từng món phải có thật và có giá.
@@ -179,4 +222,6 @@ export const NpcSchema = z.object({
 });
 
 export type NpcLine = z.infer<typeof NpcLineSchema>;
+export type NpcDialogNode = z.infer<typeof NpcDialogNodeSchema>;
+export type NpcDialogOption = z.infer<typeof NpcDialogOptionSchema>;
 export type Npc = z.infer<typeof NpcSchema>;

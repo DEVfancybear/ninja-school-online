@@ -1,0 +1,29 @@
+{
+  "id": "quest-luyen-than-thu",
+  "name": "Luyện thân thủ",
+  "chapter": 1,
+  "summary": "Thầy Hiệu Trưởng muốn con đánh thêm ba con bù nhìn nữa cho quen tay.",
+  "giverNpcId": "npc-thay-hieu-truong",
+  "turnInNpcId": "npc-thay-hieu-truong",
+  "requiresQuests": [
+    "quest-bai-hoc-dau-tien"
+  ],
+  "objectives": [
+    {
+      "kind": "kill",
+      "targetId": "mob-bui-nhon",
+      "count": 3,
+      "description": "Đánh hạ 3 Bù Nhìn Tập Luyện"
+    }
+  ],
+  "rewards": {
+    "exp": 80,
+    "yen": 100,
+    "items": [
+      {
+        "itemId": "item-banh-bao",
+        "quantity": 2
+      }
+    ]
+  }
+}

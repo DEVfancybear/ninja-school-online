@@ -1,0 +1,24 @@
+{
+  "id": "quest-duong-toi-bai-tap",
+  "name": "Đường tới bãi tập",
+  "chapter": 1,
+  "summary": "Đi sang phía đông làng, qua cổng tới Bãi Luyện Tập để bắt đầu rèn luyện.",
+  "giverNpcId": "npc-thay-hieu-truong",
+  "turnInNpcId": "npc-thay-hieu-truong",
+  "requiresQuests": [
+    "quest-chao-lang"
+  ],
+  "objectives": [
+    {
+      "kind": "reach",
+      "targetId": "bai-luyen-tap",
+      "count": 1,
+      "description": "Đặt chân tới Bãi Luyện Tập"
+    }
+  ],
+  "rewards": {
+    "exp": 40,
+    "yen": 60,
+    "items": []
+  }
+}

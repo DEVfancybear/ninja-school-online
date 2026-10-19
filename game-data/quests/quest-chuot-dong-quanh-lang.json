@@ -1,0 +1,32 @@
+{
+  "id": "quest-chuot-dong-quanh-lang",
+  "name": "Chuột đồng quanh làng",
+  "chapter": 1,
+  "summary": "Chuột Đồng phá ruộng của làng và nhả đá vụn — dẹp ba con để có nguyên liệu.",
+  "giverNpcId": "npc-thay-do",
+  "turnInNpcId": "npc-thay-do",
+  "requiresQuests": [
+    "quest-nhat-da-vun"
+  ],
+  "objectives": [
+    {
+      "kind": "kill",
+      "targetId": "mob-chuot-dong",
+      "count": 3,
+      "description": "Đánh hạ 3 Chuột Đồng"
+    }
+  ],
+  "rewards": {
+    "exp": 90,
+    "yen": 120,
+    "items": [
+      {
+        "itemId": "item-da-vun",
+        "quantity": 3
+      }
+    ]
+  },
+  "unlocks": [
+    "party"
+  ]
+}

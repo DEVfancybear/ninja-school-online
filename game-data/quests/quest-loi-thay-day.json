@@ -1,0 +1,30 @@
+{
+  "id": "quest-loi-thay-day",
+  "name": "Lời thầy dạy",
+  "chapter": 1,
+  "levelRequired": 3,
+  "summary": "Thầy Hiệu Trưởng dặn dẹp nốt ba con chuột đồng rồi hãy tới gặp Sư Phụ.",
+  "giverNpcId": "npc-thay-hieu-truong",
+  "turnInNpcId": "npc-thay-hieu-truong",
+  "requiresQuests": [
+    "quest-thu-suc-bai-tap"
+  ],
+  "objectives": [
+    {
+      "kind": "kill",
+      "targetId": "mob-chuot-dong",
+      "count": 3,
+      "description": "Đánh hạ 3 Chuột Đồng"
+    }
+  ],
+  "rewards": {
+    "exp": 180,
+    "yen": 240,
+    "items": [
+      {
+        "itemId": "item-bua-binh-an",
+        "quantity": 1
+      }
+    ]
+  }
+}

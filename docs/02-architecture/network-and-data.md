@@ -108,7 +108,7 @@ Phần **server** của M2 đã chạy thật (kiểm thử tích hợp bằng c
 
 ### 2d. Hiện trạng đã cài đặt (M4 — trang bị theo ô, shop & cường hóa)
 
-- **Trang bị theo ô:** mỗi nhân vật có 4 ô (`EQUIP_SLOTS`: `weapon`, `body`, `feet`, `accessory`).
+- **Trang bị theo ô:** mỗi nhân vật có 4 ô (`EQUIP_SLOTS`: `weapon`, `body`, `head`, `accessory`).
   `inventory_items` thêm `upgrade_level` và `equipped_slot`, kèm **unique index một phần**
   `(character_id, equipped_slot) where equipped_slot is not null` nên database tự chặn cảnh hai món cùng
   một ô. **Túi = các hàng `equipped_slot is null`**, nên mặc/tháo chỉ đổi cột trên đúng hàng cũ: không
@@ -129,6 +129,41 @@ Phần **server** của M2 đã chạy thật (kiểm thử tích hợp bằng c
 - **Client:** bảng trang bị (4 ô + nút Tháo), bảng shop (Mua/Bán, giá, yêu cầu cấp), nút Cường hóa trong
   túi (yên + tỉ lệ, khoá khi chạm trần), thông báo kết quả; HUD thêm nút **Trang bị**; bảng túi nằm dưới
   thanh HUD và hiện cấp `+N`, chỉ số, giá bán.
+
+### 2e. Hiện trạng đã cài đặt (M5 — nhiệm vụ chính tuyến chương 1)
+
+- **Hợp đồng (`PROTOCOL_VERSION` 5):** ba gói mới — `C2S_QUEST_ACCEPT` 0x0601, `C2S_QUEST_COMPLETE` 0x0602,
+  `S2C_QUEST_UPDATE` 0x0603; `C2S_NPC_TALK` thêm `optionId` (đi tiếp trong cây hội thoại), `S2C_NPC_DIALOG`
+  mang thêm `nodeId`, `options` và `quests` (nhiệm vụ làm được ngay tại NPC đó). Mã lỗi riêng theo nguyên
+  nhân: `quest_not_found`, `quest_locked`, `quest_already_active`, `quest_already_done`, `quest_too_many`,
+  `quest_not_ready`, `quest_wrong_npc`, `dialog_not_open`.
+- **Dữ liệu:** mỗi nhiệm vụ một file `game-data/quests/*.json` (người giao, người nhận trả, cấp yêu cầu,
+  danh sách nhiệm vụ phải trước, mục tiêu, thưởng, cờ mở khóa). `checkGameData` kiểm liên-file: NPC/quái/
+  bản đồ/vật phẩm được nhắc tới phải có thật, `requiresQuests` không được có vòng, `next` của cây hội thoại
+  phải trỏ tới nhánh có thật của **cùng NPC**.
+- **Bảng mới:** `character_quests` (`character_id`, `quest_id`, `status`, `progress` jsonb, `accepted_at`,
+  `completed_at`; unique theo cặp) và `character_features` (`character_id`, `feature`, `unlocked_at`).
+  Tiến độ nằm trong database nên **thoát giữa chừng rồi đăng nhập lại vẫn còn nguyên** — `S2C_QUEST_UPDATE`
+  được gửi ngay sau bắt tay, cùng lúc với `S2C_CHARACTER`/`S2C_INVENTORY_UPDATE`/`S2C_EQUIPMENT`.
+- **Luật nhận/trả:** phải **đang nói chuyện với đúng NPC** (người giao khi nhận, người nhận trả khi trả) và
+  NPC đó phải ở bản đồ hiện tại; nhiệm vụ phải trước đã trả xong, đủ cấp, chưa nhận và chưa trả; tối đa
+  `MAX_ACTIVE_QUESTS` = 5 nhiệm vụ cùng lúc; mọi thao tác bị chặn khi đang trong trận (`in_battle`).
+- **Mục tiêu:** `talk` (nói chuyện NPC), `kill` (đánh hạ quái, tính cho **mọi người** trong trận thắng),
+  `reach` (đặt chân tới bản đồ), `collect` (số món **đang có trong túi**). Ba loại đầu cộng dồn vào
+  `progress` khi nhiệm vụ **đang làm**; `collect` được đếm lại lúc mở hội thoại và lúc trả, và **không tiêu**
+  món khi trả. Tiến độ nhiệm vụ được cập nhật **trước** khi server chọn nhánh hội thoại, nên NPC phản ứng
+  đúng với việc người chơi vừa làm.
+- **Thưởng:** exp (lên cấp thì gửi `S2C_LEVEL_UP`), yên và vật phẩm; túi đầy thì nhiệm vụ vẫn trả xong, phần
+  vật phẩm không cất được **mất** kèm một dòng `S2C_NOTIFY` nói rõ — người chơi không bao giờ bị kẹt.
+  `unlocks` ghi cờ vào `character_features`; chương 1 mở `party` (M6) và `arena` (M6) và **chưa chặn** tính
+  năng nào đang có, nên không ai bị kẹt vì cờ này.
+- **Hội thoại theo cây:** NPC khai `dialog` là danh sách nhánh có điều kiện (`questId` + `state`, hoặc
+  `levelAtLeast`). Khi bắt đầu nói chuyện, server chọn **nhánh đầu tiên có `when` và khớp** theo thứ tự
+  trong file; không nhánh nào khớp thì dùng `lines` mặc định (giữ nguyên hành vi M2). Nhánh **không có
+  `when`** chỉ tới được bằng lựa chọn `next` ở nhánh trước — dùng cho đoạn nói tiếp trong cùng cuộc hội thoại.
+- **Nội dung chương 1:** 12 nhiệm vụ nối nhau từ *Chào làng* → *Bài học đầu tiên* → *Bái sư*, có nhánh song
+  song (Thầy Đồ và thầy Hiệu Trưởng) hội tụ ở *Bái sư*; NPC mới `npc-su-phu` (Sư Phụ) ở làng; hội thoại của
+  ba NPC đổi nhánh theo trạng thái nhiệm vụ.
 
 ## 3. Định dạng gói tin
 
@@ -172,11 +207,11 @@ Quy ước: `C2S_*` = client → server, `S2C_*` = server → client. Mọi gói
 | `S2C_ENTITY_MOVE` | S→C | Vị trí thực thể, gộp nhiều thực thể trong một gói mỗi tick (M2) |
 | `S2C_ENTITY_ADD/REMOVE` | S→C | Thực thể vào/ra tầm nhìn (M2: vào/ra room) |
 | `C2S_CHAT` / `S2C_CHAT` | 2 chiều | Chat khu vực/thế giới/hệ thống (M2 mới có kênh `map`) |
-| `C2S_NPC_TALK` / `S2C_NPC_DIALOG` | 2 chiều | Hội thoại NPC (M2: trả lời NPC trong map hiện tại) |
+| `C2S_NPC_TALK` / `S2C_NPC_DIALOG` | 2 chiều | Hội thoại NPC — M2: trả lời NPC trong map hiện tại; M5: `optionId` để đi tiếp trong cây hội thoại, gói trả về thêm `nodeId`, `options`, `quests` |
 | `C2S_PING` / `S2C_PONG` | 2 chiều | Nhịp sống (M2): `clientTime` / `clientTime` + `serverTime` (ms epoch) |
 | `S2C_ERROR` | S→C | Lỗi theo mã kèm `fatal` (M2); mã trong `shared/src/protocol/opcodes.ts` |
-| `C2S_QUEST_ACCEPT/COMPLETE` | C→S | Nhận/trả nhiệm vụ |
-| `S2C_QUEST_UPDATE` | S→C | Cập nhật tiến độ nhiệm vụ |
+| `C2S_QUEST_ACCEPT` / `C2S_QUEST_COMPLETE` | C→S | Nhận/trả nhiệm vụ (`questId`) — M5: phải đang nói chuyện với đúng NPC (người giao/người nhận trả) |
+| `S2C_QUEST_UPDATE` | S→C | Toàn bộ trạng thái nhiệm vụ — M5: `active` (kèm tiến độ từng mục tiêu), `available`, `completed`, `unlockedFeatures`, `maxActive`; gửi sau bắt tay và mỗi lần có gì đổi |
 | `C2S_ATTACK_MOB` | C→S | Chạm vào quái để bắt đầu trận (M3: trong tầm 96 px, quái phải còn sống) |
 | `S2C_BATTLE_START` | S→C | Trận bắt đầu: danh sách tham gia, người tới lượt, hạn lượt (M3; phát lại khi có người vào chung) |
 | `S2C_BATTLE_TURN` | S→C | Đến lượt ai, còn bao lâu (M3) |
@@ -215,10 +250,10 @@ Game gốc xử lý gần hết ở client nên bị chế auto/mod dễ dàng. 
 
 ### 6.1 Bảng PostgreSQL (dữ liệu chạy)
 
-**Trạng thái: bảng này là thiết kế đích cho cả dự án, không phải danh sách "đã có".** Sau M4, database
-có `accounts`, `characters`, `refresh_tokens`, `inventory_items` (thêm `upgrade_level`, `equipped_slot`) và
-`transactions` — xem `server/src/db/schema.ts` và ba migration trong `server/drizzle/`; các bảng còn lại sẽ
-được tạo ở cột mốc tương ứng. Cột `map_id`, `x`, `y`, `stats`, `last_login` của `characters` **chưa có**
+**Trạng thái: bảng này là thiết kế đích cho cả dự án, không phải danh sách "đã có".** Sau M5, database
+có `accounts`, `characters`, `refresh_tokens`, `inventory_items` (thêm `upgrade_level`, `equipped_slot`),
+`transactions`, `character_quests` và `character_features` — xem `server/src/db/schema.ts` và bốn migration
+trong `server/drizzle/`; các bảng còn lại sẽ được tạo ở cột mốc tương ứng. Cột `map_id`, `x`, `y`, `stats`, `last_login` của `characters` **chưa có**
 (M2/M3 chưa lưu vị trí — xem 6.3), nhưng đã có thêm `hp`/`mp` với quy ước `null` = đang đầy.
 
 | Bảng | Cột chính | Ghi chú | Đã có |
@@ -229,7 +264,8 @@ có `accounts`, `characters`, `refresh_tokens`, `inventory_items` (thêm `upgrad
 | `inventory_items` | id, character_id, item_id, quantity, **upgrade_level, equipped_slot**, created_at | **thay cho bảng `items` dự kiến**: một hàng cho mỗi **loại** vật phẩm kèm số lượng (khớp cách túi hiển thị), sức chứa đếm theo số loại. M4 thêm cấp cường hóa và ô đang mặc, kèm unique index một phần `(character_id, equipped_slot) where equipped_slot is not null`; **túi = hàng có `equipped_slot is null`** | ✅ M3 + M4 |
 | `char_skills` | char_id, skill_id, skill_level | **không dùng ở M3**: học chiêu là hàm của phái và cấp, dữ liệu chiêu là nguồn sự thật duy nhất | ❌ chưa có |
 | `items` | id, owner_id, template_id, qty, upgrade_level, bound, slot, meta(jsonb) | vật phẩm có thuộc tính riêng (cường hóa, khóa, ô trang bị) — thay bằng `inventory_items` ở M3; M4 giải quyết bằng cột `upgrade_level`/`equipped_slot` trên `inventory_items` nên bảng này vẫn không cần | ❌ không cần |
-| `quest_progress` | char_id, quest_id, state, progress(jsonb) | nhiệm vụ | M5 |
+| `character_quests` | character_id, quest_id, status, progress(jsonb), accepted_at, completed_at | **thay cho `quest_progress` dự kiến**: một hàng cho mỗi nhiệm vụ **đã nhận**; `progress` giữ số đếm của các mục tiêu `talk`/`kill`/`reach` (mục tiêu `collect` đếm lại từ túi), unique theo `(character_id, quest_id)` | ✅ M5 |
+| `character_features` | character_id, feature, unlocked_at | cờ tính năng mở khóa bằng nhiệm vụ (`unlocks`); chương 1 mở `party`, `arena` | ✅ M5 |
 | `friends` | char_id, friend_id, status | bạn bè | M6 |
 | `guilds` | id, name, level, exp, notice, created_at | bang hội | M7 |
 | `guild_members` | guild_id, char_id, rank, joined_at | thành viên | M7 |
@@ -248,7 +284,7 @@ có `accounts`, `characters`, `refresh_tokens`, `inventory_items` (thêm `upgrad
 | Quái | `monsters/mob-bui-nhon.json`, `mob-chuot-dong.json`, `mob-heo-rung.json` (đã có ở M3) | hình dáng để vẽ, màu, cấp, máu, tấn công, phòng thủ, tốc độ, kinh nghiệm, khoảng yên, bảng rơi đồ, thời gian hồi sinh |
 | Vật phẩm | `items/item-kiem-go.json`, `item-banh-bao.json`, `item-tra-rung.json`, `item-da-vun.json` (đã có) | loại, ô trang bị, chỉ số, cấp yêu cầu, giá, mốc cường hóa, **hiệu ứng dùng được** (`consumable`: hồi máu/nội lực) |
 | Chiêu thức | `skills/skill-tram-co-ban.json` (đã có) | hệ, sát thương gốc, hệ số, năng lượng, hồi chiêu, hiệu ứng, số mục tiêu |
-| Nhiệm vụ | `quests/quest-chao-lang.json` (sẽ tạo ở M5) | cấp yêu cầu, các bước (nói chuyện/đánh/thu thập), thưởng |
+| Nhiệm vụ | `quests/quest-chao-lang.json`, `quest-bai-su.json` (đã có ở M5) | người giao, người nhận trả, cấp yêu cầu, nhiệm vụ phải trước, mục tiêu (`talk`/`kill`/`reach`/`collect`), thưởng exp/yên/vật phẩm, cờ mở khóa |
 | Trường/phái | `classes/school-haruna.json`, `school-hirosaki.json`, `school-ookaza.json` (đã có ở M3) | chỉ số ở cấp 1, phần tăng mỗi cấp, yên và vật phẩm khởi đầu |
 
 Ví dụ một chiêu (minh họa định dạng, số liệu tự đặt):
@@ -288,5 +324,5 @@ Ví dụ một chiêu (minh họa định dạng, số liệu tự đặt):
 - Bắt tay `C2S_HELLO` gửi phiên bản; lệch → server từ chối kèm thông báo "hãy tải lại trang".
 - Endpoint `GET /version` trả phiên bản server + client mong đợi (dùng cho màn hình bảo trì).
 - Phía server (M2): `C2S_HELLO` lệch `PROTOCOL_VERSION` → `S2C_ERROR` `protocol_mismatch` (`fatal: true`) rồi đóng kết nối, thông báo nhắc tải lại trang.
-- `PROTOCOL_VERSION` hiện là **3** (M3 thêm gói chiến đấu, túi đồ, chỉ số nhân vật).
+- `PROTOCOL_VERSION` hiện là **5** (M4 thêm gói trang bị/shop/cường hóa, M5 thêm gói nhiệm vụ và cây hội thoại).
 - Quy tắc: thay đổi protocol **chỉ** ở server hoặc client đều phải tăng `PROTOCOL_VERSION` trong cùng một lần merge.

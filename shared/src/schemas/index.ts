@@ -6,4 +6,5 @@ export * from './item.js';
 export * from './map.js';
 export * from './school.js';
 export * from './monster.js';
+export * from './quest.js';
 export * from './game-data.js';

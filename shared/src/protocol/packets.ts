@@ -3,6 +3,7 @@ import { CLASSES, SCHOOLS } from '../constants/game.js';
 import { INVENTORY_CAPACITY } from '../constants/character.js';
 import { EQUIP_SLOTS, SELL_PRICE_RATIO } from '../constants/equipment.js';
 import { CHAT_MAX_LENGTH, MAX_MOVE_DISTANCE_PX } from '../constants/world.js';
+import { MAX_ACTIVE_QUESTS, QUEST_OBJECTIVE_KINDS, QUEST_VIEW_STATES } from '../constants/quest.js';
 import { ITEM_KINDS } from '../schemas/item.js';
 import { MONSTER_SHAPES } from '../schemas/monster.js';
 import { StatBlockSchema } from '../schemas/school.js';
@@ -65,6 +66,85 @@ export const ShopSchema = z.object({
   entries: z.array(ShopEntrySchema),
 });
 export type Shop = z.infer<typeof ShopSchema>;
+
+// ----------------------------------------------------------- nhiệm vụ (M5)
+
+/** Một mục tiêu nhiệm vụ kèm tiến độ hiện tại; client hiện thẳng, không tự tính lại. */
+export const QuestObjectiveViewSchema = z.object({
+  kind: z.enum(QUEST_OBJECTIVE_KINDS),
+  targetId: z.string().min(1),
+  description: z.string().min(1),
+  count: z.number().int().min(1),
+  /** Đã làm được bao nhiêu, luôn kẹp trong `[0, count]`. */
+  progress: z.number().int().min(0),
+  done: z.boolean(),
+});
+export type QuestObjectiveView = z.infer<typeof QuestObjectiveViewSchema>;
+
+/** Phần thưởng đã tra tên sẵn để client hiện được mà không cần đọc game-data. */
+export const QuestRewardViewSchema = z.object({
+  exp: z.number().int().min(0),
+  yen: z.number().int().min(0),
+  items: z.array(
+    z.object({
+      itemId: z.string().min(1),
+      name: z.string().min(1),
+      quantity: z.number().int().min(1),
+    }),
+  ),
+});
+export type QuestRewardView = z.infer<typeof QuestRewardViewSchema>;
+
+/** Một nhiệm vụ theo góc nhìn của người chơi, dùng cho nhật ký nhiệm vụ và hội thoại NPC. */
+export const QuestViewSchema = z.object({
+  questId: z.string().min(1),
+  name: z.string().min(1),
+  summary: z.string().default(''),
+  chapter: z.number().int().min(1),
+  state: z.enum(QUEST_VIEW_STATES),
+  giverNpcId: z.string().min(1),
+  giverName: z.string().min(1),
+  turnInNpcId: z.string().min(1),
+  turnInName: z.string().min(1),
+  levelRequired: z.number().int().min(1),
+  objectives: z.array(QuestObjectiveViewSchema).min(1),
+  rewards: QuestRewardViewSchema,
+  unlocks: z.array(z.string()).default([]),
+});
+export type QuestView = z.infer<typeof QuestViewSchema>;
+
+/** Nhiệm vụ chưa nhận mà người chơi đã đủ điều kiện nhận — dùng để chỉ đường cho người chơi mới. */
+export const QuestAvailableSchema = z.object({
+  questId: z.string().min(1),
+  name: z.string().min(1),
+  giverNpcId: z.string().min(1),
+  giverName: z.string().min(1),
+  turnInNpcId: z.string().min(1),
+  turnInName: z.string().min(1),
+  levelRequired: z.number().int().min(1),
+});
+export type QuestAvailable = z.infer<typeof QuestAvailableSchema>;
+
+/** Toàn bộ trạng thái nhiệm vụ của nhân vật — gửi sau bắt hay và mỗi lần có gì đổi. */
+export const QuestUpdateSchema = z.object({
+  /** Nhiệm vụ đang làm (kể cả đã xong mục tiêu, chờ trả), theo thứ tự nhận. */
+  active: z.array(QuestViewSchema),
+  /** Nhiệm vụ đủ điều kiện nhận, chưa nhận. */
+  available: z.array(QuestAvailableSchema),
+  /** Id các nhiệm vụ đã trả xong. */
+  completed: z.array(z.string()),
+  /** Cờ tính năng đã mở khóa bằng nhiệm vụ (`questFeatureLabel()` để hiện tên tiếng Việt). */
+  unlockedFeatures: z.array(z.string()),
+  /** Trần số nhiệm vụ nhận cùng lúc, client hiện trong nhật ký. */
+  maxActive: z.number().int().min(1).default(MAX_ACTIVE_QUESTS),
+});
+export type QuestUpdate = z.infer<typeof QuestUpdateSchema>;
+
+export const QuestAcceptSchema = z.object({ questId: z.string().min(1) });
+export type QuestAccept = z.infer<typeof QuestAcceptSchema>;
+
+export const QuestCompleteSchema = z.object({ questId: z.string().min(1) });
+export type QuestComplete = z.infer<typeof QuestCompleteSchema>;
 
 // ---------------------------------------------------------------- hệ thống
 
@@ -134,6 +214,16 @@ export const ErrorCode = {
   NOT_UPGRADABLE: 'not_upgradable',
   UPGRADE_MAXED: 'upgrade_maxed',
   NOT_ENOUGH_MATERIAL: 'not_enough_material',
+
+  // Nhiệm vụ (M5): mỗi lý do từ chối một mã riêng để người chơi biết vì sao không nhận/trả được.
+  QUEST_NOT_FOUND: 'quest_not_found',
+  QUEST_LOCKED: 'quest_locked',
+  QUEST_ALREADY_ACTIVE: 'quest_already_active',
+  QUEST_ALREADY_DONE: 'quest_already_done',
+  QUEST_TOO_MANY: 'quest_too_many',
+  QUEST_NOT_READY: 'quest_not_ready',
+  QUEST_WRONG_NPC: 'quest_wrong_npc',
+  DIALOG_NOT_OPEN: 'dialog_not_open',
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 
@@ -234,15 +324,31 @@ export const ChatMessageSchema = z.object({
 });
 export type ChatMessage = z.infer<typeof ChatMessageSchema>;
 
-export const NpcTalkSchema = z.object({ npcId: z.string().min(1) });
+export const NpcTalkSchema = z.object({
+  npcId: z.string().min(1),
+  /**
+   * Lựa chọn trong cây hội thoại đang mở. Bỏ trống là **bắt đầu** nói chuyện (server tự chọn nhánh
+   * theo trạng thái nhiệm vụ); có `optionId` là đi tiếp trong cây.
+   */
+  optionId: z.string().min(1).optional(),
+});
 export type NpcTalk = z.infer<typeof NpcTalkSchema>;
 
 export const NpcDialogSchema = z.object({
   npcId: z.string().min(1),
   npcName: z.string().min(1),
   lines: z.array(z.object({ speaker: z.string().min(1), text: z.string().min(1) })),
+  /** Nhánh hội thoại đang mở trong cây; `null` là hội thoại mặc định (không có nhánh nào khớp). */
+  nodeId: z.string().min(1).nullable().default(null),
+  /** Lựa chọn người chơi bấm được ở nhánh này; rỗng là hội thoại một chiều. */
+  options: z.array(z.object({ id: z.string().min(1), text: z.string().min(1) })).default([]),
   /** Quầy hàng của NPC này; `null` là NPC thường, chỉ nói chuyện. */
   shop: ShopSchema.nullable().default(null),
+  /**
+   * Nhiệm vụ làm được **ngay tại NPC này**: nhận ở người giao, trả ở người nhận trả. Rỗng là NPC
+   * không liên quan tới nhiệm vụ nào của người chơi.
+   */
+  quests: z.array(QuestViewSchema).default([]),
 });
 export type NpcDialog = z.infer<typeof NpcDialogSchema>;
 
@@ -544,6 +650,8 @@ export const CLIENT_PACKETS: PacketSchemaTable = {
   [Opcode.C2S_UPGRADE]: UpgradeSchema,
   [Opcode.C2S_ATTACK_MOB]: AttackMobSchema,
   [Opcode.C2S_BATTLE_ACTION]: BattleActionSchema,
+  [Opcode.C2S_QUEST_ACCEPT]: QuestAcceptSchema,
+  [Opcode.C2S_QUEST_COMPLETE]: QuestCompleteSchema,
 } as const;
 
 /** Gói tin server gửi xuống, dùng cho client kiểm tra và cho kiểm thử. */
@@ -567,6 +675,7 @@ export const SERVER_PACKETS: PacketSchemaTable = {
   [Opcode.S2C_BATTLE_TURN]: BattleTurnSchema,
   [Opcode.S2C_BATTLE_RESULT]: BattleResultSchema,
   [Opcode.S2C_BATTLE_END]: BattleEndSchema,
+  [Opcode.S2C_QUEST_UPDATE]: QuestUpdateSchema,
 } as const;
 
 /** Mã gói tin mà client được phép gửi (theo đúng bảng ở trên). */

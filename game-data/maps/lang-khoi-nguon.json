@@ -2617,6 +2617,11 @@
    "id": "npc-thay-do",
    "x": 18,
    "y": 14
+  },
+  {
+   "id": "npc-su-phu",
+   "x": 23,
+   "y": 8
   }
  ],
  "monsters": [

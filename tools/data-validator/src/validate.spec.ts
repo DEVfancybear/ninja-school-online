@@ -171,3 +171,70 @@ describe('validateGameData — kiểm liên-map', () => {
     expect(result.errors.every((error) => error.file === 'maps/map-mot.json')).toBe(true);
   });
 });
+
+describe('validateGameData — nhiệm vụ', () => {
+  const questFixture = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+    id: 'quest-chao-lang',
+    name: 'Chào làng',
+    summary: 'Ghé chào Thầy Đồ.',
+    giverNpcId: 'npc-thay-do',
+    turnInNpcId: 'npc-thay-do',
+    objectives: [{ kind: 'talk', targetId: 'npc-thay-do', description: 'Ghé chào Thầy Đồ' }],
+    rewards: { exp: 30, yen: 50 },
+    ...overrides,
+  });
+
+  it('chấp nhận nhiệm vụ trỏ tới NPC có thật', async () => {
+    await write('npcs/npc-thay-do.json', npcFixture('npc-thay-do'));
+    await write('quests/quest-chao-lang.json', questFixture());
+    expect(await validateGameData(dir)).toEqual({ checked: 2, errors: [] });
+  });
+
+  it('báo lỗi ở mọi chỗ nhiệm vụ trỏ tới NPC chưa có file', async () => {
+    await write(
+      'quests/quest-chao-lang.json',
+      questFixture({
+        giverNpcId: 'npc-chua-co',
+        turnInNpcId: 'npc-chua-co',
+        objectives: [{ kind: 'talk', targetId: 'npc-chua-co', description: 'Ghé chào' }],
+      }),
+    );
+    const result = await validateGameData(dir);
+    // Ba chỗ cùng trỏ tới NPC đó: người giao, người nhận trả và mục tiêu nói chuyện.
+    expect(result.errors).toHaveLength(3);
+    expect(result.errors.every((error) => error.file === 'quests/quest-chao-lang.json')).toBe(true);
+    expect(result.errors.every((error) => error.message.includes('npc-chua-co'))).toBe(true);
+    expect(result.errors.map((error) => error.path)).toEqual([
+      'giverNpcId',
+      'turnInNpcId',
+      'objectives.0.targetId',
+    ]);
+  });
+
+  it('báo lỗi khi nhiệm vụ phải trước không tồn tại', async () => {
+    await write('npcs/npc-thay-do.json', npcFixture('npc-thay-do'));
+    await write(
+      'quests/quest-chao-lang.json',
+      questFixture({ requiresQuests: ['quest-khong-co'] }),
+    );
+    const result = await validateGameData(dir);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]?.message).toContain('quest-khong-co');
+  });
+
+  it('báo lỗi khi cây hội thoại dẫn tới nhánh không có', async () => {
+    await write('npcs/npc-thay-do.json', {
+      ...npcFixture('npc-thay-do'),
+      dialog: [
+        {
+          id: 'mo-dau',
+          lines: [{ speaker: 'Thầy Đồ', text: 'Ghé xem hàng đi.' }],
+          options: [{ id: 'di-tiep', text: 'Vâng', next: 'khong-co' }],
+        },
+      ],
+    });
+    const result = await validateGameData(dir);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]?.message).toContain('khong-co');
+  });
+});

@@ -1,0 +1,82 @@
+{
+  "id": "npc-su-phu",
+  "name": "Sư Phụ",
+  "color": "#6f7fd6",
+  "lines": [
+    {
+      "speaker": "Sư Phụ",
+      "text": "Ta là Sư Phụ ở đây. Cứ rèn luyện đi, khi nào thầy Hiệu Trưởng bảo đã đủ thì tới gặp ta."
+    }
+  ],
+  "dialog": [
+    {
+      "id": "bai-su",
+      "when": {
+        "questId": "quest-bai-su",
+        "state": "ready"
+      },
+      "lines": [
+        {
+          "speaker": "Sư Phụ",
+          "text": "Thầy Hiệu Trưởng đã kể hết về con. Con đã sẵn sàng bái sư chưa?"
+        }
+      ],
+      "options": [
+        {
+          "id": "xin-bai-su",
+          "text": "Con xin bái sư",
+          "next": "le-bai-su"
+        },
+        {
+          "id": "suy-nghi",
+          "text": "Để con suy nghĩ thêm"
+        }
+      ]
+    },
+    {
+      "id": "le-bai-su",
+      "lines": [
+        {
+          "speaker": "Sư Phụ",
+          "text": "Từ hôm nay con là đệ tử của ta."
+        },
+        {
+          "speaker": "Sư Phụ",
+          "text": "Luyện cho giỏi, rồi Lôi Đài sẽ mở cho con."
+        }
+      ],
+      "options": [
+        {
+          "id": "da-ta",
+          "text": "Đa tạ sư phụ"
+        }
+      ]
+    },
+    {
+      "id": "da-bai-su",
+      "when": {
+        "questId": "quest-bai-su",
+        "state": "completed"
+      },
+      "lines": [
+        {
+          "speaker": "Sư Phụ",
+          "text": "Đệ tử của ta, hôm nay luyện được gì rồi?"
+        }
+      ]
+    },
+    {
+      "id": "chua-xong",
+      "when": {
+        "questId": "quest-bai-su",
+        "state": "active"
+      },
+      "lines": [
+        {
+          "speaker": "Sư Phụ",
+          "text": "Con còn việc thầy Hiệu Trưởng giao chưa xong. Làm xong rồi hãy tới bái sư."
+        }
+      ]
+    }
+  ]
+}

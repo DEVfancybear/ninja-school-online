@@ -15,5 +15,59 @@
       "speaker": "Thầy Hiệu Trưởng",
       "text": "Khi đã sẵn sàng, con sẽ được nhận nhiệm vụ đầu tiên."
     }
+  ],
+  "dialog": [
+    {
+      "id": "giao-bai-hoc",
+      "when": {
+        "questId": "quest-bai-hoc-dau-tien",
+        "state": "active"
+      },
+      "lines": [
+        {
+          "speaker": "Thầy Hiệu Trưởng",
+          "text": "Bãi Luyện Tập ở phía đông làng, qua cổng đá. Đánh hạ hai con bù nhìn rồi về báo thầy."
+        }
+      ]
+    },
+    {
+      "id": "thuong-bai-hoc",
+      "when": {
+        "questId": "quest-bai-hoc-dau-tien",
+        "state": "ready"
+      },
+      "lines": [
+        {
+          "speaker": "Thầy Hiệu Trưởng",
+          "text": "Hai con bù nhìn đã gục dưới tay con. Lại đây nhận phần thưởng."
+        }
+      ]
+    },
+    {
+      "id": "giao-thu-thach",
+      "when": {
+        "questId": "quest-thu-suc-bai-tap",
+        "state": "active"
+      },
+      "lines": [
+        {
+          "speaker": "Thầy Hiệu Trưởng",
+          "text": "Bốn con bù nhìn liên tiếp — xong thì thầy giới thiệu con với Sư Phụ."
+        }
+      ]
+    },
+    {
+      "id": "giao-bai-su",
+      "when": {
+        "questId": "quest-bai-su",
+        "state": "active"
+      },
+      "lines": [
+        {
+          "speaker": "Thầy Hiệu Trưởng",
+          "text": "Con đã đủ tư cách làm đệ tử. Sư Phụ đang đợi con ở phía đông bắc làng."
+        }
+      ]
+    }
   ]
 }

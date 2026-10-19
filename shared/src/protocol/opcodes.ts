@@ -74,6 +74,13 @@ export const Opcode = {
   S2C_BATTLE_RESULT: 0x0505,
   /** Trận kết thúc: thắng, thua hay chạy thoát, kèm phần thưởng của người nhận. */
   S2C_BATTLE_END: 0x0506,
+
+  /** Nhận một nhiệm vụ đang nói chuyện với NPC giao nhiệm vụ. */
+  C2S_QUEST_ACCEPT: 0x0601,
+  /** Trả một nhiệm vụ đã xong mục tiêu cho NPC nhận trả. */
+  C2S_QUEST_COMPLETE: 0x0602,
+  /** Toàn bộ trạng thái nhiệm vụ của nhân vật: đang làm, có thể nhận, đã xong, tính năng mở khóa. */
+  S2C_QUEST_UPDATE: 0x0603,
 } as const;
 
 export type Opcode = (typeof Opcode)[keyof typeof Opcode];

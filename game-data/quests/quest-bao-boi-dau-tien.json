@@ -1,0 +1,30 @@
+{
+  "id": "quest-bao-boi-dau-tien",
+  "name": "Bảo bối đầu tiên",
+  "chapter": 1,
+  "levelRequired": 2,
+  "summary": "Tám viên đá vụn đổi lấy thanh Kiếm Sắt của Thầy Đồ.",
+  "giverNpcId": "npc-thay-do",
+  "turnInNpcId": "npc-thay-do",
+  "requiresQuests": [
+    "quest-do-nghe-cua-thay"
+  ],
+  "objectives": [
+    {
+      "kind": "collect",
+      "targetId": "item-da-vun",
+      "count": 8,
+      "description": "Có 8 Đá Vụn trong túi"
+    }
+  ],
+  "rewards": {
+    "exp": 160,
+    "yen": 220,
+    "items": [
+      {
+        "itemId": "item-kiem-sat",
+        "quantity": 1
+      }
+    ]
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "id": "quest-chao-lang",
+  "name": "Chào làng",
+  "chapter": 1,
+  "summary": "Thầy Hiệu Trưởng bảo con ghé chào Thầy Đồ — người bán đồ cho học viên trong làng.",
+  "giverNpcId": "npc-thay-hieu-truong",
+  "turnInNpcId": "npc-thay-hieu-truong",
+  "requiresQuests": [],
+  "objectives": [
+    {
+      "kind": "talk",
+      "targetId": "npc-thay-do",
+      "count": 1,
+      "description": "Ghé chào Thầy Đồ"
+    }
+  ],
+  "rewards": {
+    "exp": 30,
+    "yen": 50,
+    "items": []
+  }
+}

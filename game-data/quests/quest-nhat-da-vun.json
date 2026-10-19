@@ -1,0 +1,24 @@
+{
+  "id": "quest-nhat-da-vun",
+  "name": "Nhặt đá vụn",
+  "chapter": 1,
+  "summary": "Thầy Đồ cần đá vụn để cường hóa đồ cho học viên: nhặt hai viên quanh làng.",
+  "giverNpcId": "npc-thay-do",
+  "turnInNpcId": "npc-thay-do",
+  "requiresQuests": [
+    "quest-bai-hoc-dau-tien"
+  ],
+  "objectives": [
+    {
+      "kind": "collect",
+      "targetId": "item-da-vun",
+      "count": 2,
+      "description": "Có 2 Đá Vụn trong túi"
+    }
+  ],
+  "rewards": {
+    "exp": 50,
+    "yen": 70,
+    "items": []
+  }
+}

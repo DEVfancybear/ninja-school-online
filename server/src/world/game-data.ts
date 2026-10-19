@@ -8,6 +8,7 @@ import {
   ItemSchema,
   MonsterSchema,
   NpcSchema,
+  QuestSchema,
   SkillSchema,
   type ClassDefinition,
   type GameDataSet,
@@ -16,6 +17,7 @@ import {
   type Item,
   type Monster,
   type Npc,
+  type Quest,
   type Skill,
 } from '@ninja/shared';
 import type { ZodType } from 'zod';
@@ -57,6 +59,7 @@ export interface GameData {
   readonly skills: ReadonlyMap<string, Skill>;
   readonly items: ReadonlyMap<string, Item>;
   readonly classes: ReadonlyMap<string, ClassDefinition>;
+  readonly quests: ReadonlyMap<string, Quest>;
 }
 
 /** Thư mục con của game-data: mỗi nơi có schema riêng và một khoá id riêng. */
@@ -123,6 +126,7 @@ export async function loadGameData(gameDataDir: string = DEFAULT_GAME_DATA_DIR):
     skills: [] as Skill[],
     items: [] as Item[],
     classes: [] as ClassDefinition[],
+    quests: [] as Quest[],
   };
   const loaded: Loaded = { checked: 0, issues: [] };
 
@@ -152,6 +156,11 @@ export async function loadGameData(gameDataDir: string = DEFAULT_GAME_DATA_DIR):
       dir: 'classes',
       schema: ClassDefinitionSchema as ZodType<unknown>,
       push: (v) => data.classes.push(v as ClassDefinition),
+    },
+    {
+      dir: 'quests',
+      schema: QuestSchema as ZodType<unknown>,
+      push: (v) => data.quests.push(v as Quest),
     },
   ];
 
@@ -186,5 +195,6 @@ export async function loadGameData(gameDataDir: string = DEFAULT_GAME_DATA_DIR):
     skills: index(data.skills, (skill) => skill.id),
     items: index(data.items, (item) => item.id),
     classes: index(data.classes, (definition) => definition.school),
+    quests: index(data.quests, (quest) => quest.id),
   };
 }

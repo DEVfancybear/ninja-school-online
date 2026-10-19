@@ -25,5 +25,46 @@
     "item-giap-da",
     "item-banh-bao",
     "item-tra-rung"
+  ],
+  "dialog": [
+    {
+      "id": "giao-da-vun",
+      "when": {
+        "questId": "quest-nhat-da-vun",
+        "state": "active"
+      },
+      "lines": [
+        {
+          "speaker": "Thầy Đồ",
+          "text": "Đá vụn rơi từ chuột đồng và heo rừng quanh làng. Nhặt đủ hai viên rồi quay lại thầy."
+        }
+      ]
+    },
+    {
+      "id": "giao-do-nghe",
+      "when": {
+        "questId": "quest-do-nghe-cua-thay",
+        "state": "active"
+      },
+      "lines": [
+        {
+          "speaker": "Thầy Đồ",
+          "text": "Đủ năm viên đá vụn thì thầy đổi cho con tấm Áo Vải."
+        }
+      ]
+    },
+    {
+      "id": "giao-bao-boi",
+      "when": {
+        "questId": "quest-bao-boi-dau-tien",
+        "state": "active"
+      },
+      "lines": [
+        {
+          "speaker": "Thầy Đồ",
+          "text": "Tám viên đá vụn đổi thanh Kiếm Sắt — món ngon nhất của thầy đấy."
+        }
+      ]
+    }
   ]
 }

@@ -16,6 +16,10 @@ export class NpcService {
       npcId: npc.id,
       npcName: npc.name,
       lines: npc.data.lines.map((line) => ({ speaker: line.speaker, text: line.text })),
+      // Hội thoại theo cây và nhiệm vụ làm ở M5 (`WorldService` truyền nhánh đã chọn vào đây).
+      nodeId: null,
+      options: [],
+      quests: [],
       // NPC thường (không bán gì) trả `null` để client khỏi mở bảng hàng rỗng.
       shop: npc.data.shop.length > 0 ? this.shops.shopFor(npc.data) : null,
     };

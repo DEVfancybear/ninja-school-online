@@ -1,0 +1,24 @@
+{
+  "id": "quest-heo-rung-hung-han",
+  "name": "Heo rừng hung hãn",
+  "chapter": 1,
+  "summary": "Heo Rừng trong làng đã đủ lớn để húc người: thầy Hiệu Trưởng giao con dẹp hai con.",
+  "giverNpcId": "npc-thay-hieu-truong",
+  "turnInNpcId": "npc-thay-hieu-truong",
+  "requiresQuests": [
+    "quest-luyen-than-thu"
+  ],
+  "objectives": [
+    {
+      "kind": "kill",
+      "targetId": "mob-heo-rung",
+      "count": 2,
+      "description": "Đánh hạ 2 Heo Rừng"
+    }
+  ],
+  "rewards": {
+    "exp": 120,
+    "yen": 150,
+    "items": []
+  }
+}
