@@ -91,6 +91,11 @@ export interface BattleServiceOptions {
    * bản đồ) — tầng trận đấu không tự đổi bản đồ.
    */
   onDefeat: (characterId: string) => void;
+  /**
+   * Nhân vật vừa thắng một trận: báo id **dữ liệu** của quái (`mob-…`, không phải id thực thể trong
+   * room) để tầng nhiệm vụ cộng tiến độ. Gọi cho **mọi** người thắng trận.
+   */
+  onMonsterKilled?: (characterId: string, monsterId: string) => void;
   now?: () => number;
   rng?: Rng;
   onError?: (error: unknown) => void;
@@ -712,6 +717,9 @@ export class BattleService {
           await this.options.inventory.toPacket(combatant.id),
         );
       }
+      // Báo tiến độ nhiệm vụ **sau cùng**: client thấy kết quả trận trước rồi mới thấy nhật ký nhiệm
+      // vụ nhảy, đúng thứ tự người chơi nhìn thấy trên màn hình.
+      this.options.onMonsterKilled?.(combatant.id, monsterData.id);
       return;
     }
 
