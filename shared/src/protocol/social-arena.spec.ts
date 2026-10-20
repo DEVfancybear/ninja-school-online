@@ -10,6 +10,7 @@ import {
   WORLD_CHAT_MIN_INTERVAL_MS,
 } from '../constants/index.js';
 import { decodeClientPacket, decodeServerPacket } from './codec.js';
+import { ErrorCode } from './packets.js';
 import { Opcode } from './opcodes.js';
 import { PROTOCOL_VERSION } from './version.js';
 
@@ -129,6 +130,11 @@ describe('hợp đồng M6', () => {
 
     it('gói rời đội không cần thân', () => {
       expect(decodeClientPacket(Opcode.C2S_PARTY_LEAVE, {}).ok).toBe(true);
+    });
+
+    it('tự mời/tự đuổi mình có mã lỗi riêng', () => {
+      expect(ErrorCode.PARTY_SELF).toBe('party_self');
+      expect(ErrorCode.FRIEND_SELF).toBe('friend_self');
     });
   });
 

@@ -233,6 +233,7 @@ export const ErrorCode = {
   FRIEND_ALREADY: 'friend_already',
   FRIEND_NOT_FOUND: 'friend_not_found',
   FRIENDS_FULL: 'friends_full',
+  PARTY_SELF: 'party_self',
   PARTY_FULL: 'party_full',
   PARTY_ALREADY_MEMBER: 'party_already_member',
   PARTY_NOT_LEADER: 'party_not_leader',
