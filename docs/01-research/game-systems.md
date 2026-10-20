@@ -19,9 +19,9 @@
 | 11 | Shop NPC | Mua/bán trang bị, tiêu hao | Should | Một shop/làng |
 | 12 | Chat | Chat khu vực/thế giới/nhóm/bang/riêng | Must | MVP (M2): chat khu vực; Alpha (M6): thế giới/nhóm/riêng + lọc, chống spam |
 | 13 | Bạn bè & nhóm | Kết bạn, lập nhóm đánh quái | Should | Alpha (M6): nhóm chính thức (tối đa 4); MVP chỉ cần 2 người cùng vào một trận |
-| 14 | Lôi Đài (PvP) | Đấu trường xếp hạng 1v1 | Should | Xếp hàng chờ, tính điểm |
-| 15 | Bảng xếp hạng | Thiên Địa Bảng: top cấp, top lực chiến | Should | Redis sorted set |
-| 16 | Thư (mail) | Nhận quà hệ thống, thư người chơi | Should | Kèm quà đính kèm |
+| 14 | Lôi Đài (PvP) | Đấu trường xếp hạng 1v1 | Should | Alpha (M6): xếp hàng chờ 1v1 từ cấp 3; điểm Elo khởi đầu 1000, K = 32, sàn 100 (`shared/src/constants/arena.ts`) |
+| 15 | Bảng xếp hạng | Thiên Địa Bảng: top cấp, top lực chiến | Should | Alpha (M6): đọc PostgreSQL — top cấp và top Lôi Đài; Redis chưa dùng |
+| 16 | Thư (mail) | Nhận quà hệ thống, thư người chơi | Should | Alpha (M6): hộp thư hệ thống kèm quà, mỗi thư nhận quà một lần; thư giữa người chơi để sau |
 | 17 | Bang hội | Lập bang, thành viên, cấp bang, chiến bang | Could | Sau khi PvP ổn định |
 | 18 | Boss dã ngoại | Boss theo giờ, giới hạn rơi đồ/ngày | Could | Kèm bảng thông báo |
 | 19 | Sự kiện định kỳ | Trung thu, Tết... kèm chuỗi nhiệm vụ riêng | Could | Cơ chế: bật/tắt bằng dữ liệu |
@@ -66,7 +66,6 @@ Các chi tiết chưa chắc chắn, cần chơi thử game gốc hoặc tra wik
 - **(cần xác minh)** Bộ chỉ số chính xác của nhân vật (sức mạnh, thân pháp, linh hồn...) và công thức sát thương.
 - **(cần xác minh)** Danh sách đầy đủ chiêu thức từng phái và yêu cầu cấp của từng chiêu.
 - **(cần xác minh)** Số ô túi đồ/trang bị, các mốc cấp mặc trang bị.
-- **(cần xác minh)** Cơ chế Lôi Đài: giải thưởng theo tuần/tháng, cách tính điểm.
 - **(cần xác minh)** Chi tiết tinh luyện áo choàng, thú cưỡi (tỷ lệ, nguyên liệu).
 
 *Lưu ý: các số liệu này chỉ dùng để tham khảo cho thiết kế nguyên bản của chúng ta — không sao chép nguyên bảng số từ game gốc.*
