@@ -1024,6 +1024,8 @@ export class BattleService {
       actorId: battle.actorId ?? '',
       turnMs: BATTLE_TURN_MS,
       turnEndsAt: battle.turnEndsAt,
+      // Trận PvE nói rõ loại trận: client dùng chung một khung chiến đấu cho cả PvE và Lôi Đài (M6).
+      mode: 'pve',
     };
   }
 

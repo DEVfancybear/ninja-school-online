@@ -81,6 +81,46 @@ export const Opcode = {
   C2S_QUEST_COMPLETE: 0x0602,
   /** Toàn bộ trạng thái nhiệm vụ của nhân vật: đang làm, có thể nhận, đã xong, tính năng mở khóa. */
   S2C_QUEST_UPDATE: 0x0603,
+
+  /** Gửi lời mời kết bạn tới một nhân vật (theo tên). */
+  C2S_FRIEND_REQUEST: 0x0701,
+  /** Đồng ý lời mời kết bạn của một nhân vật. */
+  C2S_FRIEND_ACCEPT: 0x0702,
+  /** Từ chối lời mời kết bạn (xoá lời mời đang chờ). */
+  C2S_FRIEND_DECLINE: 0x0703,
+  /** Bỏ một người khỏi danh sách bạn. */
+  C2S_FRIEND_REMOVE: 0x0704,
+  /** Toàn bộ danh sách bạn và lời mời đang chờ — gửi sau bắt tay và mỗi lần có gì đổi. */
+  S2C_SOCIAL_UPDATE: 0x0705,
+  /** Mời một nhân vật vào tổ đội; người chưa có đội thì lời mời này lập đội mới. */
+  C2S_PARTY_INVITE: 0x0706,
+  /** Đồng ý lời mời vào đội của một đội trưởng. */
+  C2S_PARTY_ACCEPT: 0x0707,
+  /** Từ chối lời mời vào đội. */
+  C2S_PARTY_DECLINE: 0x0708,
+  /** Rời tổ đội hiện tại (đội trưởng rời thì chuyển quyền cho người còn lại). */
+  C2S_PARTY_LEAVE: 0x0709,
+  /** Đội trưởng đuổi một thành viên khỏi đội. */
+  C2S_PARTY_KICK: 0x070a,
+  /** Trạng thái tổ đội của chính người nhận (kèm lời mời vào đội đang chờ) — gửi sau bắt tay và mỗi lần đổi. */
+  S2C_PARTY_UPDATE: 0x070b,
+  /** Toàn bộ hộp thư của nhân vật — gửi sau bắt tay và mỗi lần có thư mới hoặc nhận quà. */
+  S2C_MAILS: 0x070c,
+  /** Nhận quà trong một lá thư. */
+  C2S_MAIL_CLAIM: 0x070d,
+
+  /** Vào hàng chờ Lôi Đài 1v1. */
+  C2S_ARENA_QUEUE: 0x0801,
+  /** Rời hàng chờ trước khi có đối thủ. */
+  C2S_ARENA_CANCEL: 0x0802,
+  /** Trạng thái Lôi Đài của chính người nhận: đang chờ, điểm, thắng/thua — gửi sau bắt tay và mỗi lần đổi. */
+  S2C_ARENA_STATE: 0x0803,
+  /** Trận Lôi Đài kết thúc: thắng/thua, điểm trước và sau, điểm của đối thủ. */
+  S2C_ARENA_END: 0x0804,
+  /** Xin một bảng xếp hạng. */
+  C2S_LEADERBOARD: 0x0805,
+  /** Bảng xếp hạng theo yêu cầu gần nhất. */
+  S2C_LEADERBOARD: 0x0806,
 } as const;
 
 export type Opcode = (typeof Opcode)[keyof typeof Opcode];
@@ -90,6 +130,13 @@ export const OPCODE_NAMES: Record<number, string> = Object.fromEntries(
   Object.entries(Opcode).map(([name, value]) => [value, name]),
 );
 
-/** Kênh chat ở M2. Các kênh khác (thế giới, nhóm, bang) để các cột mốc sau. */
-export const CHAT_CHANNELS = ['map', 'system'] as const;
+/**
+ * Kênh chat. M2 chỉ có `map` (phát cho room hiện tại) và `system` (server tự gửi); M6 thêm `world`
+ * (mọi người đang online), `party` (tổ đội) và `private` (một người).
+ */
+export const CHAT_CHANNELS = ['map', 'world', 'party', 'private', 'system'] as const;
 export type ChatChannel = (typeof CHAT_CHANNELS)[number];
+
+/** Kênh client được phép gửi lên — `system` chỉ server dùng. */
+export const CHAT_SEND_CHANNELS = ['map', 'world', 'party', 'private'] as const;
+export type ChatSendChannel = (typeof CHAT_SEND_CHANNELS)[number];

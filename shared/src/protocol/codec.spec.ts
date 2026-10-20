@@ -195,8 +195,8 @@ function combatant(id: string, kind: 'player' | 'monster') {
 }
 
 describe('PROTOCOL_VERSION', () => {
-  it('là 5 ở cột mốc M5 (đã thêm nhiệm vụ chính tuyến và cây hội thoại NPC)', () => {
-    expect(PROTOCOL_VERSION).toBe(5);
+  it('là 6 ở cột mốc M6 (thêm xã hội, Lôi Đài, bảng xếp hạng và hộp thư)', () => {
+    expect(PROTOCOL_VERSION).toBe(6);
   });
 });
 

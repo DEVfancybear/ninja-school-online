@@ -44,6 +44,7 @@ function start(overrides: Partial<BattleStart> = {}): BattleStart {
     actorId: 'p1',
     turnMs: BATTLE_TURN_MS,
     turnEndsAt: Date.now() + BATTLE_TURN_MS,
+    mode: 'pve',
     ...overrides,
   };
 }

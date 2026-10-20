@@ -6,3 +6,5 @@ export * from './battle.js';
 export * from './stats.js';
 export * from './equipment.js';
 export * from './quest.js';
+export * from './social.js';
+export * from './arena.js';

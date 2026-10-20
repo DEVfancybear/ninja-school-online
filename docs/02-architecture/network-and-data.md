@@ -216,7 +216,7 @@ Quy ước: `C2S_*` = client → server, `S2C_*` = server → client. Mọi gói
 | `C2S_MOVE` | C→S | Ý định di chuyển (tọa độ đích, pixel) |
 | `S2C_ENTITY_MOVE` | S→C | Vị trí thực thể, gộp nhiều thực thể trong một gói mỗi tick (M2) |
 | `S2C_ENTITY_ADD/REMOVE` | S→C | Thực thể vào/ra tầm nhìn (M2: vào/ra room) |
-| `C2S_CHAT` / `S2C_CHAT` | 2 chiều | Chat khu vực/thế giới/hệ thống (M2 mới có kênh `map`) |
+| `C2S_CHAT` / `S2C_CHAT` | 2 chiều | Chat — M2: kênh `map`; M6: `channel` = `map`/`world`/`party`/`private` (tin riêng kèm `to`), kênh thế giới giãn cách 5 giây/người |
 | `C2S_NPC_TALK` / `S2C_NPC_DIALOG` | 2 chiều | Hội thoại NPC — M2: trả lời NPC trong map hiện tại; M5: `optionId` để đi tiếp trong cây hội thoại, gói trả về thêm `nodeId`, `options`, `quests` |
 | `C2S_PING` / `S2C_PONG` | 2 chiều | Nhịp sống (M2): `clientTime` / `clientTime` + `serverTime` (ms epoch) |
 | `S2C_ERROR` | S→C | Lỗi theo mã kèm `fatal` (M2); mã trong `shared/src/protocol/opcodes.ts` |
@@ -235,6 +235,15 @@ Quy ước: `C2S_*` = client → server, `S2C_*` = server → client. Mọi gói
 | `C2S_UPGRADE` / `S2C_UPGRADE_RESULT` | 2 chiều | Cường hóa trang bị — M4: tốn 1 đá vụn + yên theo cấp hiện tại (`UPGRADE_YEN_COST` = 50/120/260/520/1000) mỗi lần thử kể cả khi hỏng, tỉ lệ theo cấp (0→1 = 1.0), trần 5 |
 | `S2C_LEVEL_UP` / `S2C_CHARACTER` | S→C | Lên cấp (kèm chiêu mới học) và chỉ số nhân vật — M3 gửi `S2C_CHARACTER` ngay sau bắt tay và mỗi lần chỉ số đổi; chưa có `S2C_STATS_UPDATE` riêng |
 | `S2C_NOTIFY` | S→C | Thông báo hệ thống (thưởng, sự kiện, lỗi) |
+| `C2S_FRIEND_REQUEST` / `ACCEPT` / `DECLINE` / `REMOVE` | C→S | Bạn bè (M6) theo **tên nhân vật**; gửi lời mời cho người đã mời mình = đồng ý luôn |
+| `S2C_SOCIAL_UPDATE` | S→C | Bạn bè + lời mời nhận/gửi (kèm cấp, trường, phái, đang online) — M6; gửi sau bắt tay và mỗi lần đổi |
+| `C2S_PARTY_INVITE` / `ACCEPT` / `DECLINE` / `LEAVE` / `KICK` | C→S | Tổ đội 4 người (M6); lời mời lập đội mới khi người mời chưa có đội |
+| `S2C_PARTY_UPDATE` | S→C | Đội hiện tại (đội trưởng, thành viên, lời mời đang chờ) — M6; gửi sau bắt tay và mỗi lần đổi |
+| `S2C_MAILS` / `C2S_MAIL_CLAIM` | 2 chiều | Hộp thư hệ thống (M6): thư có yên/vật phẩm, nhận quà một lần, tối đa 20 thư |
+| `C2S_ARENA_QUEUE` / `C2S_ARENA_CANCEL` | C→S | Vào/rời hàng chờ Lôi Đài 1v1 (M6, cấp ≥ 3, không đang trong trận) |
+| `S2C_ARENA_STATE` | S→C | Đang chờ?, số người chờ, điểm, thắng/thua của chính người nhận — M6; gửi sau bắt tay và mỗi lần đổi |
+| `S2C_ARENA_END` | S→C | Trận Lôi Đài kết thúc (M6): thắng/thua của **người nhận**, điểm trước/sau, điểm đối thủ, thành tích |
+| `C2S_LEADERBOARD` / `S2C_LEADERBOARD` | 2 chiều | Bảng xếp hạng `level` (cấp, kinh nghiệm) hoặc `arena` (điểm Lôi Đài) — M6, tối đa 20 dòng |
 
 ## 4. Vòng lặp server (tick)
 
@@ -334,5 +343,5 @@ Ví dụ một chiêu (minh họa định dạng, số liệu tự đặt):
 - Bắt tay `C2S_HELLO` gửi phiên bản; lệch → server từ chối kèm thông báo "hãy tải lại trang".
 - Endpoint `GET /version` trả phiên bản server + client mong đợi (dùng cho màn hình bảo trì).
 - Phía server (M2): `C2S_HELLO` lệch `PROTOCOL_VERSION` → `S2C_ERROR` `protocol_mismatch` (`fatal: true`) rồi đóng kết nối, thông báo nhắc tải lại trang.
-- `PROTOCOL_VERSION` hiện là **5** (M4 thêm gói trang bị/shop/cường hóa, M5 thêm gói nhiệm vụ và cây hội thoại).
+- `PROTOCOL_VERSION` hiện là **6** (M5 thêm gói nhiệm vụ và cây hội thoại, M6 thêm gói bạn bè/tổ đội/chat nhiều kênh/hộp thư/Lôi Đài/bảng xếp hạng).
 - Quy tắc: thay đổi protocol **chỉ** ở server hoặc client đều phải tăng `PROTOCOL_VERSION` trong cùng một lần merge.

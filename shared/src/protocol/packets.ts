@@ -4,10 +4,12 @@ import { INVENTORY_CAPACITY } from '../constants/character.js';
 import { EQUIP_SLOTS, SELL_PRICE_RATIO } from '../constants/equipment.js';
 import { CHAT_MAX_LENGTH, MAX_MOVE_DISTANCE_PX } from '../constants/world.js';
 import { MAX_ACTIVE_QUESTS, QUEST_OBJECTIVE_KINDS, QUEST_VIEW_STATES } from '../constants/quest.js';
+import { MAX_FRIENDS, PARTY_MAX_MEMBERS } from '../constants/social.js';
+import { LEADERBOARD_MAX_ENTRIES, LEADERBOARDS, MAIL_MAX_ENTRIES } from '../constants/arena.js';
 import { ITEM_KINDS } from '../schemas/item.js';
 import { MONSTER_SHAPES } from '../schemas/monster.js';
 import { StatBlockSchema } from '../schemas/school.js';
-import { CHAT_CHANNELS, Opcode } from './opcodes.js';
+import { CHAT_CHANNELS, CHAT_SEND_CHANNELS, Opcode } from './opcodes.js';
 
 /** Toạ độ trong thế giới, tính bằng pixel. */
 export const PositionSchema = z.object({
@@ -224,6 +226,26 @@ export const ErrorCode = {
   QUEST_NOT_READY: 'quest_not_ready',
   QUEST_WRONG_NPC: 'quest_wrong_npc',
   DIALOG_NOT_OPEN: 'dialog_not_open',
+
+  // Xã hội (M6): bạn bè và tổ đội. Mỗi lý do từ chối một mã riêng để client nói đúng nguyên nhân.
+  CHARACTER_NOT_FOUND: 'character_not_found',
+  FRIEND_SELF: 'friend_self',
+  FRIEND_ALREADY: 'friend_already',
+  FRIEND_NOT_FOUND: 'friend_not_found',
+  FRIENDS_FULL: 'friends_full',
+  PARTY_FULL: 'party_full',
+  PARTY_ALREADY_MEMBER: 'party_already_member',
+  PARTY_NOT_LEADER: 'party_not_leader',
+  PARTY_NOT_INVITED: 'party_not_invited',
+  NOT_IN_PARTY: 'not_in_party',
+
+  // Lôi Đài và hộp thư (M6).
+  ARENA_LEVEL_LOW: 'arena_level_low',
+  ARENA_QUEUED: 'arena_queued',
+  ARENA_NOT_QUEUED: 'arena_not_queued',
+  ARENA_NO_FLEE: 'arena_no_flee',
+  MAIL_NOT_FOUND: 'mail_not_found',
+  MAIL_CLAIMED: 'mail_claimed',
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 
@@ -309,10 +331,26 @@ export type EntityAdd = z.infer<typeof EntityAddSchema>;
 export const EntityRemoveSchema = z.object({ id: z.string().min(1) });
 export type EntityRemove = z.infer<typeof EntityRemoveSchema>;
 
-export const ChatSendSchema = z.object({
-  channel: z.literal('map'),
-  text: z.string().min(1).max(CHAT_MAX_LENGTH),
-});
+/**
+ * Một tin nhắn client gửi lên. `channel` bỏ trống là kênh bản đồ (hợp đồng M2 vẫn còn nguyên).
+ *
+ * Tin `private` phải kèm `to` (tên nhân vật nhận); các kênh khác **không** được kèm `to` — thừa
+ * trường đó là client hiểu sai hợp đồng, nên bị từ chối thay vì lặng lẽ bỏ qua.
+ */
+export const ChatSendSchema = z
+  .object({
+    channel: z.enum(CHAT_SEND_CHANNELS).default('map'),
+    text: z.string().min(1).max(CHAT_MAX_LENGTH),
+    to: z.string().min(1).max(24).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.channel === 'private' && value.to === undefined) {
+      ctx.addIssue({ code: 'custom', path: ['to'], message: 'tin riêng phải kèm người nhận' });
+    }
+    if (value.channel !== 'private' && value.to !== undefined) {
+      ctx.addIssue({ code: 'custom', path: ['to'], message: 'chỉ tin riêng mới có người nhận' });
+    }
+  });
 export type ChatSend = z.infer<typeof ChatSendSchema>;
 
 export const ChatMessageSchema = z.object({
@@ -321,6 +359,8 @@ export const ChatMessageSchema = z.object({
   fromName: z.string().min(1),
   text: z.string().min(1),
   at: z.number().int().min(0),
+  /** Người nhận của tin `private`; không có ở kênh khác. */
+  toName: z.string().min(1).optional(),
 });
 export type ChatMessage = z.infer<typeof ChatMessageSchema>;
 
@@ -532,6 +572,9 @@ export const CombatantSchema = z.object({
 export type Combatant = z.infer<typeof CombatantSchema>;
 
 /** Trận bắt đầu (với người vừa vào) hoặc có người vào giữa trận. */
+export const BATTLE_MODES = ['pve', 'arena'] as const;
+export type BattleMode = (typeof BATTLE_MODES)[number];
+
 export const BattleStartSchema = z.object({
   battleId: z.string().min(1),
   roundNo: z.number().int().min(1),
@@ -539,6 +582,12 @@ export const BattleStartSchema = z.object({
   actorId: z.string().min(1),
   turnMs: z.number().int().min(1),
   turnEndsAt: z.number().int().min(0),
+  /**
+   * Loại trận: `pve` (đánh quái, M3) hay `arena` (Lôi Đài, M6). Trận Lôi Đài dùng **chung** các gói
+   * `S2C_BATTLE_START/TURN/RESULT` và `C2S_BATTLE_ACTION`; chỉ gói kết thúc là riêng
+   * (`S2C_ARENA_END`, vì phần thưởng của Lôi Đài là điểm chứ không phải kinh nghiệm/yên).
+   */
+  mode: z.enum(BATTLE_MODES).default('pve'),
 });
 export type BattleStart = z.infer<typeof BattleStartSchema>;
 
@@ -637,6 +686,147 @@ export const BattleEndSchema = z.object({
 });
 export type BattleEnd = z.infer<typeof BattleEndSchema>;
 
+// ------------------------------------------------------------- xã hội (M6)
+
+/** Một người trong danh sách bạn hoặc tổ đội. Tên là **địa chỉ** dùng chung cho mọi gói xã hội. */
+export const SocialPersonSchema = z.object({
+  name: z.string().min(1),
+  level: z.number().int().min(1),
+  school: z.enum(SCHOOLS),
+  class: z.enum(CLASSES),
+  online: z.boolean(),
+});
+export type SocialPerson = z.infer<typeof SocialPersonSchema>;
+
+/**
+ * Toàn bộ trạng thái xã hội của nhân vật: bạn bè, lời mời nhận được và lời mời đã gửi. Gửi sau bắt
+ * tay và mỗi lần danh sách đổi (kể cả khi người khác đổi trạng thái online).
+ */
+export const SocialUpdateSchema = z.object({
+  friends: z.array(SocialPersonSchema),
+  incoming: z.array(SocialPersonSchema),
+  outgoing: z.array(SocialPersonSchema),
+  maxFriends: z.number().int().min(1).default(MAX_FRIENDS),
+});
+export type SocialUpdate = z.infer<typeof SocialUpdateSchema>;
+
+/** Tên nhân vật trong các gói bạn bè. */
+export const PersonNameSchema = z.object({ name: z.string().min(1).max(24) });
+export type PersonName = z.infer<typeof PersonNameSchema>;
+
+export const PartyInviteSchema = PersonNameSchema;
+export type PartyInvite = z.infer<typeof PersonNameSchema>;
+export const PartyKickSchema = PersonNameSchema;
+export type PartyKick = z.infer<typeof PersonNameSchema>;
+/** Trả lời lời mời vào đội: địa chỉ là **đội trưởng** đã mời mình. */
+export const PartyReplySchema = z.object({ leaderName: z.string().min(1).max(24) });
+export type PartyReply = z.infer<typeof PartyReplySchema>;
+
+/**
+ * Trạng thái tổ đội của chính người nhận. Không có đội thì `partyId`/`leaderName` là `null` và
+ * `members` rỗng; `invites` vẫn có thể có lời mời đang chờ.
+ */
+export const PartyUpdateSchema = z.object({
+  partyId: z.string().min(1).nullable(),
+  leaderName: z.string().min(1).nullable(),
+  members: z.array(SocialPersonSchema),
+  invites: z.array(
+    z.object({
+      fromName: z.string().min(1),
+      fromLevel: z.number().int().min(1),
+    }),
+  ),
+  maxMembers: z.number().int().min(1).default(PARTY_MAX_MEMBERS),
+});
+export type PartyUpdate = z.infer<typeof PartyUpdateSchema>;
+
+/** Một món quà trong thư. */
+export const MailItemSchema = z.object({
+  itemId: z.string().min(1),
+  name: z.string().min(1),
+  qty: z.number().int().min(1),
+});
+export type MailItem = z.infer<typeof MailItemSchema>;
+
+export const MailSchema = z.object({
+  id: z.string().min(1),
+  subject: z.string().min(1),
+  body: z.string().default(''),
+  yen: z.number().int().min(0).default(0),
+  items: z.array(MailItemSchema).default([]),
+  claimed: z.boolean(),
+  /** Thời điểm server gửi thư (ms epoch). */
+  sentAt: z.number().int().min(0),
+});
+export type Mail = z.infer<typeof MailSchema>;
+
+export const MailsSchema = z.object({
+  mails: z.array(MailSchema),
+  maxEntries: z.number().int().min(1).default(MAIL_MAX_ENTRIES),
+});
+export type Mails = z.infer<typeof MailsSchema>;
+
+export const MailClaimSchema = z.object({ mailId: z.string().min(1) });
+export type MailClaim = z.infer<typeof MailClaimSchema>;
+
+// ------------------------------------------------------- Lôi Đài (M6)
+
+/** Trạng thái Lôi Đài của chính người nhận. Điểm chỉ đổi khi trận kết thúc. */
+export const ArenaStateSchema = z.object({
+  queued: z.boolean(),
+  /** Số người đang chờ ghép trận, tính cả mình. */
+  queueSize: z.number().int().min(0),
+  rating: z.number().int().min(0),
+  wins: z.number().int().min(0),
+  losses: z.number().int().min(0),
+});
+export type ArenaState = z.infer<typeof ArenaStateSchema>;
+
+/**
+ * Trận Lôi Đài kết thúc — gói riêng thay cho `S2C_BATTLE_END` (phần thưởng của Lôi Đài là điểm, không
+ * phải kinh nghiệm/yên). Mỗi bên nhận **điểm của chính mình**, nên `outcome` là thắng hay thua của
+ * người nhận.
+ */
+export const ArenaEndSchema = z.object({
+  battleId: z.string().min(1),
+  outcome: z.enum(['win', 'loss']),
+  reason: z.enum(['defeat', 'opponent_left']),
+  ratingBefore: z.number().int().min(0),
+  ratingAfter: z.number().int().min(0),
+  ratingDelta: z.number().int(),
+  opponentName: z.string().min(1),
+  /** Điểm của đối thủ **sau** trận. */
+  opponentRatingAfter: z.number().int().min(0),
+  wins: z.number().int().min(0),
+  losses: z.number().int().min(0),
+});
+export type ArenaEnd = z.infer<typeof ArenaEndSchema>;
+
+export const LeaderboardRequestSchema = z.object({
+  board: z.enum(LEADERBOARDS),
+  limit: z.number().int().min(1).max(LEADERBOARD_MAX_ENTRIES).default(LEADERBOARD_MAX_ENTRIES),
+});
+export type LeaderboardRequest = z.infer<typeof LeaderboardRequestSchema>;
+
+export const LeaderboardEntrySchema = z.object({
+  rank: z.number().int().min(1),
+  name: z.string().min(1),
+  level: z.number().int().min(1),
+  school: z.enum(SCHOOLS),
+  class: z.enum(CLASSES),
+  /** Chỉ bảng `arena` mới có điểm và thành tích. */
+  rating: z.number().int().min(0).optional(),
+  wins: z.number().int().min(0).optional(),
+  losses: z.number().int().min(0).optional(),
+});
+export type LeaderboardEntry = z.infer<typeof LeaderboardEntrySchema>;
+
+export const LeaderboardSchema = z.object({
+  board: z.enum(LEADERBOARDS),
+  entries: z.array(LeaderboardEntrySchema),
+});
+export type LeaderboardView = z.infer<typeof LeaderboardSchema>;
+
 // --------------------------------------------------- bảng schema theo mã gói
 
 /**
@@ -663,6 +853,19 @@ export const CLIENT_PACKETS: PacketSchemaTable = {
   [Opcode.C2S_BATTLE_ACTION]: BattleActionSchema,
   [Opcode.C2S_QUEST_ACCEPT]: QuestAcceptSchema,
   [Opcode.C2S_QUEST_COMPLETE]: QuestCompleteSchema,
+  [Opcode.C2S_FRIEND_REQUEST]: PersonNameSchema,
+  [Opcode.C2S_FRIEND_ACCEPT]: PersonNameSchema,
+  [Opcode.C2S_FRIEND_DECLINE]: PersonNameSchema,
+  [Opcode.C2S_FRIEND_REMOVE]: PersonNameSchema,
+  [Opcode.C2S_PARTY_INVITE]: PartyInviteSchema,
+  [Opcode.C2S_PARTY_ACCEPT]: PartyReplySchema,
+  [Opcode.C2S_PARTY_DECLINE]: PartyReplySchema,
+  [Opcode.C2S_PARTY_LEAVE]: z.object({}),
+  [Opcode.C2S_PARTY_KICK]: PartyKickSchema,
+  [Opcode.C2S_MAIL_CLAIM]: MailClaimSchema,
+  [Opcode.C2S_ARENA_QUEUE]: z.object({}),
+  [Opcode.C2S_ARENA_CANCEL]: z.object({}),
+  [Opcode.C2S_LEADERBOARD]: LeaderboardRequestSchema,
 } as const;
 
 /** Gói tin server gửi xuống, dùng cho client kiểm tra và cho kiểm thử. */
@@ -687,6 +890,12 @@ export const SERVER_PACKETS: PacketSchemaTable = {
   [Opcode.S2C_BATTLE_RESULT]: BattleResultSchema,
   [Opcode.S2C_BATTLE_END]: BattleEndSchema,
   [Opcode.S2C_QUEST_UPDATE]: QuestUpdateSchema,
+  [Opcode.S2C_SOCIAL_UPDATE]: SocialUpdateSchema,
+  [Opcode.S2C_PARTY_UPDATE]: PartyUpdateSchema,
+  [Opcode.S2C_MAILS]: MailsSchema,
+  [Opcode.S2C_ARENA_STATE]: ArenaStateSchema,
+  [Opcode.S2C_ARENA_END]: ArenaEndSchema,
+  [Opcode.S2C_LEADERBOARD]: LeaderboardSchema,
 } as const;
 
 /** Mã gói tin mà client được phép gửi (theo đúng bảng ở trên). */
