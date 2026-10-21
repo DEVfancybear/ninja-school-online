@@ -171,7 +171,7 @@ Chữ trong code/giao diện: tiếng Anh cho định danh, chuỗi hiển thị
 | M3 (đã xong) | `client/src/app/ui/battle-panel/`, `server/src/battle/`, `server/src/modules/inventory/`, chiêu thức trong `server/src/modules/character/stats.ts`, `game-data/{monsters,items,skills,classes}` |
 | M4 (đã xong) | `server/src/modules/{equipment,shop,upgrade}/`, `client/src/app/ui/{equipment,shop}-panel/`; mua/bán, trang bị và cường hóa |
 | M5 (đã xong) | `server/src/modules/quest/`, 12 tệp `game-data/quests/`, `client/src/app/net/quest-state.ts`, `ui/quest-log/`; 4 kịch bản e2e |
-| M6 (đang hoàn thiện) | `server/src/modules/{social,party,arena,leaderboard,mail}/`; protocol v6, các bảng `friendships`, `character_arena`, `mails`; client `ui/{social,chat,arena,mail}-panel/`; 5 kịch bản e2e |
+| M6 (đã xong 2026-10-21) | `server/src/modules/{social,party,arena,leaderboard,mail}/`; protocol v6, các bảng `friendships`, `character_arena`, `mails`; client `ui/{social,chat,arena,mail}-panel/`; 5 kịch bản e2e |
 | M7–M8 (Beta) | `modules/{guild,event}`, `tools/gm-cli`, `infra/deploy`, `tests/load` |
 
 Chi tiết tiêu chí từng mốc xem `docs/03-plan/roadmap.md`.
