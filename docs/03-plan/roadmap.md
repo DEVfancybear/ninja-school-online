@@ -229,7 +229,7 @@ Riêng M4: server **44 bài** (equipment 10, shop 13, upgrade 9, WebSocket thậ
 
 **Ghi chú thiết kế (đã ghi vào `docs/02-architecture/network-and-data.md` §2e):** nhận/trả chỉ khi đang mở hội thoại với đúng NPC ở bản đồ hiện tại; thứ tự lỗi khi nhận cố định (`quest_not_found` → `quest_wrong_npc` → `quest_already_active` → `quest_already_done` → `quest_locked` → `quest_too_many`) để câu báo lỗi luôn nói đúng lý do; `progress` chỉ lưu talk/kill/reach, còn `collect` đếm lại từ túi nên không có số nào để lưu; mỗi cờ tính năng chỉ ghi một hàng.
 
-### M6 — Xã hội & PvP (~2,5 tuần) — *kết thúc Alpha* — CI 6fb961d đã xanh; chờ CI/verifier trên cập nhật roadmap
+### M6 — Xã hội & PvP (~2,5 tuần) — *kết thúc Alpha*
 Nội dung: bạn bè, nhóm, chat thế giới/nhóm/riêng, Lôi Đài 1v1 có xếp hàng chờ và tính điểm, bảng xếp hạng (top cấp, top Lôi Đài), thư hệ thống.
 **Xong khi:** hai người chơi đấu Lôi Đài, điểm được cập nhật, bảng xếp hạng hiển thị đúng; chat thế giới có giới hạn chống spam.
 
@@ -239,7 +239,7 @@ Nội dung: bạn bè, nhóm, chat thế giới/nhóm/riêng, Lôi Đài 1v1 có
 - **Client:** giao diện và trạng thái bạn bè, tổ đội, chat, Arena/bảng xếp hạng và thư; dùng lại khung chiến đấu chung cho PvE/PvP.
 - **Kiểm thử:** 212 server, 266 client, 116 shared, 14 data-validator (**608 test**); server có regression cho admission/cancel/disconnect, lỗi khởi tạo trận và rollback Elo, reservation lúc settlement, bạn bè ngược chiều đồng thời, party full và cooldown chat. Tổng 30 kịch bản e2e, trong đó 5 M6; M6 e2e chạy riêng 5/5 trên Chromium; bộ dò giao thức độc lập trên server thật đạt 43/43. Client build ban đầu khoảng 734,54 kB.
 - **Kiểm chứng cuối tại chỗ:** `validate:data → lint → typecheck → test → build` PASS; 608 test (212 server / 266 client / 116 shared / 14 data-validator); M6 e2e 5/5; probe độc lập 43/43.
-- **CI:** run [39658753709](https://github.com/DEVfancybear/ninja-school-online/actions/runs/39658753709), attempt 2, xanh trên commit `6fb961d` sau các fix lifecycle và sửa README: 608 test, build xanh, Playwright **30/30** (5 kịch bản M6). Run cũ `39615135515` chỉ là mốc trước các fix reservation/transaction. Roadmap được cập nhật sau run này; cần CI và verifier trên revision tài liệu mới trước khi đóng M6.
+- **CI:** run [39658753709](https://github.com/DEVfancybear/ninja-school-online/actions/runs/39658753709), attempt 2, xanh trên commit `6fb961d`: 608 test, build xanh, Playwright **30/30** (5 kịch bản M6). Run mới [39661684590](https://github.com/DEVfancybear/ninja-school-online/actions/runs/39661684590) cũng xanh trên SHA `00ed9bdb003d7612025e1c34eeb474c1ddc5a7d7`, gồm build/test và browser E2E. Commit sửa roadmap sau run này cần có CI xanh và verifier PASS trên cùng revision trước khi đóng M6.
 
 ### M7 — Bang hội, boss, sự kiện (~2,5 tuần)
 Nội dung: lập bang/tham gia/rời bang, chat bang, cấp bang; boss dã ngoại theo giờ có giới hạn rơi đồ/ngày; sự kiện đầu tiên (đăng nhập nhận quà + nhiệm vụ sự kiện).
