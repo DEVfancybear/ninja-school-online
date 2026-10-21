@@ -263,30 +263,34 @@ test.describe('Lôi Đài 1v1', () => {
         String(START_RATING + EQUAL_DELTA),
       );
 
-      // Bảng xếp hạng Lôi Đài: bảng là của cả server (những lần chạy trước còn trong DB), nên kiểm
-      // đúng thứ tự tương đối giữa hai người này và đúng điểm của từng người, không kiểm vị trí tuyệt
-      // đối.
-      await winnerPage.locator('.arena-board-tab--arena').click();
-      const arenaNames = () => winnerPage.locator('.arena-entry__name').allTextContents();
-      await expect
-        .poll(async () => {
-          const names = await arenaNames();
-          return names.includes(winner) && names.includes(loser);
-        })
-        .toBe(true);
-      const arenaOrder = await arenaNames();
-      expect(arenaOrder.indexOf(winner)).toBeLessThan(arenaOrder.indexOf(loser));
-      expect(await winnerPage.locator('.arena-entry__rating').first().textContent()).toMatch(
-        /^\d+$/,
+      // Bảng là dữ liệu toàn server, giới hạn 20 dòng và có thể không chứa cả hai nhân vật vừa đấu.
+      // Kiểm thứ tự điểm của các dòng đang hiển thị; nếu một đấu sĩ lọt top 20 thì kiểm luôn điểm của họ.
+      const arenaTab = winnerPage.locator('.arena-board-tab--arena');
+      await arenaTab.click();
+      await expect(arenaTab).toHaveClass(/arena-board-tab--active/);
+      const arenaRows = winnerPage.locator('.arena-entry:not(.arena-entry--empty)');
+      await expect.poll(() => arenaRows.count(), { timeout: 10_000 }).toBeGreaterThan(0);
+      const arenaEntries = await Promise.all(
+        (await arenaRows.all()).map(async (row) => {
+          const name = (await row.locator('.arena-entry__name').textContent())?.trim() ?? '';
+          const ratingText =
+            (await row.locator('.arena-entry__rating').textContent())?.trim() ?? '';
+          expect(ratingText).toMatch(/^\d+$/);
+          return { name, rating: Number(ratingText) };
+        }),
       );
-      const winnerRow = winnerPage.locator('.arena-entry').filter({ hasText: winner });
-      const loserRow = winnerPage.locator('.arena-entry').filter({ hasText: loser });
-      await expect(winnerRow.locator('.arena-entry__rating')).toHaveText(
-        String(START_RATING + EQUAL_DELTA),
-      );
-      await expect(loserRow.locator('.arena-entry__rating')).toHaveText(
-        String(START_RATING - EQUAL_DELTA),
-      );
+      const visibleRatings = arenaEntries.map((entry) => entry.rating);
+      expect(arenaEntries.length).toBeLessThanOrEqual(20);
+      expect(visibleRatings).toEqual([...visibleRatings].sort((a, b) => b - a));
+
+      const winnerEntry = arenaEntries.find((entry) => entry.name === winner);
+      if (winnerEntry) {
+        expect(winnerEntry.rating).toBe(START_RATING + EQUAL_DELTA);
+      }
+      const loserEntry = arenaEntries.find((entry) => entry.name === loser);
+      if (loserEntry) {
+        expect(loserEntry.rating).toBe(START_RATING - EQUAL_DELTA);
+      }
 
       // Bảng cấp độ là dữ liệu toàn máy chủ và chỉ giữ 20 dòng đầu; những nhân vật thử cấp 3 có
       // thể nằm ngoài giới hạn. Kiểm loại bảng và thứ tự cấp giảm dần trên các dòng đang hiển thị.
