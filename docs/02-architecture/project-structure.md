@@ -45,27 +45,28 @@ ninja/
 │           ├── pages/home/       # (M0) trang chủ
 │           ├── pages/login/      # (M1) đăng nhập + đăng ký
 │           ├── pages/characters/ # (M1) danh sách + tạo nhân vật; (M2) lối vào thế giới
-│           ├── pages/play/       # (M2) trang /play: nối WebSocket, nạp bản đồ, HUD, chat; (M3) sàn đấu, (M4) bảng túi/trang bị/shop; (M5) nhật ký nhiệm vụ
-│           ├── net/              # (M2) game-socket.ts (WebSocket, nối lại, ping), world-state.ts (signals;
-│           │                     # (M4) thêm trạng thái trang bị, (M5) trạng thái nhiệm vụ), ws-url.ts
+│           ├── pages/play/       # (M2) trang /play: nối WebSocket, nạp bản đồ, HUD; (M3) chiến đấu; (M4) túi/trang bị/shop; (M5) nhiệm vụ; (M6) xã hội và Lôi Đài
+│           ├── net/              # (M2) game-socket.ts (WebSocket, nối lại, ping), world-state.ts;
+│           │                     # (M4) equipment-state; (M5) quest-state; (M6) social-state, party-state, arena-state, mail-state
 │           ├── input/            # (M2) key-map.ts (bàn phím), movement-controller.ts (gửi đích mỗi 100 ms)
 │           ├── game/             # (M0) world-canvas/, game-config; (M2) world-scene.ts, world-logic.ts, test-hook.ts
-│           │                     # (M5) hook nhiệm vụ (questState, openQuestLog) cho e2e
+│           │                     # (M5) hook nhiệm vụ; (M6) hook xã hội, thư và Lôi Đài cho e2e
 │           ├── ui/               # (M2) hud/, chat-panel/, npc-dialog/, notice-bar/; (M3) battle-panel/;
-│           │                     # (M4) inventory-panel/, equipment-panel/, shop-panel/; (M5) quest-log/
+│           │                     # (M4) inventory-panel/, equipment-panel/, shop-panel/; (M5) quest-log/;
+│           │                     # (M6) social-panel/, arena-panel/, mail-panel/
 │           └── # các thư mục thêm ở cột mốc sau (đặt trong src/app/):
 │               #   i18n/     tách chuỗi giao diện (hiện đang viết trực tiếp trong template)
 │
 ├── server/                       # GAME SERVER (Node.js + Fastify + ws)
-│   ├── drizzle/                  # file SQL migration (drizzle-kit sinh)
+│   ├── drizzle/                  # M1–M6 migrations 0001–0004, journal và metadata snapshot
 │   ├── drizzle.config.ts
 │   └── src/
 │       ├── main.ts               # khởi động: nạp .env, mở pool, dựng app, đóng sạch khi có tín hiệu
-│       ├── app.ts                # (M1) dựng Fastify: cors, jwt, route, xử lý lỗi thống nhất; (M2) thêm thế giới + WebSocket
+│       ├── app.ts                # (M1) dựng Fastify: cors, jwt, route, xử lý lỗi thống nhất; (M2) thế giới + WebSocket; (M6) nối social/arena/mail
 │       ├── config/               # (M1) env.ts (kiểm biến môi trường), dotenv.ts
 │       ├── http/                 # (M1) parseRequest, auth.ts (preHandler xác thực)
 │       ├── security/             # (M1) password.ts (Argon2id), tokens.ts (JWT + refresh token)
-│       ├── db/                   # (M1) schema.ts, client.ts, migrate.ts
+│       ├── db/                   # schema.ts, client.ts, migrate.ts; M6 thêm friendships, character_arena, mails
 │       ├── net/                  # (M2) gateway WS gắn vào Fastify (`/ws`), phiên kết nối, bảng phiên theo nhân vật
 │       ├── core/                 # (M2) tick.ts (một interval dùng chung), room-manager.ts
 │       ├── world/                # (M2) game-data.ts (nạp + kiểm), map.ts, movement.ts, room.ts, world-service.ts
@@ -74,39 +75,38 @@ ninja/
 │       ├── modules/account/      # (M1) đăng ký/đăng nhập/làm mới/đăng xuất
 │       ├── modules/character/    # (M1) tạo/liệt kê nhân vật; (M2) chọn nhân vật để vào game;
 │       │                         # (M3) stats.ts (chỉ số theo cấp), máu/nội lực, thưởng trận đấu
-│       ├── modules/chat/         # (M2) giới hạn tần suất + tạo tin nhắn kênh map
+│       ├── modules/chat/         # (M2) chat khu vực; M6 bổ sung map/world/party/private và giới hạn tần suất
 │       ├── modules/inventory/    # (M3) túi đồ: cất/lấy theo số lượng, sức chứa theo số loại;
 │       │                         # (M4) món trong túi có cấp cường hóa + ô đang mặc
 │       ├── modules/equipment/    # (M4) mặc/tháo 4 ô trang bị, cộng chỉ số vào nhân vật
 │       ├── modules/shop/         # (M4) quầy NPC: mua/bán, ghi sổ giao dịch
 │       ├── modules/upgrade/      # (M4) cường hóa: yên + đá vụn, tỉ lệ theo cấp
-│       ├── modules/npc/          # (M2) hội thoại NPC theo game-data (M4: trả thêm quầy hàng; M5: nhánh theo nhiệm vụ)
-│       ├── modules/quest/        # (M5) nhiệm vụ chính tuyến: nhận/trả, tiến độ, thưởng, cờ mở khoá; chọn nhánh hội thoại
-│       ├── test/                 # (M1) global-setup + database kiểm thử; (M2) server thật trên cổng 0 + client ws;
-│       │                         # (M3) thư mục game-data tạm để thử dữ liệu sai
-│       # thêm ở cột mốc sau:
-│       #   world/                tầm nhìn theo vùng, nhiều kênh mỗi bản đồ
-│       #   modules/<hệ thống>    skill (bảng chiêu đã học), social, guild, arena, event, mail, admin
-│       #   security/             rate-limit chung, chống gian lận, audit log
+│       ├── modules/npc/          # (M2) hội thoại NPC theo game-data (M4: quầy hàng; M5: nhánh theo nhiệm vụ)
+│       ├── modules/quest/        # (M5) nhiệm vụ chính tuyến: nhận/trả, tiến độ, thưởng, cờ mở khoá
+│       ├── modules/social/       # (M6) lời mời/đồng ý/bỏ bạn; giới hạn 50 bạn mỗi nhân vật
+│       ├── modules/party/        # (M6) lập đội, mời, rời/đuổi; tối đa 4 thành viên
+│       ├── modules/arena/        # (M6) hàng chờ 1v1, đấu PvP, Elo và xử lý ngắt kết nối
+│       ├── modules/leaderboard/  # (M6) bảng cấp độ và điểm Arena, tối đa 20 dòng
+│       ├── modules/mail/         # (M6) thư hệ thống; claim yên/vật phẩm nguyên tử
+│       ├── test/                 # global-setup + DB kiểm thử; server thật trên cổng 0 + client ws;
+│       │                         # M3 dữ liệu game tạm để thử dữ liệu sai; M6 test xã hội/arena và admission
+│       # cột mốc sau: guild, event, admin và rate-limit chung
 │
 ├── shared/                       # HỢP ĐỒNG CHUNG client ↔ server
 │   └── src/
-│       ├── protocol/             # PROTOCOL_VERSION (opcode, gói tin thêm ở cột mốc sau)
-│       ├── constants/            # enum: trường, phái, quan hệ trường–phái (M0)
-│       │                         # (M1) account, character; (M2) world; (M3) battle (luật trận), stats (chỉ số);
-│       │                         # (M4) equipment (4 ô, giá bán, tỉ lệ cường hóa);
-│       │                         # (M5) quest (loại mục tiêu, trạng thái nhiệm vụ, cờ mở khoá)
-│       ├── schemas/              # schema zod: skill, item (M0), account, character (M1), map (M2),
-│       │                         # school, monster, game-data (luật liên-file) (M3);
-│       │                         # (M4) item thêm trường trang bị (ô, cấp cường hóa, giá);
-│       │                         # (M5) quest (nhiệm vụ, mục tiêu, thưởng), map thêm cây hội thoại NPC
+│       ├── protocol/             # PROTOCOL_VERSION 6; opcodes/gói tin M0–M6 và schema lỗi chung
+│       ├── constants/            # enum trường/phái (M0); account/character (M1), world (M2), battle/stats (M3);
+│       │                         # equipment (M4), quest (M5), social/party/chat/arena/leaderboard/mail (M6)
+│       ├── schemas/              # schema zod: skill/item (M0), account/character (M1), map (M2),
+│       │                         # school/monster/game-data (M3), item/equipment (M4), quest/NPC dialog (M5),
+│       │                         # social/party/chat/mail/arena/leaderboard (M6)
 │       └── index.ts              # điểm xuất chung
 │       # thêm ở cột mốc sau: types/ (DTO), utils/ (toán, RNG xác định)
 │
 ├── game-data/                    # NỘI DUNG GAME (JSON, chỉ server nạp)
-│   ├── maps/ monsters/ items/ skills/ npcs/ classes/   # đã có ở M4 (26 file);
-│   │                                                   # (M4) quầy hàng khai ngay trong npcs/npc-thay-do.json
-│   ├── quests/                                         # (M5) 12 nhiệm vụ chương 1; cả thư mục là 39 file hợp lệ
+│   ├── maps/ monsters/ items/ skills/ npcs/ classes/   # 27 tệp nội dung nền; quầy khai trong NPC
+│   ├── quests/                                         # (M5) 12 nhiệm vụ chính tuyến chương 1
+│   │   # Đo hiện tại: 39 tệp JSON gồm nội dung nền và quest; validator kiểm cả 39 file
 │   ├── events/                                         # cột mốc sau (M7)
 │
 ├── assets/                       # TÀI NGUYÊN NGUỒN (hình, âm thanh, font)
@@ -141,11 +141,11 @@ ninja/
 | Đấu theo lượt, quái, rơi đồ | `battle/` (M3), `world/` | `ui/battle-panel/`, `game/` | `game-data/monsters/` |
 | Kỹ năng, chiêu thức | `modules/character/stats.ts` (M3: học theo phái + cấp) | `ui/battle-panel/` | `game-data/skills/` |
 | Túi đồ, trang bị, cường hóa | `modules/inventory` (M3: túi), trang bị/cường hóa M4 | `ui/inventory-panel/` | `game-data/items/` |
-| Chat, bạn, nhóm | `modules/chat` (chat khu vực — M2) + `modules/social` (bạn/nhóm, mốc sau) | `ui/` (chat) | bảng `friends` |
-| Bang hội | `modules/guild` | `ui/` | bảng `guilds` |
-| Lôi Đài, xếp hạng | `modules/arena` | `scenes/` (lôi đài) | Redis + bảng `arena_rank` |
-| Sự kiện, quà đăng nhập | `modules/event` | `ui/` | `game-data/events/` |
-| Thư (mail) | `modules/mail` | `ui/` | bảng `mails` |
+| Chat theo khu vực/thế giới/tổ đội/riêng, bạn bè và tổ đội | `modules/chat`, `modules/social`, `modules/party` | `ui/chat-panel/`, `ui/social-panel/`; state trong `net/` | bảng `friendships`; tổ đội lưu trong bộ nhớ server |
+| Bang hội | `modules/guild` (M7, chưa triển khai) | `ui/` (M7) | bảng `guilds` (M7) |
+| Lôi Đài 1v1, điểm và bảng xếp hạng | `modules/arena`, `modules/leaderboard`; dùng chung `battle/engine.ts` | `ui/arena-panel/`, `ui/battle-panel/` | bảng `character_arena` |
+| Sự kiện, quà đăng nhập | `modules/event` (M7, chưa triển khai) | `ui/` (M7) | `game-data/events/` (M7) |
+| Thư hệ thống | `modules/mail` | `ui/mail-panel/`; state trong `net/mail-state.ts` | bảng `mails` |
 | Công cụ GM | `modules/admin` | — | audit log |
 
 ## 4. Quy ước đặt tên
@@ -168,8 +168,10 @@ Chữ trong code/giao diện: tiếng Anh cho định danh, chuỗi hiển thị
 | M0 (nền móng) | `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, CI, `infra/docker/docker-compose.dev.yml`, `tools/data-validator` |
 | M1 (đã xong) | `client/src/app/{core,pages/login,pages/characters}`, `server/src/{config,db,http,security,modules/{account,character}}`, `shared/src/schemas`, `server/drizzle`, `tests/e2e` (8 kịch bản tài khoản & nhân vật) |
 | M2 (đã xong) | `server/src/{net,core,world,modules/{chat,npc}}`, `client/src/app/{net,input,ui,pages/play}` + `game/world-logic.ts`, `game-data/{maps,npcs}` (2 bản đồ + 1 NPC có hội thoại), `server/src/net/ws.spec.ts`, e2e thế giới/chat trong `tests/e2e` |
-| M3 | `client/src/app/battle/`, `server/src/modules/{inventory,battle,skill}`, `game-data/{monsters,items,skills,classes}` |
-| M4–M6 (Alpha) | `modules/{quest,social,arena,mail}`, mở rộng `game-data/{quests,shops}`, `tools/{map-editor,asset-pipeline}`, thêm kịch bản e2e cho thế giới/chat rồi chiến đấu |
+| M3 (đã xong) | `client/src/app/ui/battle-panel/`, `server/src/battle/`, `server/src/modules/inventory/`, chiêu thức trong `server/src/modules/character/stats.ts`, `game-data/{monsters,items,skills,classes}` |
+| M4 (đã xong) | `server/src/modules/{equipment,shop,upgrade}/`, `client/src/app/ui/{equipment,shop}-panel/`; mua/bán, trang bị và cường hóa |
+| M5 (đã xong) | `server/src/modules/quest/`, 12 tệp `game-data/quests/`, `client/src/app/net/quest-state.ts`, `ui/quest-log/`; 4 kịch bản e2e |
+| M6 (đang hoàn thiện) | `server/src/modules/{social,party,arena,leaderboard,mail}/`; protocol v6, các bảng `friendships`, `character_arena`, `mails`; client `ui/{social,chat,arena,mail}-panel/`; 5 kịch bản e2e |
 | M7–M8 (Beta) | `modules/{guild,event}`, `tools/gm-cli`, `infra/deploy`, `tests/load` |
 
 Chi tiết tiêu chí từng mốc xem `docs/03-plan/roadmap.md`.

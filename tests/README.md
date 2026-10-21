@@ -66,10 +66,45 @@ Hai **context trình duyệt riêng biệt** trong cùng một test, mỗi bên 
 | 3 | Hai người chơi (hai context riêng) cùng bấm vào **một con quái**: vào chung một trận, danh sách có hai người, cả hai cùng thắng và cùng nhận thưởng | M3 ✅ |
 | 4 | Lệnh không hợp lệ: bấm lại con quái vừa gục thì server trả `monster_gone` và client hiện đúng lý do; đang trong trận thì giữ phím di chuyển cũng không nhúc nhích | M3 ✅ |
 
-**Tổng: 17 kịch bản.** Các kịch bản dùng hook `window.__ninjaWorld` — hook này **chỉ** được gắn khi
-`isDevMode()`, bản production không phơi nó (xem `client/src/app/game/test-hook.ts`). Hook M3 có thêm:
-`monsters()`, `attackMonster(name)`, `attackMonsterAt(index)`, `battle()`, `character()`, `inventory()`,
-`useItem(name)`, `toggleInventory(open)`, `inventoryOpen()`, `lastError()`.
+### `src/equipment-shop-upgrade.spec.ts` (4 kịch bản — M4)
+
+| # | Kịch bản | Thuộc |
+|---|---|---|
+| 1 | Mua áo ở shop, mặc vào, xác nhận chỉ số tăng và còn giữ sau khi tải lại trang | M4 ✅ |
+| 2 | Bán bánh bao, đánh quái lấy đá vụn rồi cường hóa kiếm gỗ lên +1 | M4 ✅ |
+| 3 | Mua món đắt hơn số yên đang có thì bị từ chối và hiện thông báo | M4 ✅ |
+| 4 | Mua lại món trang bị đã có thì bị từ chối | M4 ✅ |
+
+### `src/quest-main-line.spec.ts` (4 kịch bản — M5)
+
+| # | Kịch bản | Thuộc |
+|---|---|---|
+| 1 | Người chơi mới nhận, làm và trả hai nhiệm vụ đầu, nhận thưởng | M5 ✅ |
+| 2 | Đăng nhập lại vẫn giữ nhiệm vụ đang làm và tiến độ | M5 ✅ |
+| 3 | Hội thoại đổi nhánh theo trạng thái nhiệm vụ và đi tiếp trong cây | M5 ✅ |
+| 4 | Nhánh Thầy Đồ: mục tiêu đếm đồ không tiêu món, trả xong mở khóa tính năng | M5 ✅ |
+
+### `src/social-chat-mail.spec.ts` (4 kịch bản — M6)
+
+| # | Kịch bản | Thuộc |
+|---|---|---|
+| 1 | Hai người kết bạn, lập tổ đội rồi rời đội; nhận quà từ thư chào mừng | M6 ✅ |
+| 2 | Gửi lời mời kết bạn với tên không tồn tại thì nhận đúng mã lỗi | M6 ✅ |
+| 3 | Tin thế giới/tổ đội/riêng tới đúng người; chat thế giới bị giới hạn 5 giây | M6 ✅ |
+| 4 | Đánh chuột đồng để lên cấp 3, mốc tối thiểu vào Lôi Đài | M6 ✅ |
+
+### `src/arena-pvp.spec.ts` (1 kịch bản — M6)
+
+| # | Kịch bản | Thuộc |
+|---|---|---|
+| 1 | Cấp thấp bị từ chối; hai người đủ cấp ghép trận, đánh kết thúc, cập nhật điểm và bảng xếp hạng | M6 ✅ |
+
+**Tổng: 30 kịch bản** (8 M1 + 5 M2 + 4 M3 + 4 M4 + 4 M5 + 5 M6). Các kịch bản dùng hook
+`window.__ninjaWorld` — hook này **chỉ** được gắn khi `isDevMode()`, bản production không phơi nó
+(xem `client/src/app/game/test-hook.ts`). Hook M3–M6 đọc trạng thái server đang vẽ: `monsters()`,
+`battle()`, `character()`, `inventory()`, `social()`, `party()`, `mails()`, `arena()`; các hành động
+chính gồm `attackMonster(name)`, `useItem(name)`, `toggleInventory(open)`, `openQuestLog(open)` và
+`lastError()`. Không khẳng định vị trí hoặc số dòng tuyệt đối trên bảng xếp hạng toàn máy chủ.
 
 ## Dự kiến thêm sau
 

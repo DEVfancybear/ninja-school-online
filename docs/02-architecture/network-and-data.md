@@ -175,6 +175,16 @@ Phần **server** của M2 đã chạy thật (kiểm thử tích hợp bằng c
   song (Thầy Đồ và thầy Hiệu Trưởng) hội tụ ở *Bái sư*; NPC mới `npc-su-phu` (Sư Phụ) ở làng; hội thoại của
   ba NPC đổi nhánh theo trạng thái nhiệm vụ.
 
+### 2f. Xã hội, chat, Lôi Đài và thư (M6)
+
+- Giao thức v6 khai báo opcode bạn bè/tổ đội/thư tại `0x0701–0x070d`, Arena/bảng xếp hạng tại `0x0801–0x0806`. Gói chat dùng lại `C2S_CHAT`/`S2C_CHAT` của M2.
+- Bạn bè tra theo tên nhân vật; quan hệ có hai chiều, tối đa `MAX_FRIENDS = 50` bạn được chấp nhận cho mỗi nhân vật. Khi đồng ý (kể cả lời mời ngược chiều), server khóa và kiểm sức chứa của cả hai bên.
+- Tổ đội tối đa `PARTY_MAX_MEMBERS = 4`; trạng thái tổ đội nằm trong bộ nhớ server, không có bảng `party_members` trong DB. Thành viên cùng đội được giữ khi chuyển map.
+- Chat có kênh `map`, `world`, `party`, `private`; thiếu `channel` hiểu là `map`. Chỉ `private` nhận trường `to`; kênh khác có `to` hoặc client gửi `system` đều bị từ chối. Chat thường cách nhau ít nhất `CHAT_MIN_INTERVAL_MS = 1000` ms/người; `world` có giới hạn riêng 5 giây/người (`WORLD_CHAT_MIN_INTERVAL_MS = 5000`).
+- Lôi Đài yêu cầu cấp `ARENA_MIN_LEVEL = 3`, bắt đầu ở `ARENA_START_RATING = 1000`, dùng `arenaExpectedScore()`/`arenaDelta()` trong shared với `ARENA_K_FACTOR = 32` và sàn `ARENA_RATING_FLOOR = 100`. PvP dùng khung `S2C_BATTLE_START/TURN/RESULT` và `C2S_BATTLE_ACTION` (`mode: 'arena'`); kết trận dùng `S2C_ARENA_END`. Không dùng vật phẩm hoặc chạy thoát để kết thúc trận Arena. Đăng ký Arena và trận PvE giữ chỗ nhân vật đồng bộ trước khi chờ truy vấn DB để không đồng thời vào cả hai chế độ.
+- Bảng `level`/`arena` tối đa `LEADERBOARD_MAX_ENTRIES = 20` dòng. Hộp thư tối đa `MAIL_MAX_ENTRIES = 20` thư.
+- Claim thư khóa thư và nhân vật trong cùng transaction. Nếu túi đầy, server trả `ErrorCode.INVENTORY_FULL` (`inventory_full`), không nhận yên/vật phẩm, giữ `claimed_at` rỗng để người chơi dọn túi rồi thử lại; claim đồng thời/lặp lại chỉ cấp thưởng một lần.
+
 ## 3. Định dạng gói tin
 
 Mỗi gói tin WebSocket là **một khung text JSON** (chưa dùng nhị phân/MessagePack; để dành khi băng thông thành vấn đề):
@@ -269,11 +279,11 @@ Game gốc xử lý gần hết ở client nên bị chế auto/mod dễ dàng. 
 
 ### 6.1 Bảng PostgreSQL (dữ liệu chạy)
 
-**Trạng thái: bảng này là thiết kế đích cho cả dự án, không phải danh sách "đã có".** Sau M5, database
-có `accounts`, `characters`, `refresh_tokens`, `inventory_items` (thêm `upgrade_level`, `equipped_slot`),
-`transactions`, `character_quests` và `character_features` — xem `server/src/db/schema.ts` và bốn migration
-trong `server/drizzle/`; các bảng còn lại sẽ được tạo ở cột mốc tương ứng. Cột `map_id`, `x`, `y`, `stats`, `last_login` của `characters` **chưa có**
-(M2/M3 chưa lưu vị trí — xem 6.3), nhưng đã có thêm `hp`/`mp` với quy ước `null` = đang đầy.
+**Trạng thái sau M6:** database có `accounts`, `characters`, `refresh_tokens`, `inventory_items`, `transactions`,
+`character_quests`, `character_features`, `friendships`, `character_arena` và `mails` — xem
+`server/src/db/schema.ts` và migrations `0001`–`0004` trong `server/drizzle/`. Tổ đội giữ trạng thái trong
+bộ nhớ server, không có bảng `party_members`. Cột `map_id`, `x`, `y`, `stats`, `last_login` của `characters`
+**chưa có** (M2/M3 chưa lưu vị trí — xem 6.3), nhưng đã có `hp`/`mp` với quy ước `null` = đang đầy.
 
 | Bảng | Cột chính | Ghi chú | Đã có |
 |---|---|---|---|
@@ -285,11 +295,11 @@ trong `server/drizzle/`; các bảng còn lại sẽ được tạo ở cột m�
 | `items` | id, owner_id, template_id, qty, upgrade_level, bound, slot, meta(jsonb) | vật phẩm có thuộc tính riêng (cường hóa, khóa, ô trang bị) — thay bằng `inventory_items` ở M3; M4 giải quyết bằng cột `upgrade_level`/`equipped_slot` trên `inventory_items` nên bảng này vẫn không cần | ❌ không cần |
 | `character_quests` | character_id, quest_id, status, progress(jsonb), accepted_at, completed_at | **thay cho `quest_progress` dự kiến**: một hàng cho mỗi nhiệm vụ **đã nhận**; `progress` giữ số đếm của các mục tiêu `talk`/`kill`/`reach` (mục tiêu `collect` đếm lại từ túi), unique theo `(character_id, quest_id)` | ✅ M5 |
 | `character_features` | character_id, feature, unlocked_at | cờ tính năng mở khóa bằng nhiệm vụ (`unlocks`); chương 1 mở `party`, `arena` | ✅ M5 |
-| `friends` | char_id, friend_id, status | bạn bè | M6 |
+| `friendships` | id, requester_id, addressee_id, status, created_at | lời mời và quan hệ bạn bè theo cặp requester/addressee; service tra cả hai hướng | ✅ M6 |
+| `character_arena` | character_id, rating, wins, losses, updated_at | điểm và kết quả Arena hiện tại | ✅ M6 |
+| `mails` | id, character_id, mail_key, subject, body, yen, items(jsonb), created_at, claimed_at | thư quà hệ thống, claim nguyên tử | ✅ M6 |
 | `guilds` | id, name, level, exp, notice, created_at | bang hội | M7 |
 | `guild_members` | guild_id, char_id, rank, joined_at | thành viên | M7 |
-| `mails` | id, to_char_id, from_name, title, body, attach(jsonb), is_read, expires_at | thư + quà | M6 |
-| `arena_rank` | char_id, season, rating, wins, losses | Lôi Đài | M6 |
 | `daily_limits` | char_id, kind, count, day | giới hạn theo ngày (boss, sự kiện) | M7 |
 | `transactions` | id, character_id, kind, item_id, quantity, yen_delta, detail, created_at | **thay cho `trade_logs` dự kiến**: sổ giao dịch mua/bán/cường hóa, ghi khi thành công (`yen_delta` âm khi mua/cường hóa, dương khi bán) | ✅ M4 |
 | `audit_logs` | id, actor, action, meta(jsonb), created_at | đối soát | ❌ chưa có |
