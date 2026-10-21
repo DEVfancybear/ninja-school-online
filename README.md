@@ -2,7 +2,7 @@
 
 Dự án game **nhập vai 2D nhiều người chơi (MMORPG nhẹ)**, chiến đấu theo lượt, **chơi trực tiếp trên trình duyệt** (máy tính + mobile web), lấy cảm hứng từ dòng game "Ninja School Online" nổi tiếng ở Việt Nam.
 
-> **Trạng thái:** đã hoàn thành các mốc M0–M6; M6 kết thúc Alpha. M0–M3 là nền tảng/MVP, M4 trang bị/shop/cường hóa, M5 nhiệm vụ chương 1, M6 xã hội và PvP. Mốc tiếp theo là M7 (bang hội, boss, sự kiện).
+> **Trạng thái:** đã triển khai các mốc M0–M6; M6 kết thúc Alpha sau CI trình duyệt cuối và kiểm chứng độc lập. M0–M3 là nền tảng/MVP, M4 trang bị/shop/cường hóa, M5 nhiệm vụ chương 1, M6 xã hội và PvP. Mốc tiếp theo là M7 (bang hội, boss, sự kiện).
 > Chơi được trên web: đăng ký/đăng nhập, tạo nhân vật, vào thế giới 2D bằng WebSocket, đi lại và chat; nói chuyện với NPC, làm nhiệm vụ; mua/bán, mặc trang bị và cường hóa; chiến đấu PvE/PvP theo lượt; kết bạn, lập tổ đội, chat thế giới/tổ đội/riêng, vào Lôi Đài xếp hạng, xem bảng xếp hạng và nhận thư hệ thống. Dữ liệu tài khoản/nhân vật/túi đồ/xã hội/Arena lưu hoặc được đồng bộ từ PostgreSQL.
 
 ## Lệnh nhanh
@@ -12,7 +12,7 @@ pnpm install            # cài phụ thuộc (pnpm 12 trở lên)
 cp .env.example .env    # rồi chỉnh DATABASE_URL cho đúng máy bạn
 pnpm db:migrate         # tạo bảng trong PostgreSQL (tự build shared trước)
 pnpm dev                # chạy client (ng serve) + server (tsx watch)
-pnpm lint && pnpm typecheck && pnpm test   # 604 test theo CI hiện tại
+pnpm lint && pnpm typecheck && pnpm test   # 608 test theo CI hiện tại
 pnpm e2e                                   # 30 kịch bản trên trình duyệt thật (Playwright)
 pnpm validate:data      # kiểm tra game-data/ theo schema
 pnpm build

@@ -1,6 +1,6 @@
 # server/ — Game server
 
-**Trạng thái:** Đã triển khai M0–M6 (M6 kết thúc Alpha); CI cuối và kiểm chứng độc lập của các fix lifecycle đang chờ. Server có tài khoản/nhân vật, thế giới, PvE, trang bị/shop/cường hóa, nhiệm vụ, bạn bè/tổ đội/chat theo kênh, Lôi Đài/Elo, bảng xếp hạng và thư hệ thống.
+**Trạng thái:** Đã triển khai M0–M6 (M6 kết thúc Alpha). Kết quả CI và kiểm chứng độc lập được theo dõi cùng roadmap. Server có tài khoản/nhân vật, thế giới, PvE, trang bị/shop/cường hóa, nhiệm vụ, bạn bè/tổ đội/chat theo kênh, Lôi Đài/Elo, bảng xếp hạng và thư hệ thống.
 
 ## Vai trò
 
@@ -243,10 +243,10 @@ pnpm --filter @ninja/server build && pnpm --filter @ninja/server start
 
 ## Chưa làm (các cột mốc sau)
 
-- Module còn lại: `quest`, `social`, `guild`, `arena`, `event`, `mail`, `admin`; trang bị & cường hóa (M4),
-  nhiệm vụ (M5).
-- Chiến đấu: trận nhiều quái (1–3 như thiết kế), hiệu ứng phụ của chiêu (độc/choáng/hồi máu), và việc lưu
-  trạng thái trận xuống database khi chạy nhiều tiến trình.
+- Module M7+: bang hội (`guild`), sự kiện (`event`) và công cụ quản trị (`admin`). M4 trang bị/shop/cường hóa,
+  M5 nhiệm vụ và M6 bạn bè/tổ đội/Arena/thư đã triển khai.
+- Chiến đấu: trận nhiều quái (1–3 như thiết kế), hiệu ứng phụ của chiêu (độc/choáng/hồi máu), và lưu trạng thái
+  trận đang chạy qua database khi vận hành nhiều tiến trình.
 - Lưu vị trí nhân vật vào database, chia kênh theo map, pub/sub qua Redis (nhiều tiến trình).
 - Giới hạn tần suất chung cho mọi gói tin, khoá tài khoản sau nhiều lần sai, audit log.
 
