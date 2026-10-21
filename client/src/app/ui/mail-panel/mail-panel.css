@@ -1,0 +1,118 @@
+/* Cùng chỗ với bảng xã hội và bảng Lôi Đài: hộp giữa màn hình dưới thanh HUD. */
+:host {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 7;
+  display: block;
+}
+
+.mail-panel {
+  width: min(420px, 92vw);
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(134, 239, 172, 0.35);
+  background: rgba(8, 14, 20, 0.95);
+  color: #e8f1f8;
+  font-size: 13px;
+  overflow-y: auto;
+}
+
+.mail-panel__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mail-panel__title {
+  margin: 0;
+  font-size: 15px;
+}
+
+.mail-panel__count {
+  font-size: 11px;
+  color: #9fb3c8;
+}
+
+.mail-panel__close {
+  width: 24px;
+  height: 24px;
+  margin-left: auto;
+  border-radius: 7px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: transparent;
+  color: inherit;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.mail-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.mail-item__subject {
+  font-size: 13px;
+  color: #86efac;
+}
+
+.mail-item__body {
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+/* Thư không có nội dung (server cho `body` mặc định rỗng) thì không chiếm một dòng trống. */
+.mail-item__body:empty {
+  display: none;
+}
+
+.mail-item__gift {
+  font-size: 11px;
+  color: #fbbf24;
+}
+
+.mail-item--claimed .mail-item__subject,
+.mail-item--claimed .mail-item__body,
+.mail-item--claimed .mail-item__gift {
+  color: #64748b;
+}
+
+.mail-item__claimed {
+  align-self: flex-start;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.mail-claim {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 3px 9px;
+  border-radius: 8px;
+  border: 1px solid rgba(134, 239, 172, 0.5);
+  background: rgba(134, 239, 172, 0.12);
+  color: #e8f1f8;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.mail-panel__empty {
+  padding: 6px 0;
+  font-size: 12px;
+  color: #9fb3c8;
+}

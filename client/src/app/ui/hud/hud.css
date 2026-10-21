@@ -142,3 +142,25 @@
 .ghost--active {
   background: rgba(127, 209, 255, 0.2);
 }
+
+/* Huy hiệu số lời mời / số thư chưa nhận: chấm nhỏ dính góc nút, không làm nút nhảy kích thước. */
+.hud__social,
+.hud__mail {
+  position: relative;
+}
+
+.hud__social-badge,
+.hud__mail-badge {
+  position: absolute;
+  top: -0.35rem;
+  right: -0.3rem;
+  min-width: 0.95rem;
+  padding: 0 0.2rem;
+  border-radius: 999px;
+  background: #d2544f;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 0.95rem;
+  text-align: center;
+}

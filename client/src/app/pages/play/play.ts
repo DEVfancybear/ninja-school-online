@@ -24,6 +24,7 @@ import {
   type BattleAction,
   type Character,
   type EquipSlot,
+  type LeaderboardKind,
   type Notify,
   type UpgradeResult,
 } from '@ninja/shared';
@@ -35,19 +36,26 @@ import { WorldTestHook } from '../../game/test-hook';
 import { type Point } from '../../game/world-logic';
 import { isTypingTarget } from '../../input/key-map';
 import { MOVE_COMMAND_INTERVAL_MS, MovementController } from '../../input/movement-controller';
+import { ArenaState } from '../../net/arena-state';
 import { BattleState } from '../../net/battle-state';
 import { GameSocket, type SocketError } from '../../net/game-socket';
+import { MailState } from '../../net/mail-state';
+import { PartyState } from '../../net/party-state';
+import { SocialState } from '../../net/social-state';
 import { type Facing } from '../../net/world-types';
 import { WorldState } from '../../net/world-state';
+import { ArenaPanel } from '../../ui/arena-panel/arena-panel';
 import { BattlePanel, type BattleActionRequest } from '../../ui/battle-panel/battle-panel';
-import { ChatPanel } from '../../ui/chat-panel/chat-panel';
+import { ChatPanel, type ChatDraft } from '../../ui/chat-panel/chat-panel';
 import { EquipmentPanel } from '../../ui/equipment-panel/equipment-panel';
 import { Hud } from '../../ui/hud/hud';
 import { InventoryPanel } from '../../ui/inventory-panel/inventory-panel';
+import { MailPanel } from '../../ui/mail-panel/mail-panel';
 import { NoticeBar } from '../../ui/notice-bar/notice-bar';
 import { NpcDialogPanel, type NpcDialogOption } from '../../ui/npc-dialog/npc-dialog';
 import { QuestLog } from '../../ui/quest-log/quest-log';
 import { ShopPanel } from '../../ui/shop-panel/shop-panel';
+import { SocialPanel } from '../../ui/social-panel/social-panel';
 
 /** Thời gian thanh thông báo tự ẩn. */
 export const NOTICE_HIDE_MS = 4000;
@@ -73,6 +81,13 @@ export const SNAPSHOT_FALLBACK_DELAY = new InjectionToken<number>('ninja.snapsho
   factory: () => SNAPSHOT_FALLBACK_MS,
 });
 
+/** Mã lỗi thuộc về khung chat, để câu giải thích hiện đúng chỗ người chơi vừa thao tác. */
+const CHAT_ERROR_CODES: ReadonlySet<string> = new Set<string>([
+  ErrorCode.RATE_LIMITED,
+  ErrorCode.NOT_IN_PARTY,
+  ErrorCode.CHARACTER_NOT_FOUND,
+]);
+
 /**
  * Trang `/play`: vào thế giới ninja.
  *
@@ -94,6 +109,9 @@ export const SNAPSHOT_FALLBACK_DELAY = new InjectionToken<number>('ninja.snapsho
     EquipmentPanel,
     QuestLog,
     ShopPanel,
+    SocialPanel,
+    ArenaPanel,
+    MailPanel,
   ],
   templateUrl: './play.html',
   styleUrl: './play.css',
@@ -105,6 +123,10 @@ export class Play implements OnInit, OnDestroy {
   private readonly socket = inject(GameSocket);
   private readonly world = inject(WorldState);
   private readonly battleState = inject(BattleState);
+  private readonly socialState = inject(SocialState);
+  private readonly partyState = inject(PartyState);
+  private readonly mailState = inject(MailState);
+  private readonly arenaState = inject(ArenaState);
   private readonly testHook = inject(WorldTestHook);
   private readonly snapshotFallbackMs = inject(SNAPSHOT_FALLBACK_DELAY);
 
@@ -124,6 +146,15 @@ export class Play implements OnInit, OnDestroy {
   readonly equipmentOpen = signal(false);
   /** Mở/đóng nhật ký nhiệm vụ; nhật ký chỉ để xem nên mở ra cũng không sợ lỡ tay. */
   readonly questOpen = signal(false);
+  /**
+   * Ba bảng của M6 (xã hội, Lôi Đài, thư) loại trừ nhau.
+   *
+   * Chúng cùng đặt ở giữa màn hình dưới thanh HUD — chỗ duy nhất còn trống mà không che nút HUD.
+   * Mở ba bảng chồng lên nhau thì cái dưới không bấm được nữa, nên mở bảng nào là đóng hai bảng kia.
+   */
+  readonly socialOpen = signal(false);
+  readonly arenaOpen = signal(false);
+  readonly mailOpen = signal(false);
   readonly notice = signal<string | null>(null);
   readonly chatNotice = signal<string | null>(null);
   readonly localFacing = signal<Facing | null>(null);
@@ -152,6 +183,25 @@ export class Play implements OnInit, OnDestroy {
   readonly battleRemainingMs = this.battleState.remainingMs;
   readonly isMyTurn = this.battleState.isMyTurn;
   readonly inBattle = this.battleState.inBattle;
+
+  readonly friends = this.socialState.friends;
+  readonly friendRequests = this.socialState.incoming;
+  readonly friendRequestsSent = this.socialState.outgoing;
+  readonly maxFriends = this.socialState.maxFriends;
+  readonly party = this.partyState.snapshot;
+  readonly mails = this.mailState.mails;
+  readonly mailCapacity = this.mailState.maxEntries;
+  readonly arena = this.arenaState.state;
+  readonly arenaResult = this.arenaState.result;
+  readonly leaderboard = this.arenaState.entries;
+  readonly leaderboardBoard = this.arenaState.board;
+
+  /** Huy hiệu nút Xã hội: lời mời kết bạn **và** lời mời vào đội đều cần người chơi để ý. */
+  readonly socialBadge = computed(
+    () => this.socialState.incoming().length + this.partyState.invites().length,
+  );
+  /** Huy hiệu nút Thư: số thư còn quà chưa nhận. */
+  readonly mailBadge = this.mailState.unclaimedCount;
 
   readonly characterName = computed(() => this.world.self()?.name ?? this.character()?.name ?? '');
   readonly mapName = computed(() => this.world.mapName());
@@ -231,6 +281,10 @@ export class Play implements OnInit, OnDestroy {
         }
         this.world.reset();
         this.battleState.reset();
+        this.socialState.reset();
+        this.partyState.reset();
+        this.mailState.reset();
+        this.arenaState.reset();
         this.movement.reset();
         this.localFacing.set(null);
         this.snapshotEpoch = 0;
@@ -239,6 +293,9 @@ export class Play implements OnInit, OnDestroy {
         this.bagOpen.set(false);
         this.equipmentOpen.set(false);
         this.questOpen.set(false);
+        this.socialOpen.set(false);
+        this.arenaOpen.set(false);
+        this.mailOpen.set(false);
         this.announcedFeatures.clear();
         this.clearSnapshotTimer();
       });
@@ -464,6 +521,26 @@ export class Play implements OnInit, OnDestroy {
     this.battleState.closeOutcome();
   }
 
+  /**
+   * Mở một trong ba bảng M6 và đóng hai bảng còn lại.
+   *
+   * Ba bảng cùng nằm ở giữa màn hình dưới thanh HUD; chồng lên nhau thì bảng dưới không bấm được
+   * nữa. Đóng bảng Lôi Đài cũng là "đã đọc xong kết quả" — xoá `result` theo đúng hợp đồng
+   * ("giữ tới khi người chơi đóng bảng").
+   */
+  private openExclusivePanel(panel: 'social' | 'arena' | 'mail' | null, open: boolean): void {
+    const show = open ? panel : null;
+    this.socialOpen.set(show === 'social');
+    this.arenaOpen.set(show === 'arena');
+    this.mailOpen.set(show === 'mail');
+    if (show === 'arena') {
+      // Bảng vừa mở: xin bảng xếp hạng đang xem để số liệu không cũ từ lần mở trước.
+      this.socket.requestLeaderboard(this.arenaState.board());
+      return;
+    }
+    this.arenaState.closeResult();
+  }
+
   toggleInventory(): void {
     this.bagOpen.update((open) => !open);
   }
@@ -486,6 +563,30 @@ export class Play implements OnInit, OnDestroy {
 
   setQuestOpen(open: boolean): void {
     this.questOpen.set(open);
+  }
+
+  toggleSocial(): void {
+    this.setSocialOpen(!this.socialOpen());
+  }
+
+  setSocialOpen(open: boolean): void {
+    this.openExclusivePanel('social', open);
+  }
+
+  toggleArena(): void {
+    this.setArenaOpen(!this.arenaOpen());
+  }
+
+  setArenaOpen(open: boolean): void {
+    this.openExclusivePanel('arena', open);
+  }
+
+  toggleMail(): void {
+    this.setMailOpen(!this.mailOpen());
+  }
+
+  setMailOpen(open: boolean): void {
+    this.openExclusivePanel('mail', open);
   }
 
   /** Dùng một vật phẩm ngoài trận (trong trận phải dùng qua lượt của mình). */
@@ -527,16 +628,91 @@ export class Play implements OnInit, OnDestroy {
     this.socket.send(Opcode.C2S_NPC_TALK, { npcId });
   }
 
-  onChatSend(text: string): void {
-    const trimmed = text.trim().slice(0, CHAT_MAX_LENGTH);
-    if (trimmed.length === 0) {
+  /** Gửi một tin chat theo kênh người chơi đã chọn (kênh riêng phải kèm người nhận). */
+  onChatSend(draft: ChatDraft): void {
+    const text = draft.text.trim().slice(0, CHAT_MAX_LENGTH);
+    if (text.length === 0) {
+      return;
+    }
+    const to = draft.to?.trim() ?? '';
+    if (draft.channel === 'private' && to.length === 0) {
+      // Nút Gửi đã khoá ở trường hợp này; chặn lần nữa để không bao giờ gửi tin riêng vô chủ.
+      this.showChatNotice('Tin riêng cần tên người nhận.');
       return;
     }
     if (!this.online()) {
       this.showChatNotice('Chưa kết nối tới máy chủ nên tin nhắn chưa gửi đi được.');
       return;
     }
-    this.socket.send(Opcode.C2S_CHAT, { channel: 'map', text: trimmed });
+    this.socket.sendChat(draft.channel, text, draft.channel === 'private' ? to : undefined);
+  }
+
+  // ----------------------------------------------------------- xã hội (M6)
+
+  onFriendRequest(name: string): void {
+    this.socket.requestFriend(name);
+  }
+
+  onFriendAccept(name: string): void {
+    this.socket.acceptFriend(name);
+  }
+
+  onFriendDecline(name: string): void {
+    this.socket.declineFriend(name);
+  }
+
+  onFriendRemove(name: string): void {
+    this.socket.removeFriend(name);
+  }
+
+  onPartyInvite(name: string): void {
+    this.socket.inviteParty(name);
+  }
+
+  /** Nhận lời mời vào đội của `leaderName` — địa chỉ của lời mời là đội trưởng, không phải đội. */
+  onPartyAccept(leaderName: string): void {
+    this.socket.acceptParty(leaderName);
+  }
+
+  onPartyDecline(leaderName: string): void {
+    this.socket.declineParty(leaderName);
+  }
+
+  onPartyLeave(): void {
+    this.socket.leaveParty();
+  }
+
+  onPartyKick(name: string): void {
+    this.socket.kickParty(name);
+  }
+
+  // ------------------------------------------------------- thư & Lôi Đài (M6)
+
+  onMailClaim(mailId: string): void {
+    this.socket.claimMail(mailId);
+  }
+
+  onArenaQueue(): void {
+    this.socket.arenaQueue();
+  }
+
+  onArenaCancel(): void {
+    this.socket.arenaCancel();
+  }
+
+  /**
+   * Đổi bảng xếp hạng đang xem.
+   *
+   * Bảng hiện ra theo `board` trong `S2C_LEADERBOARD` chứ không theo cú bấm: nhờ vậy thẻ đang sáng
+   * luôn khớp đúng bảng đang vẽ, kể cả khi máy chủ trả lời chậm một nhịp.
+   */
+  onArenaBoard(board: LeaderboardKind): void {
+    this.socket.requestLeaderboard(board);
+  }
+
+  /** Người chơi đóng khung kết quả trận vừa xong nhưng vẫn để bảng Lôi Đài mở. */
+  closeArenaResult(): void {
+    this.arenaState.closeResult();
   }
 
   // ------------------------------------------------------------------ nội bộ
@@ -556,10 +732,29 @@ export class Play implements OnInit, OnDestroy {
       this.showNotice((payload as Notify).message);
     } else if (op === Opcode.S2C_UPGRADE_RESULT) {
       this.onUpgradeResult(payload as UpgradeResult);
+    } else if (op === Opcode.S2C_ARENA_END) {
+      // Kết quả Lôi Đài vừa tới: bảng Lôi Đài nhận điểm mới, **và** khung chiến đấu đang mở phải
+      // đóng lại (server không gửi `S2C_BATTLE_END` cho trận Lôi Đài). Hai service độc lập nhau nên
+      // gọi cả hai; mở bảng Lôi Đài để người chơi đọc được kết quả ngay.
+      this.arenaState.applyPacket(op, payload);
+      this.battleState.applyPacket(op, payload);
+      this.openExclusivePanel('arena', true);
+      return;
+    } else if (op === Opcode.S2C_BATTLE_START) {
+      // Vào trận thì nhường màn hình cho khung chiến đấu; ba bảng M6 đóng lại (kết quả Lôi Đài mở
+      // lại bảng khi trận xong).
+      this.openExclusivePanel(null, false);
     }
-    if (!this.battleState.applyPacket(op, payload)) {
-      this.world.applyPacket(op, payload);
+    if (
+      this.battleState.applyPacket(op, payload) ||
+      this.arenaState.applyPacket(op, payload) ||
+      this.socialState.applyPacket(op, payload) ||
+      this.partyState.applyPacket(op, payload) ||
+      this.mailState.applyPacket(op, payload)
+    ) {
+      return;
     }
+    this.world.applyPacket(op, payload);
   };
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
@@ -626,8 +821,10 @@ export class Play implements OnInit, OnDestroy {
 
   private onSocketError(error: SocketError): void {
     this.showNotice(error.message);
-    if (error.code === ErrorCode.RATE_LIMITED) {
-      this.showChatNotice('Bạn gửi tin nhắn quá nhanh, chờ một chút rồi gửi lại.');
+    if (CHAT_ERROR_CODES.has(error.code)) {
+      // Lỗi của khung chat (gửi quá nhanh, chưa ở tổ đội, không tìm thấy người nhận) hiện ngay trong
+      // khung chat và giữ nguyên câu tiếng Việt server soạn — client không diễn giải lại.
+      this.showChatNotice(error.message);
     }
     if (error.code === ErrorCode.NO_CHARACTER) {
       this.noCharacter.set(true);

@@ -56,6 +56,28 @@
   border-color: rgba(74, 222, 128, 0.5);
 }
 
+/* Thẻ đối thủ của trận Lôi Đài: viền đỏ như quái để không lẫn với thẻ của mình. */
+.card--opponent {
+  border-color: rgba(248, 113, 113, 0.55);
+}
+
+.battle__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.battle__mode {
+  font-size: 13px;
+  font-weight: 700;
+  color: #7dd3fc;
+}
+
+.battle__note {
+  font-size: 11px;
+  color: #fbbf24;
+}
+
 .card--dead {
   opacity: 0.55;
 }

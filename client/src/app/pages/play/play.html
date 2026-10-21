@@ -53,10 +53,18 @@
         [bagOpen]="bagOpen()"
         [equipmentOpen]="equipmentOpen()"
         [questOpen]="questOpen()"
+        [socialOpen]="socialOpen()"
+        [arenaOpen]="arenaOpen()"
+        [mailOpen]="mailOpen()"
+        [socialBadge]="socialBadge()"
+        [mailBadge]="mailBadge()"
         (toggleChat)="toggleChat()"
         (toggleInventory)="toggleInventory()"
         (toggleEquipment)="toggleEquipment()"
         (toggleQuest)="toggleQuest()"
+        (toggleSocial)="toggleSocial()"
+        (toggleArena)="toggleArena()"
+        (toggleMail)="toggleMail()"
       />
 
       @if (chatVisible()) {
@@ -91,6 +99,50 @@
 
       @if (questOpen()) {
         <app-quest-log [quests]="quests()" (closed)="setQuestOpen(false)" />
+      }
+
+      @if (socialOpen()) {
+        <app-social-panel
+          [friends]="friends()"
+          [incoming]="friendRequests()"
+          [outgoing]="friendRequestsSent()"
+          [maxFriends]="maxFriends()"
+          [party]="party()"
+          [selfName]="characterName()"
+          (closed)="setSocialOpen(false)"
+          (friendRequest)="onFriendRequest($event)"
+          (friendAccept)="onFriendAccept($event)"
+          (friendDecline)="onFriendDecline($event)"
+          (friendRemove)="onFriendRemove($event)"
+          (partyInvite)="onPartyInvite($event)"
+          (partyAccept)="onPartyAccept($event)"
+          (partyDecline)="onPartyDecline($event)"
+          (partyLeave)="onPartyLeave()"
+          (partyKick)="onPartyKick($event)"
+        />
+      }
+
+      @if (arenaOpen()) {
+        <app-arena-panel
+          [state]="arena()"
+          [result]="arenaResult()"
+          [board]="leaderboardBoard()"
+          [entries]="leaderboard()"
+          (queue)="onArenaQueue()"
+          (queueCancel)="onArenaCancel()"
+          (boardChange)="onArenaBoard($event)"
+          (resultClosed)="closeArenaResult()"
+          (closed)="setArenaOpen(false)"
+        />
+      }
+
+      @if (mailOpen()) {
+        <app-mail-panel
+          [mails]="mails()"
+          [maxEntries]="mailCapacity()"
+          (claim)="onMailClaim($event)"
+          (closed)="setMailOpen(false)"
+        />
       }
 
       @if (dialog(); as npcDialog) {

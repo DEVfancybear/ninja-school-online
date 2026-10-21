@@ -1,8 +1,24 @@
 <section class="chat" aria-label="Khung chat">
   <ul #chatLog class="chat-log">
     @for (line of messages(); track $index) {
-      <li class="chat-line" [class.system]="line.channel === 'system'" [class.mine]="isMine(line)">
-        <span class="chat-from">{{ line.channel === 'system' ? 'Hệ thống' : line.fromName }}</span>
+      <li
+        class="chat-line"
+        [class.system]="line.channel === 'system'"
+        [class.mine]="isMine(line)"
+        [class.chat-line--world]="line.channel === 'world'"
+        [class.chat-line--party]="line.channel === 'party'"
+        [class.chat-line--private]="line.channel === 'private'"
+      >
+        <span class="chat-from">
+          @if (line.channel === 'system') {
+            Hệ thống
+          } @else if (channelPrefix(line.channel); as prefix) {
+            [{{ prefix }}] {{ line.fromName
+            }}{{ line.channel === 'private' && line.toName ? ' → ' + line.toName : '' }}
+          } @else {
+            {{ line.fromName }}
+          }
+        </span>
         <span class="chat-text">{{ line.text }}</span>
       </li>
     } @empty {
@@ -11,6 +27,31 @@
   </ul>
 
   <form class="compose" (ngSubmit)="submit()">
+    <select
+      class="chat-channel"
+      name="chatChannel"
+      aria-label="Kênh gửi tin"
+      [value]="channel()"
+      [disabled]="disabled()"
+      (change)="onChannel($event)"
+    >
+      @for (option of channels; track option.value) {
+        <option [value]="option.value">{{ option.label }}</option>
+      }
+    </select>
+    @if (isPrivateChannel()) {
+      <input
+        class="chat-target"
+        type="text"
+        name="chatTarget"
+        autocomplete="off"
+        placeholder="Người nhận"
+        aria-label="Tên người nhận tin riêng"
+        [value]="target()"
+        [disabled]="disabled()"
+        (input)="onTarget($event)"
+      />
+    }
     <input
       class="chat-input"
       type="text"
@@ -22,9 +63,7 @@
       [disabled]="disabled()"
       (input)="onDraft($event)"
     />
-    <button class="chat-send" type="submit" [disabled]="disabled() || draft().trim().length === 0">
-      Gửi
-    </button>
+    <button class="chat-send" type="submit" [disabled]="!canSend()">Gửi</button>
   </form>
 
   @if (notice(); as text) {

@@ -1,4 +1,11 @@
 <section class="battle" [class.battle--waiting]="!isMyTurn()">
+  <div class="battle__head">
+    <span class="battle__mode">{{ modeLabel() }}</span>
+    @if (isArena()) {
+      <span class="battle__note">Trận Lôi Đài — không bỏ chạy được</span>
+    }
+  </div>
+
   <div class="battle__field">
     @if (monster(); as mob) {
       <article class="card card--monster" [class.card--dead]="!mob.alive">
@@ -21,6 +28,7 @@
         <article
           class="card"
           [class.card--self]="player.id === selfId()"
+          [class.card--opponent]="isOpponent(player)"
           [class.card--dead]="!player.alive"
         >
           <header class="card__head">
@@ -76,20 +84,24 @@
           </small>
         </button>
       }
-      <button type="button" class="btn" [disabled]="!canAct()" (click)="toggleItems()">
-        Dùng vật phẩm
-      </button>
-      <button
-        type="button"
-        class="btn btn--flee"
-        [disabled]="!canAct()"
-        (click)="choose({ action: 'flee' })"
-      >
-        Bỏ chạy
-      </button>
+      @if (!isArena()) {
+        <button type="button" class="btn" [disabled]="!canAct()" (click)="toggleItems()">
+          Dùng vật phẩm
+        </button>
+      }
+      @if (!isArena()) {
+        <button
+          type="button"
+          class="btn btn--flee"
+          [disabled]="!canAct()"
+          (click)="choose({ action: 'flee' })"
+        >
+          Bỏ chạy
+        </button>
+      }
     </div>
 
-    @if (itemsOpen()) {
+    @if (!isArena() && itemsOpen()) {
       <div class="items">
         @if (usableItems().length === 0) {
           <p class="items__empty">Túi không có món nào dùng được trong trận.</p>

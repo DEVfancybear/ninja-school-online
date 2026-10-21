@@ -1,8 +1,10 @@
 import { Injectable, computed, signal } from '@angular/core';
 import {
   Opcode,
+  type ArenaEnd,
   type BattleEnd,
   type BattleEvent,
+  type BattleMode,
   type BattleResult,
   type BattleStart,
   type BattleTurn,
@@ -17,6 +19,11 @@ export interface BattleSnapshot {
   readonly turnMs: number;
   readonly turnEndsAt: number;
   readonly participants: readonly Combatant[];
+  /**
+   * Loại trận do server khai trong `S2C_BATTLE_START`. Cùng một khung chiến đấu vẽ cả trận đánh
+   * quái (`pve`) lẫn trận Lôi Đài (`arena`); chỉ khác tiêu đề, thẻ đối thủ và nút bỏ chạy.
+   */
+  readonly mode: BattleMode;
 }
 
 /** Số dòng nhật ký giữ lại; trận dài cũng không làm khung nhật ký phình ra. */
@@ -87,6 +94,12 @@ export class BattleState {
 
   readonly inBattle = computed(() => this.battleSignal() !== null);
 
+  /** Loại trận đang mở; `null` khi không ở trong trận nào. */
+  readonly mode = computed<BattleMode | null>(() => this.battleSignal()?.mode ?? null);
+
+  /** Đang ở trận Lôi Đài (khác trận đánh quái thường). */
+  readonly isArena = computed(() => this.battleSignal()?.mode === 'arena');
+
   setSelfId(characterId: string | null): void {
     this.selfIdSignal.set(characterId);
   }
@@ -106,6 +119,12 @@ export class BattleState {
         return true;
       case Opcode.S2C_BATTLE_END:
         this.end(payload as BattleEnd);
+        return true;
+      case Opcode.S2C_ARENA_END:
+        // Lôi Đài kết thúc bằng gói riêng (phần thưởng là điểm, không phải kinh nghiệm/yên). Khung
+        // chiến đấu phải đóng ngay, nếu không trận treo lại trên màn hình chờ một `S2C_BATTLE_END`
+        // sẽ không bao giờ tới. Không dựng `outcome` PvE: kết quả Lôi Đài do bảng Lôi Đài hiện.
+        this.closeArenaBattle(payload as ArenaEnd);
         return true;
       default:
         return false;
@@ -134,8 +153,23 @@ export class BattleState {
       turnMs: payload.turnMs,
       turnEndsAt: payload.turnEndsAt,
       participants: payload.participants,
+      mode: payload.mode,
     });
     this.restartClock(payload.turnMs);
+  }
+
+  /**
+   * Đóng khung chiến đấu khi trận Lôi Đài kết thúc.
+   *
+   * Chỉ đóng đúng trận vừa xong: gói kết thúc của một trận khác tới muộn không được xoá trận đang
+   * chạy.
+   */
+  private closeArenaBattle(payload: ArenaEnd): void {
+    const battle = this.battleSignal();
+    if (battle !== null && battle.battleId !== payload.battleId) {
+      return;
+    }
+    this.closeOutcome();
   }
 
   private turn(payload: BattleTurn): void {

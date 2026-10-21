@@ -108,6 +108,12 @@ export class BattlePanel {
     this.inventory().filter((item) => item.usable && item.quantity > 0),
   );
 
+  /** Đang đánh ở Lôi Đài: cùng khung chiến đấu nhưng luật hiển thị khác (không bỏ chạy được). */
+  readonly isArena = computed(() => this.battle()?.mode === 'arena');
+
+  /** Tiêu đề loại trận — nơi duy nhất nói cho người chơi biết đang đánh quái hay đấu Lôi Đài. */
+  readonly modeLabel = computed(() => (this.isArena() ? 'Lôi Đài' : 'Đánh quái'));
+
   readonly canAct = computed(
     () => this.isMyTurn() && this.outcome() === null && (this.me()?.alive ?? false),
   );
@@ -171,6 +177,11 @@ export class BattlePanel {
       return 0;
     }
     return Math.max(0, Math.min(100, Math.round((value / max) * 100)));
+  }
+
+  /** Trong trận Lôi Đài thì người chơi kia là đối thủ — thẻ của họ được đánh dấu riêng. */
+  isOpponent(player: Combatant): boolean {
+    return this.isArena() && player.id !== this.selfId();
   }
 
   choose(action: BattleActionRequest): void {

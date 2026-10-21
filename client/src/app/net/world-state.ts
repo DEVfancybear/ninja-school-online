@@ -38,6 +38,11 @@ export interface ChatLine {
   readonly text: string;
   readonly at: number;
   readonly fromId?: string;
+  /**
+   * Người nhận của tin `private`. Chỉ kênh riêng mới có trường này — hợp đồng gửi kèm `toName`
+   * đúng cho người nhận, còn kênh khác không có.
+   */
+  readonly toName?: string;
 }
 
 /** Số dòng chat giữ trong bộ nhớ; nhiều hơn `CHAT_BACKLOG_SIZE` để cuộn lại vẫn thấy. */
@@ -244,5 +249,6 @@ function toChatLine(message: ChatMessage | ServerEnterMap['chatBacklog'][number]
     text: message.text,
     at: message.at,
     ...('fromId' in message ? { fromId: message.fromId } : {}),
+    ...('toName' in message && message.toName !== undefined ? { toName: message.toName } : {}),
   };
 }

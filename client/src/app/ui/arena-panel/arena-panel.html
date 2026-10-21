@@ -1,0 +1,80 @@
+<aside class="arena-panel" aria-label="Bảng Lôi Đài">
+  <header class="arena-panel__head">
+    <h2 class="arena-panel__title">Lôi Đài</h2>
+    <button
+      type="button"
+      class="arena-panel__close"
+      (click)="closed.emit()"
+      aria-label="Đóng bảng Lôi Đài"
+    >
+      ×
+    </button>
+  </header>
+
+  <div class="arena-summary">
+    <span class="arena-rating" title="Điểm Lôi Đài của bạn">{{ state().rating }} điểm</span>
+    <span class="arena-record" title="Số trận thắng / thua"
+      >Thắng/Thua: {{ state().wins }}/{{ state().losses }}</span
+    >
+  </div>
+
+  <div class="arena-queue-row">
+    @if (state().queued) {
+      <button type="button" class="arena-cancel" (click)="queueCancel.emit()">Rời hàng chờ</button>
+    } @else {
+      <button type="button" class="arena-queue" (click)="queue.emit()">Vào hàng chờ</button>
+    }
+    <span class="arena-queue-size">Đang chờ: {{ state().queueSize }} người</span>
+  </div>
+
+  @if (result(); as end) {
+    <div class="arena-result" role="status">
+      <p class="arena-result__title" [class.arena-result__title--loss]="end.outcome === 'loss'">
+        {{ resultTitle() }} trước {{ end.opponentName }}
+      </p>
+      <p class="arena-result__line">
+        <span class="arena-result__delta">{{ resultDelta() }}</span>
+        điểm · điểm mới <strong class="arena-result__rating">{{ end.ratingAfter }}</strong> (đối thủ
+        {{ end.opponentRatingAfter }})
+      </p>
+      @if (end.reason === 'opponent_left') {
+        <p class="arena-result__note">Đối thủ đã rời trận.</p>
+      }
+      <button type="button" class="arena-result__close" (click)="resultClosed.emit()">Đóng</button>
+    </div>
+  }
+
+  <nav class="arena-board-tabs" aria-label="Chọn bảng xếp hạng">
+    <button
+      type="button"
+      class="arena-board-tab arena-board-tab--level"
+      [class.arena-board-tab--active]="board() === 'level'"
+      (click)="chooseBoard('level')"
+    >
+      {{ labels.level }}
+    </button>
+    <button
+      type="button"
+      class="arena-board-tab arena-board-tab--arena"
+      [class.arena-board-tab--active]="board() === 'arena'"
+      (click)="chooseBoard('arena')"
+    >
+      {{ labels.arena }}
+    </button>
+  </nav>
+
+  <ul class="arena-board">
+    @for (entry of entries(); track entry.rank) {
+      <li class="arena-entry">
+        <span class="arena-entry__rank">{{ entry.rank }}</span>
+        <span class="arena-entry__name">{{ entry.name }}</span>
+        <span class="arena-entry__level">cấp {{ entry.level }}</span>
+        @if (showRating()) {
+          <span class="arena-entry__rating">{{ entry.rating ?? 0 }}</span>
+        }
+      </li>
+    } @empty {
+      <li class="arena-entry arena-entry--empty">Bảng xếp hạng còn trống.</li>
+    }
+  </ul>
+</aside>

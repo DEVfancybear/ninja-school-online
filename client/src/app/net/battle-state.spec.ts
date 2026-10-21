@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import {
   BATTLE_TURN_MS,
   Opcode,
+  type ArenaEnd,
   type BattleEnd,
   type BattleResult,
   type BattleStart,
@@ -45,6 +46,23 @@ function start(overrides: Partial<BattleStart> = {}): BattleStart {
     turnMs: BATTLE_TURN_MS,
     turnEndsAt: Date.now() + BATTLE_TURN_MS,
     mode: 'pve',
+    ...overrides,
+  };
+}
+
+/** Gói kết thúc trận Lôi Đài như server gửi: điểm trước/sau, đối thủ, thành tích mới. */
+function arenaEnd(overrides: Partial<ArenaEnd> = {}): ArenaEnd {
+  return {
+    battleId: 'btl:1',
+    outcome: 'win',
+    reason: 'defeat',
+    ratingBefore: 1000,
+    ratingAfter: 1016,
+    ratingDelta: 16,
+    opponentName: 'Sasuke',
+    opponentRatingAfter: 984,
+    wins: 1,
+    losses: 0,
     ...overrides,
   };
 }
@@ -223,5 +241,30 @@ describe('BattleState', () => {
   it('bỏ qua gói không thuộc phần trận đấu', () => {
     expect(battle.applyPacket(Opcode.S2C_NOTIFY, { message: 'xin chào' })).toBe(false);
     expect(battle.applyPacket(Opcode.S2C_CHARACTER, {})).toBe(false);
+  });
+
+  it('giữ `mode` của S2C_BATTLE_START để giao diện biết đây là trận Lôi Đài', () => {
+    battle.applyPacket(Opcode.S2C_BATTLE_START, start({ mode: 'arena' }));
+
+    expect(battle.battle()?.mode).toBe('arena');
+    expect(battle.isArena()).toBe(true);
+  });
+
+  it('S2C_ARENA_END đóng khung chiến đấu đang mở thay vì để trận treo', () => {
+    battle.applyPacket(Opcode.S2C_BATTLE_START, start({ mode: 'arena' }));
+
+    // Server không gửi `S2C_BATTLE_END` cho trận Lôi Đài: nếu client chờ gói đó thì trận treo mãi.
+    expect(battle.applyPacket(Opcode.S2C_ARENA_END, arenaEnd())).toBe(true);
+    expect(battle.battle()).toBeNull();
+    expect(battle.inBattle()).toBe(false);
+    expect(battle.isArena()).toBe(false);
+  });
+
+  it('S2C_ARENA_END của trận khác không đóng trận đang chạy', () => {
+    battle.applyPacket(Opcode.S2C_BATTLE_START, start({ mode: 'arena' }));
+
+    battle.applyPacket(Opcode.S2C_ARENA_END, arenaEnd({ battleId: 'btl:cu' }));
+
+    expect(battle.battle()?.battleId).toBe('btl:1');
   });
 });

@@ -8,6 +8,9 @@ import {
   decodeServerPacket,
   encodePacket,
   type ClientHello,
+  type ChatSend,
+  type ChatSendChannel,
+  type LeaderboardKind,
   type Pong,
   type ServerError,
   type ServerHello,
@@ -193,6 +196,72 @@ export class GameSocket {
     }
     this.write(frame);
     return true;
+  }
+
+  // --------------------------------------------------- xã hội & Lôi Đài (M6)
+
+  /**
+   * Gửi một tin nhắn chat.
+   *
+   * Tin `private` **phải** kèm `to`; các kênh khác **không** được kèm — `ChatSendSchema` của gói
+   * dùng chung từ chối cả hai trường hợp sai, nên chỗ này chỉ dựng đúng hình dạng gói.
+   */
+  sendChat(channel: ChatSendChannel, text: string, to?: string): boolean {
+    const payload: ChatSend = to === undefined ? { channel, text } : { channel, text, to };
+    return this.send(Opcode.C2S_CHAT, payload);
+  }
+
+  requestFriend(name: string): boolean {
+    return this.send(Opcode.C2S_FRIEND_REQUEST, { name });
+  }
+
+  acceptFriend(name: string): boolean {
+    return this.send(Opcode.C2S_FRIEND_ACCEPT, { name });
+  }
+
+  declineFriend(name: string): boolean {
+    return this.send(Opcode.C2S_FRIEND_DECLINE, { name });
+  }
+
+  removeFriend(name: string): boolean {
+    return this.send(Opcode.C2S_FRIEND_REMOVE, { name });
+  }
+
+  inviteParty(name: string): boolean {
+    return this.send(Opcode.C2S_PARTY_INVITE, { name });
+  }
+
+  /** Trả lời lời mời vào đội: địa chỉ là **đội trưởng** đã mời mình. */
+  acceptParty(leaderName: string): boolean {
+    return this.send(Opcode.C2S_PARTY_ACCEPT, { leaderName });
+  }
+
+  declineParty(leaderName: string): boolean {
+    return this.send(Opcode.C2S_PARTY_DECLINE, { leaderName });
+  }
+
+  leaveParty(): boolean {
+    return this.send(Opcode.C2S_PARTY_LEAVE, {});
+  }
+
+  kickParty(name: string): boolean {
+    return this.send(Opcode.C2S_PARTY_KICK, { name });
+  }
+
+  claimMail(mailId: string): boolean {
+    return this.send(Opcode.C2S_MAIL_CLAIM, { mailId });
+  }
+
+  arenaQueue(): boolean {
+    return this.send(Opcode.C2S_ARENA_QUEUE, {});
+  }
+
+  arenaCancel(): boolean {
+    return this.send(Opcode.C2S_ARENA_CANCEL, {});
+  }
+
+  requestLeaderboard(board: LeaderboardKind): boolean {
+    return this.send(Opcode.C2S_LEADERBOARD, { board });
   }
 
   /** Đăng ký nghe mọi gói server gửi xuống (đã kiểm bằng `decodeServerPacket`). */

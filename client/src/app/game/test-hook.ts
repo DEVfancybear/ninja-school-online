@@ -1,6 +1,11 @@
 import { Injectable, inject, isDevMode } from '@angular/core';
+import { ArenaState } from '../net/arena-state';
 import { BattleState } from '../net/battle-state';
+import { MailState } from '../net/mail-state';
+import { PartyState } from '../net/party-state';
+import { SocialState } from '../net/social-state';
 import { WorldState } from '../net/world-state';
+import type { SocialPerson } from '@ninja/shared';
 import type { Point } from './world-logic';
 
 declare global {
@@ -35,6 +40,8 @@ export interface NinjaTestCombatant {
 /** Trạng thái trận đấu mà client đang vẽ. */
 export interface NinjaTestBattle {
   readonly battleId: string;
+  /** `pve` (đánh quái) hay `arena` (Lôi Đài) — e2e cần biết đang ở trận nào. */
+  readonly mode: string;
   readonly roundNo: number;
   readonly actorId: string;
   readonly actorName: string;
@@ -162,6 +169,54 @@ export interface NinjaTestQuestState {
   readonly maxActive: number;
 }
 
+/** Một người trong danh sách bạn bè / thành viên đội / lời mời, đủ để e2e so tên và cấp. */
+export interface NinjaTestPerson {
+  readonly name: string;
+  readonly level: number;
+  readonly online: boolean;
+}
+
+/** Bạn bè và lời mời kết bạn mà bảng xã hội đang vẽ. */
+export interface NinjaTestSocial {
+  readonly friends: readonly NinjaTestPerson[];
+  readonly incoming: readonly NinjaTestPerson[];
+  readonly outgoing: readonly NinjaTestPerson[];
+  readonly maxFriends: number;
+}
+
+/** Tổ đội mà bảng xã hội đang vẽ. */
+export interface NinjaTestParty {
+  readonly partyId: string | null;
+  readonly leaderName: string | null;
+  readonly members: readonly NinjaTestPerson[];
+  readonly invites: readonly { readonly fromName: string }[];
+  readonly maxMembers: number;
+}
+
+/** Lôi Đài mà bảng Lôi Đài đang vẽ: hàng chờ, điểm và thành tích. */
+export interface NinjaTestArena {
+  readonly queued: boolean;
+  readonly queueSize: number;
+  readonly rating: number;
+  readonly wins: number;
+  readonly losses: number;
+}
+
+/** Một lá thư trong hộp thư.
+ *
+ * `yen` và `items` là quà kèm theo — e2e kiểm được "nhận thư thì được gì" mà không phải mở gói
+ * `S2C_MAILS` thô.
+ */
+export interface NinjaTestMail {
+  readonly id: string;
+  readonly subject: string;
+  /** Nội dung thư; server cho phép rỗng nên kiểu để tuỳ chọn. */
+  readonly body?: string;
+  readonly claimed: boolean;
+  readonly yen: number;
+  readonly items: readonly { readonly name: string; readonly qty: number }[];
+}
+
 /** Cầu nối cho e2e: đọc trạng thái client đang vẽ và mô phỏng hành động của người chơi. */
 export interface NinjaWorldTestHook {
   /** Tên mọi thực thể đang vẽ, kể cả nhân vật của mình. */
@@ -200,6 +255,14 @@ export interface NinjaWorldTestHook {
   questLogOpen(): boolean;
   /** Câu lỗi gần nhất đang hiện trên thanh thông báo (server từ chối lệnh chẳng hạn). */
   lastError(): string | null;
+  /** Bạn bè và lời mời kết bạn đang vẽ — bản chụp dữ liệu thuần, không phải signal. */
+  social(): NinjaTestSocial;
+  /** Tổ đội đang vẽ. */
+  party(): NinjaTestParty;
+  /** Hàng chờ và điểm Lôi Đài đang vẽ. */
+  arena(): NinjaTestArena;
+  /** Hộp thư đang vẽ, kèm quà của từng lá. */
+  mails(): NinjaTestMail[];
 }
 
 export interface NinjaWorldTestActions {
@@ -230,6 +293,10 @@ export interface NinjaWorldTestActions {
 export class WorldTestHook {
   private readonly world = inject(WorldState);
   private readonly battleState = inject(BattleState);
+  private readonly socialState = inject(SocialState);
+  private readonly partyState = inject(PartyState);
+  private readonly arenaState = inject(ArenaState);
+  private readonly mailState = inject(MailState);
   private installed = false;
 
   install(actions: NinjaWorldTestActions, enabled: boolean = isDevMode()): void {
@@ -317,6 +384,10 @@ export class WorldTestHook {
       },
       questLogOpen: () => actions.questLogOpen(),
       lastError: () => actions.lastError(),
+      social: () => this.social(),
+      party: () => this.party(),
+      arena: () => this.arena(),
+      mails: () => this.mails(),
     };
   }
 
@@ -404,6 +475,7 @@ export class WorldTestHook {
     const actor = battle.participants.find((entry) => entry.id === battle.actorId);
     return {
       battleId: battle.battleId,
+      mode: battle.mode,
       roundNo: battle.roundNo,
       actorId: battle.actorId,
       actorName: actor?.name ?? '',
@@ -435,6 +507,50 @@ export class WorldTestHook {
     };
   }
 
+  /** Bạn bè và lời mời kết bạn, đúng những gì bảng xã hội đang vẽ. */
+  private social(): NinjaTestSocial {
+    return {
+      friends: toPersons(this.socialState.friends()),
+      incoming: toPersons(this.socialState.incoming()),
+      outgoing: toPersons(this.socialState.outgoing()),
+      maxFriends: this.socialState.maxFriends(),
+    };
+  }
+
+  /** Tổ đội: id, đội trưởng, thành viên và người đã mời mình. */
+  private party(): NinjaTestParty {
+    return {
+      partyId: this.partyState.partyId(),
+      leaderName: this.partyState.leaderName(),
+      members: toPersons(this.partyState.members()),
+      invites: this.partyState.invites().map((invite) => ({ fromName: invite.fromName })),
+      maxMembers: this.partyState.maxMembers(),
+    };
+  }
+
+  /** Hàng chờ và điểm Lôi Đài đang vẽ. */
+  private arena(): NinjaTestArena {
+    return {
+      queued: this.arenaState.queued(),
+      queueSize: this.arenaState.queueSize(),
+      rating: this.arenaState.rating(),
+      wins: this.arenaState.wins(),
+      losses: this.arenaState.losses(),
+    };
+  }
+
+  /** Hộp thư, kèm quà của từng lá để e2e kiểm được yên/món nhận được. */
+  private mails(): NinjaTestMail[] {
+    return this.mailState.mails().map((mail) => ({
+      id: mail.id,
+      subject: mail.subject,
+      body: mail.body,
+      claimed: mail.claimed,
+      yen: mail.yen,
+      items: mail.items.map((item) => ({ name: item.name, qty: item.qty })),
+    }));
+  }
+
   uninstall(): void {
     if (!this.installed) {
       return;
@@ -446,3 +562,12 @@ export class WorldTestHook {
 
 /** Ô trang bị trống không có món nào để đọc chỉ số, nhưng e2e vẫn cần đủ năm trường. */
 const EMPTY_STATS = { strength: 0, agility: 0, spirit: 0, hp: 0, mp: 0 } as const;
+
+/** Bản chụp người trong danh sách xã hội, chỉ giữ ba trường e2e dùng. */
+function toPersons(people: readonly SocialPerson[]): NinjaTestPerson[] {
+  return people.map((person) => ({
+    name: person.name,
+    level: person.level,
+    online: person.online,
+  }));
+}

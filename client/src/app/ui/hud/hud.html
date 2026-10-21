@@ -67,6 +67,40 @@
     >
       Nhiệm vụ
     </button>
+    <button
+      type="button"
+      class="hud__social ghost"
+      [class.ghost--active]="socialOpen()"
+      (click)="toggleSocial.emit()"
+    >
+      Xã hội
+      @if (socialBadge() > 0) {
+        <span class="hud__social-badge" [attr.aria-label]="socialBadge() + ' lời mời đang chờ'">{{
+          socialBadge()
+        }}</span>
+      }
+    </button>
+    <button
+      type="button"
+      class="hud__arena ghost"
+      [class.ghost--active]="arenaOpen()"
+      (click)="toggleArena.emit()"
+    >
+      Lôi Đài
+    </button>
+    <button
+      type="button"
+      class="hud__mail ghost"
+      [class.ghost--active]="mailOpen()"
+      (click)="toggleMail.emit()"
+    >
+      Thư
+      @if (mailBadge() > 0) {
+        <span class="hud__mail-badge" [attr.aria-label]="mailBadge() + ' thư chưa nhận quà'">{{
+          mailBadge()
+        }}</span>
+      }
+    </button>
     <button type="button" class="ghost" (click)="toggleChat.emit()">
       {{ chatVisible() ? 'Ẩn chat' : 'Hiện chat' }}
     </button>

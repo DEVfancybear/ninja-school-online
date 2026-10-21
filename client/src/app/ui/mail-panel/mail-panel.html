@@ -1,0 +1,31 @@
+<aside class="mail-panel" aria-label="Hộp thư">
+  <header class="mail-panel__head">
+    <h2 class="mail-panel__title">Thư</h2>
+    <span class="mail-panel__count">{{ mails().length }} / {{ maxEntries() }}</span>
+    <button
+      type="button"
+      class="mail-panel__close"
+      (click)="closed.emit()"
+      aria-label="Đóng hộp thư"
+    >
+      ×
+    </button>
+  </header>
+
+  <ul class="mail-list">
+    @for (mail of mails(); track mail.id) {
+      <li class="mail-item" [class.mail-item--claimed]="mail.claimed">
+        <span class="mail-item__subject">{{ mail.subject }}</span>
+        <span class="mail-item__body">{{ mail.body }}</span>
+        <span class="mail-item__gift">{{ giftText(mail) }}</span>
+        @if (mail.claimed) {
+          <span class="mail-item__claimed">Đã nhận quà</span>
+        } @else {
+          <button type="button" class="mail-claim" (click)="claim.emit(mail.id)">Nhận quà</button>
+        }
+      </li>
+    } @empty {
+      <li class="mail-panel__empty">Hộp thư còn trống.</li>
+    }
+  </ul>
+</aside>

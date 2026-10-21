@@ -49,6 +49,19 @@
   color: #4bab6a;
 }
 
+/* Màu theo kênh để mắt tách được tin thế giới / tổ đội / riêng khỏi tin bản đồ. */
+.chat-line--world .chat-from {
+  color: #7fb3e0;
+}
+
+.chat-line--party .chat-from {
+  color: #86efac;
+}
+
+.chat-line--private .chat-from {
+  color: #d8a5f0;
+}
+
 .chat-text {
   word-break: break-word;
 }
@@ -74,6 +87,22 @@
   background: rgba(6, 11, 15, 0.9);
   color: var(--fg);
   font: inherit;
+}
+
+.chat-channel,
+.chat-target {
+  padding: 0.35rem 0.4rem;
+  border: 1px solid rgba(127, 209, 255, 0.25);
+  border-radius: 0.4rem;
+  background: rgba(6, 11, 15, 0.9);
+  color: var(--fg);
+  font: inherit;
+}
+
+/* Ô người nhận hẹp lại để ô tin nhắn còn chỗ gõ, nhưng vẫn đủ đọc tên. */
+.chat-target {
+  width: 6.5rem;
+  flex: none;
 }
 
 .chat-send {

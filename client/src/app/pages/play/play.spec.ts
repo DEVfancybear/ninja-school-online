@@ -5,7 +5,9 @@ import { provideRouter } from '@angular/router';
 import {
   CHAT_MAX_LENGTH,
   ErrorCode,
+  MAIL_MAX_ENTRIES,
   MAX_ACTIVE_QUESTS,
+  MAX_FRIENDS,
   Opcode,
   PROTOCOL_VERSION,
   TICK_RATE_MS,
@@ -377,7 +379,7 @@ function upgradeResultFrame(seq: number): string {
   );
 }
 
-function battleStartFrame(overrides: Record<string, unknown> = {}): string {
+function battleStartFrame(overrides: Record<string, unknown> = {}, seq = 5): string {
   return encodePacket(
     Opcode.S2C_BATTLE_START,
     {
@@ -426,9 +428,110 @@ function battleStartFrame(overrides: Record<string, unknown> = {}): string {
       actorId: 'p1',
       turnMs: 30000,
       turnEndsAt: Date.now() + 30000,
+      mode: 'pve',
       ...overrides,
     },
-    5,
+    seq,
+  );
+}
+
+/** Người chơi khác trong danh sách xã hội, đủ trường của `SocialPersonSchema`. */
+const FRIEND = {
+  name: 'Sasuke',
+  level: 5,
+  school: 'haruna',
+  class: 'dao',
+  online: true,
+};
+
+function socialUpdateFrame(seq: number): string {
+  return encodePacket(
+    Opcode.S2C_SOCIAL_UPDATE,
+    { friends: [], incoming: [FRIEND], outgoing: [], maxFriends: MAX_FRIENDS },
+    seq,
+  );
+}
+
+function partyUpdateFrame(seq: number): string {
+  return encodePacket(
+    Opcode.S2C_PARTY_UPDATE,
+    {
+      partyId: null,
+      leaderName: null,
+      members: [],
+      invites: [{ fromName: 'Kakashi', fromLevel: 9 }],
+      maxMembers: 4,
+    },
+    seq,
+  );
+}
+
+function mailsFrame(seq: number): string {
+  return encodePacket(
+    Opcode.S2C_MAILS,
+    {
+      mails: [
+        {
+          id: 'mail-1',
+          subject: 'Quà khai trường',
+          body: 'Chúc bạn học tốt.',
+          yen: 100,
+          items: [],
+          claimed: false,
+          sentAt: 1_760_000_000_000,
+        },
+      ],
+      maxEntries: MAIL_MAX_ENTRIES,
+    },
+    seq,
+  );
+}
+
+/** Trận Lôi Đài: hai người chơi, không có quái, `mode` do server khai. */
+function arenaBattleStartFrame(seq: number): string {
+  return battleStartFrame(
+    {
+      battleId: 'btl:arena:1',
+      mode: 'arena',
+      participants: [{ ...PLAYER_ONE }, { ...PLAYER_ONE, id: 'p2', name: 'Sasuke' }],
+    },
+    seq,
+  );
+}
+
+/** Người chơi trong trận, đủ trường `CombatantSchema` (Lôi Đài không có kỹ năng nào đang hồi). */
+const PLAYER_ONE = {
+  id: 'p1',
+  kind: 'player',
+  name: 'Kakashi',
+  level: 1,
+  hp: 60,
+  maxHp: 60,
+  mp: 40,
+  maxMp: 40,
+  attack: 13,
+  defense: 2,
+  speed: 6,
+  alive: true,
+  skills: [],
+};
+
+function arenaEndFrame(seq: number): string {
+  return encodePacket(
+    Opcode.S2C_ARENA_END,
+    {
+      battleId: 'btl:arena:1',
+      outcome: 'win',
+      reason: 'defeat',
+      ratingBefore: 1000,
+      ratingAfter: 1016,
+      ratingDelta: 16,
+      opponentName: 'Sasuke',
+      opponentRatingAfter: 984,
+      wins: 1,
+      losses: 0,
+    },
+    seq,
   );
 }
 
@@ -1287,5 +1390,81 @@ describe('Play', () => {
     const notice = element(fixture).querySelector('.notice-bar')?.textContent ?? '';
     expect(notice).toContain('Mở khóa tính năng: Lôi Đài.');
     expect(notice).not.toContain('Lập nhóm');
+  });
+
+  it('xã hội: huy hiệu trên HUD đếm lời mời, mở bảng và đồng ý kết bạn thì gửi C2S_FRIEND_ACCEPT', async () => {
+    fixture = await setup();
+    const webSocket = await joinWorld(fixture);
+    webSocket.deliver(socialUpdateFrame(60));
+    webSocket.deliver(partyUpdateFrame(61));
+    await render(fixture);
+
+    // Huy hiệu phải đếm cả lời mời kết bạn lẫn lời mời vào đội, nếu không người chơi bỏ sót lời mời đội.
+    expect(element(fixture).querySelector('.hud__social-badge')?.textContent?.trim()).toBe('2');
+
+    element(fixture).querySelector<HTMLElement>('.hud__social')?.click();
+    await render(fixture);
+
+    expect(element(fixture).querySelector('.social-panel')).not.toBeNull();
+    expect(element(fixture).querySelectorAll('.social-incoming__row')).toHaveLength(1);
+
+    element(fixture).querySelector<HTMLElement>('.social-incoming__accept')?.click();
+    await render(fixture);
+
+    expect(webSocket.lastPacket().op).toBe(Opcode.C2S_FRIEND_ACCEPT);
+    expect(payloadOf(webSocket.lastPacket())).toEqual({ name: 'Sasuke' });
+  });
+
+  it('thư: huy hiệu đếm thư chưa nhận, bấm Nhận quà gửi C2S_MAIL_CLAIM', async () => {
+    fixture = await setup();
+    const webSocket = await joinWorld(fixture);
+    webSocket.deliver(mailsFrame(62));
+    await render(fixture);
+
+    expect(element(fixture).querySelector('.hud__mail-badge')?.textContent?.trim()).toBe('1');
+
+    element(fixture).querySelector<HTMLElement>('.hud__mail')?.click();
+    await render(fixture);
+    expect(element(fixture).querySelector('.mail-item')).not.toBeNull();
+
+    element(fixture).querySelector<HTMLElement>('.mail-claim')?.click();
+    await render(fixture);
+
+    expect(webSocket.lastPacket().op).toBe(Opcode.C2S_MAIL_CLAIM);
+    expect(payloadOf(webSocket.lastPacket())).toEqual({ mailId: 'mail-1' });
+  });
+
+  it('trận Lôi Đài ẩn nút bỏ chạy; xong trận thì đóng khung chiến đấu và mở bảng kết quả', async () => {
+    fixture = await setup();
+    const webSocket = await joinWorld(fixture);
+    webSocket.deliver(arenaBattleStartFrame(63));
+    await render(fixture);
+
+    expect(element(fixture).querySelector('.battle__mode')?.textContent).toContain('Lôi Đài');
+    expect(element(fixture).querySelector('.btn--flee')).toBeNull();
+
+    webSocket.deliver(arenaEndFrame(64));
+    await render(fixture);
+
+    // Server không gửi `S2C_BATTLE_END` cho trận Lôi Đài: trận phải đóng theo `S2C_ARENA_END`.
+    expect(element(fixture).querySelector('.battle')).toBeNull();
+    expect(element(fixture).querySelector('.arena-panel')).not.toBeNull();
+    expect(element(fixture).querySelector('.arena-result__delta')?.textContent?.trim()).toBe('+16');
+  });
+
+  it('bấm Vào hàng chờ ở bảng Lôi Đài gửi C2S_ARENA_QUEUE', async () => {
+    fixture = await setup();
+    const webSocket = await joinWorld(fixture);
+
+    element(fixture).querySelector<HTMLElement>('.hud__arena')?.click();
+    await render(fixture);
+
+    // Mở bảng là xin bảng xếp hạng đang xem để số liệu không cũ.
+    expect(webSocket.lastPacket().op).toBe(Opcode.C2S_LEADERBOARD);
+
+    element(fixture).querySelector<HTMLElement>('.arena-queue')?.click();
+    await render(fixture);
+
+    expect(webSocket.lastPacket().op).toBe(Opcode.C2S_ARENA_QUEUE);
   });
 });

@@ -23,11 +23,22 @@ export class Hud {
   readonly bagOpen = input(false);
   readonly equipmentOpen = input(false);
   readonly questOpen = input(false);
+  /** Ba bảng của M6 mở hay đóng, để nút HUD sáng lên như các nút đang có. */
+  readonly socialOpen = input(false);
+  readonly arenaOpen = input(false);
+  readonly mailOpen = input(false);
+  /** Số lời mời đang chờ (kết bạn + vào đội) — hiện thành huy hiệu trên nút Xã hội. */
+  readonly socialBadge = input(0);
+  /** Số thư chưa nhận quà — hiện thành huy hiệu trên nút Thư. */
+  readonly mailBadge = input(0);
 
   readonly toggleChat = output<void>();
   readonly toggleInventory = output<void>();
   readonly toggleEquipment = output<void>();
   readonly toggleQuest = output<void>();
+  readonly toggleSocial = output<void>();
+  readonly toggleArena = output<void>();
+  readonly toggleMail = output<void>();
 
   readonly statusLabel = computed(() => CONNECTION_LABELS[this.status()]);
   readonly online = computed(() => this.status() === 'ready');

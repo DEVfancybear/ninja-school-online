@@ -1,0 +1,186 @@
+<aside class="social-panel" aria-label="Bảng xã hội">
+  <header class="social-panel__head">
+    <h2 class="social-panel__title">Xã hội</h2>
+    <button
+      type="button"
+      class="social-panel__close"
+      (click)="closed.emit()"
+      aria-label="Đóng bảng xã hội"
+    >
+      ×
+    </button>
+  </header>
+
+  <nav class="social-tabs" aria-label="Chọn thẻ xã hội">
+    <button
+      type="button"
+      class="social-tab social-tab--friends"
+      [class.social-tab--active]="tab() === 'friends'"
+      (click)="showTab('friends')"
+    >
+      Bạn bè ({{ friends().length }}/{{ maxFriends() }})
+    </button>
+    <button
+      type="button"
+      class="social-tab social-tab--party"
+      [class.social-tab--active]="tab() === 'party'"
+      (click)="showTab('party')"
+    >
+      Tổ đội ({{ members().length }}/{{ maxMembers() }})
+    </button>
+  </nav>
+
+  @if (tab() === 'friends') {
+    <form class="social-add" (ngSubmit)="submitFriend()">
+      <input
+        class="social-add-input"
+        type="text"
+        name="friendName"
+        autocomplete="off"
+        placeholder="Tên nhân vật muốn kết bạn"
+        aria-label="Tên nhân vật muốn kết bạn"
+        [attr.maxlength]="nameMaxLength"
+        [value]="friendDraft()"
+        (input)="onFriendDraft($event)"
+      />
+      <button
+        class="social-add-submit"
+        type="submit"
+        [disabled]="friendDraft().trim().length === 0"
+      >
+        Kết bạn
+      </button>
+    </form>
+
+    @if (incoming().length > 0) {
+      <ul class="social-incoming">
+        @for (person of incoming(); track person.name) {
+          <li class="social-incoming__row">
+            <span class="social-incoming__name"
+              >{{ person.name }} <small>cấp {{ person.level }}</small></span
+            >
+            <button
+              type="button"
+              class="social-incoming__accept"
+              (click)="friendAccept.emit(person.name)"
+            >
+              Đồng ý
+            </button>
+            <button
+              type="button"
+              class="social-incoming__decline"
+              (click)="friendDecline.emit(person.name)"
+            >
+              Từ chối
+            </button>
+          </li>
+        }
+      </ul>
+    } @else {
+      <p class="social-panel__empty">Không có lời mời kết bạn nào.</p>
+    }
+
+    <ul class="social-friends">
+      @for (person of friends(); track person.name) {
+        <li class="social-friend">
+          <span class="social-friend__name">{{ person.name }}</span>
+          <span class="social-friend__meta"
+            >cấp {{ person.level }} · {{ person.online ? 'đang chơi' : 'ngoại tuyến' }}</span
+          >
+          <button
+            type="button"
+            class="social-friend__remove"
+            (click)="friendRemove.emit(person.name)"
+          >
+            Bỏ bạn
+          </button>
+        </li>
+      } @empty {
+        <li class="social-friend social-friend--empty">Chưa có người bạn nào.</li>
+      }
+    </ul>
+
+    @if (outgoing().length > 0) {
+      <p class="social-outgoing">
+        Đã gửi lời mời:
+        @for (person of outgoing(); track person.name) {
+          <span class="social-outgoing__name">{{ person.name }}</span>
+        }
+      </p>
+    }
+  } @else {
+    <div class="party-panel">
+      <form class="party-invite" (ngSubmit)="submitParty()">
+        <input
+          class="party-invite-input"
+          type="text"
+          name="partyName"
+          autocomplete="off"
+          placeholder="Tên nhân vật muốn mời vào đội"
+          aria-label="Tên nhân vật muốn mời vào đội"
+          [attr.maxlength]="nameMaxLength"
+          [value]="partyDraft()"
+          (input)="onPartyDraft($event)"
+        />
+        <button
+          class="party-invite-submit"
+          type="submit"
+          [disabled]="partyDraft().trim().length === 0"
+        >
+          Mời vào đội
+        </button>
+      </form>
+
+      @if (invites().length > 0) {
+        <ul class="party-invites">
+          @for (invite of invites(); track invite.fromName) {
+            <li class="party-invite-row">
+              <span class="party-invite-row__name"
+                >{{ invite.fromName }} <small>cấp {{ invite.fromLevel }}</small> mời bạn vào
+                đội</span
+              >
+              <button
+                type="button"
+                class="party-invite-accept"
+                (click)="partyAccept.emit(invite.fromName)"
+              >
+                Vào đội
+              </button>
+              <button
+                type="button"
+                class="party-invite-decline"
+                (click)="partyDecline.emit(invite.fromName)"
+              >
+                Từ chối
+              </button>
+            </li>
+          }
+        </ul>
+      }
+
+      @if (inParty()) {
+        <p class="party-head">
+          Đội trưởng: <strong>{{ party()?.leaderName }}</strong>
+        </p>
+        <ul class="party-members">
+          @for (person of members(); track person.name) {
+            <li class="party-member">
+              <span class="party-member__name">{{ person.name }}</span>
+              <span class="party-member__meta"
+                >cấp {{ person.level }} · {{ person.online ? 'đang chơi' : 'ngoại tuyến' }}</span
+              >
+              @if (canKick(person.name)) {
+                <button type="button" class="party-kick" (click)="partyKick.emit(person.name)">
+                  Đuổi
+                </button>
+              }
+            </li>
+          }
+        </ul>
+        <button type="button" class="party-leave" (click)="partyLeave.emit()">Rời đội</button>
+      } @else {
+        <p class="party-empty">Bạn chưa ở trong đội nào.</p>
+      }
+    </div>
+  }
+</aside>

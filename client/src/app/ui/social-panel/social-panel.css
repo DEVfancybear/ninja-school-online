@@ -1,0 +1,190 @@
+/*
+ * Bảng xã hội: hộp giữa màn hình, ngay dưới thanh HUD.
+ *
+ * Đặt giữa thay vì góc trái/phải vì bốn chỗ còn lại đã có chủ (nhật ký nhiệm vụ và trang bị bên
+ * trái, túi đồ bên phải, chat và quầy hàng phía dưới) — và quan trọng hơn: không được che ba nút
+ * HUD mà e2e bấm vào. `z-index` cao hơn các bảng cũ để bảng đang mở luôn bấm được.
+ */
+:host {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 7;
+  display: block;
+}
+
+.social-panel {
+  width: min(420px, 92vw);
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(127, 209, 255, 0.35);
+  background: rgba(8, 14, 20, 0.95);
+  color: #e8f1f8;
+  font-size: 13px;
+  overflow-y: auto;
+}
+
+.social-panel__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.social-panel__title {
+  margin: 0;
+  font-size: 15px;
+}
+
+.social-panel__close {
+  width: 24px;
+  height: 24px;
+  margin-left: auto;
+  border-radius: 7px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: transparent;
+  color: inherit;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.social-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.social-tab {
+  flex: 1;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: transparent;
+  color: #cbd5e1;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.social-tab--active {
+  border-color: rgba(127, 209, 255, 0.7);
+  background: rgba(127, 209, 255, 0.16);
+  color: #f2f7fb;
+}
+
+.social-add,
+.party-invite {
+  display: flex;
+  gap: 4px;
+}
+
+.social-add-input,
+.party-invite-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(11, 18, 24, 0.85);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+}
+
+.social-add-submit,
+.party-invite-submit,
+.social-incoming__accept,
+.social-incoming__decline,
+.social-friend__remove,
+.party-kick,
+.party-leave,
+.party-invite-accept,
+.party-invite-decline {
+  padding: 4px 9px;
+  border-radius: 8px;
+  border: 1px solid rgba(127, 209, 255, 0.45);
+  background: rgba(127, 209, 255, 0.12);
+  color: #e8f1f8;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.social-add-submit:disabled,
+.party-invite-submit:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.social-incoming,
+.social-friends,
+.party-invites,
+.party-members {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.social-incoming__row,
+.social-friend,
+.party-invite-row,
+.party-member {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.social-friend__name,
+.party-member__name,
+.social-incoming__name,
+.party-invite-row__name {
+  font-size: 12px;
+}
+
+.social-friend__meta,
+.party-member__meta {
+  margin-right: auto;
+  font-size: 11px;
+  color: #9fb3c8;
+}
+
+.social-incoming__name,
+.party-invite-row__name {
+  margin-right: auto;
+}
+
+.social-friend__remove {
+  margin-left: auto;
+}
+
+.social-panel__empty,
+.party-empty,
+.party-head,
+.social-outgoing {
+  margin: 0;
+  font-size: 12px;
+  color: #9fb3c8;
+}
+
+.social-outgoing__name {
+  padding-right: 6px;
+  color: #fbbf24;
+}
+
+.party-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.party-leave {
+  align-self: flex-start;
+  border-color: rgba(248, 113, 113, 0.5);
+  background: rgba(248, 113, 113, 0.12);
+}
