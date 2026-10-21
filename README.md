@@ -2,15 +2,8 @@
 
 Dự án game **nhập vai 2D nhiều người chơi (MMORPG nhẹ)**, chiến đấu theo lượt, **chơi trực tiếp trên trình duyệt** (máy tính + mobile web), lấy cảm hứng từ dòng game "Ninja School Online" nổi tiếng ở Việt Nam.
 
-> **Trạng thái: đã xong Giai đoạn 0 (nghiên cứu & thiết kế) và các mốc M0 (nền móng), M1 (tài khoản &
-> nhân vật), M2 (thế giới, di chuyển, chat), M3 (chiến đấu theo lượt PvE) — hết phạm vi MVP — và M4
-> (trang bị theo ô, shop & cường hóa).**
-> Chơi được trên web: đăng ký/đăng nhập, tạo nhân vật, vào thế giới 2D bằng WebSocket, đi lại bằng bàn
-> phím, thấy người chơi khác cùng bản đồ, chat trong bản đồ, nói chuyện với NPC, mua/bán ở shop, mặc đồ
-> vào 4 ô trang bị thấy chỉ số tăng, cường hóa đồ tốn yên + đá vụn rơi từ quái, đi qua cổng sang bản đồ
-> thứ hai, **chạm quái để vào trận theo lượt**, dùng chiêu và vật phẩm, nhận kinh nghiệm/yên/vật phẩm rơi,
-> lên cấp, và hồi sinh ở làng khi thua; dữ liệu tài khoản/nhân vật/túi đồ/trang bị lưu trong PostgreSQL.
-> Chưa có nhiệm vụ (M5), xã hội & PvP (M6).
+> **Trạng thái:** đã hoàn thành các mốc M0–M6; M6 kết thúc Alpha. M0–M3 là nền tảng/MVP, M4 trang bị/shop/cường hóa, M5 nhiệm vụ chương 1, M6 xã hội và PvP. Mốc tiếp theo là M7 (bang hội, boss, sự kiện).
+> Chơi được trên web: đăng ký/đăng nhập, tạo nhân vật, vào thế giới 2D bằng WebSocket, đi lại và chat; nói chuyện với NPC, làm nhiệm vụ; mua/bán, mặc trang bị và cường hóa; chiến đấu PvE/PvP theo lượt; kết bạn, lập tổ đội, chat thế giới/tổ đội/riêng, vào Lôi Đài xếp hạng, xem bảng xếp hạng và nhận thư hệ thống. Dữ liệu tài khoản/nhân vật/túi đồ/xã hội/Arena lưu hoặc được đồng bộ từ PostgreSQL.
 
 ## Lệnh nhanh
 
@@ -19,8 +12,8 @@ pnpm install            # cài phụ thuộc (pnpm 12 trở lên)
 cp .env.example .env    # rồi chỉnh DATABASE_URL cho đúng máy bạn
 pnpm db:migrate         # tạo bảng trong PostgreSQL (tự build shared trước)
 pnpm dev                # chạy client (ng serve) + server (tsx watch)
-pnpm lint && pnpm typecheck && pnpm test   # 422 test
-pnpm e2e                                   # 21 kịch bản trên trình duyệt thật (Playwright)
+pnpm lint && pnpm typecheck && pnpm test   # 604 test theo CI hiện tại
+pnpm e2e                                   # 30 kịch bản trên trình duyệt thật (Playwright)
 pnpm validate:data      # kiểm tra game-data/ theo schema
 pnpm build
 ```
@@ -80,30 +73,26 @@ ninja/
 │   ├── 01-research/        # nghiên cứu game gốc + nguồn tham khảo
 │   ├── 02-architecture/    # công nghệ, cấu trúc, mạng & dữ liệu
 │   └── 03-plan/            # lộ trình, MVP, rủi ro
-├── client/                 # Angular 22 + Phaser 4: đăng nhập, nhân vật, thế giới 2D, HUD, chat, trận đấu
-├── server/                 # Node.js + Fastify: xác thực, nhân vật, túi đồ, trận đấu, WebSocket ở /ws
-├── shared/                 # PROTOCOL_VERSION (=3), hằng số trận đấu/thế giới, gói tin, schema zod, luật game-data
-├── game-data/              # dữ liệu nội dung JSON: 2 bản đồ, 3 loại quái, 3 phái, 7 chiêu, 4 vật phẩm, 1 NPC
+├── client/                 # Angular 22 + Phaser 4: thế giới 2D, nhiệm vụ, xã hội, Arena, thư
+├── server/                 # Node.js + Fastify: xác thực, thế giới, PvE/PvP, xã hội, DB, WebSocket /ws
+├── shared/                 # PROTOCOL_VERSION (=6), hằng số, gói tin và schema Zod dùng chung
+├── game-data/              # JSON: bản đồ, quái, chiêu, vật phẩm, NPC và 12 nhiệm vụ chương 1
 ├── assets/                 # chỉ có README + CREDITS; chưa có tài nguyên hình/âm thanh
 ├── tools/                  # data-validator: kiểm tra game-data theo schema
 ├── infra/                  # Docker Compose cho PostgreSQL + Redis (môi trường dev)
-└── tests/                  # tests/e2e: 17 kịch bản Playwright trên trình duyệt thật
+└── tests/                  # tests/e2e: 30 kịch bản Playwright trên trình duyệt thật
 ```
 
 Các thư mục `client/`, `server/`, `shared/`, `tools/data-validator/` đã có mã nguồn chạy được.
 `assets/` mới chỉ có `README.md` và `CREDITS.md`; kiểm thử tải (`tests/load`) sẽ làm ở M8.
 
-## 5. Việc tiếp theo (từ M4)
+## 5. Trạng thái phát triển
 
-- [x] ~~Xác nhận stack~~ → **Angular + Phaser + Node.js + PostgreSQL + Redis + Docker** (2026-10-15).
-- [x] ~~M0: khởi tạo monorepo pnpm, tsconfig, ESLint/Prettier, CI, docker-compose~~ → xong (xem `docs/03-plan/roadmap.md`).
-- [x] ~~M1: tài khoản + tạo nhân vật~~ → xong (xem `docs/03-plan/roadmap.md`).
-- [x] ~~M2: thế giới, di chuyển, chat~~ → xong: WebSocket ở `/ws`, 2 bản đồ, đồng bộ người chơi, chat
-      trong bản đồ, NPC có hội thoại, cổng dịch chuyển (xem `docs/03-plan/roadmap.md`).
-- [x] ~~M3: chiến đấu theo lượt PvE~~ → xong: chạm quái để vào trận, trận theo lượt có đồng hồ 30 giây,
-      chiêu và vật phẩm, quái trên bản đồ có máu và hồi sinh, phần thưởng/lên cấp/rơi đồ, hồi sinh khi
-      thua, hai người đánh chung một con quái (xem `docs/03-plan/roadmap.md`).
-- [x] **M4: trang bị theo ô, shop & cường hóa** — 4 ô trang bị cộng chỉ số, shop mua/bán, cường hóa tới +5 (xong 2026-10-16).
+- [x] **M0–M3:** nền tảng, tài khoản/nhân vật, thế giới, chat khu vực và chiến đấu PvE.
+- [x] **M4:** trang bị theo ô, shop mua/bán và cường hóa.
+- [x] **M5:** nhiệm vụ chính tuyến chương 1.
+- [x] **M6 — kết thúc Alpha:** bạn bè, tổ đội, chat thế giới/tổ đội/riêng, Lôi Đài 1v1 và Elo, bảng xếp hạng, thư hệ thống. Migration, tests, E2E và CI: [roadmap](docs/03-plan/roadmap.md).
+- [ ] **M7:** bang hội, boss và sự kiện.
 - [ ] Quyết định có đổi tên sản phẩm hay không (xem mục 6).
 
 ## 6. Lưu ý bản quyền (đọc kỹ)
