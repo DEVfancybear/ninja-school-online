@@ -229,16 +229,17 @@ Riêng M4: server **44 bài** (equipment 10, shop 13, upgrade 9, WebSocket thậ
 
 **Ghi chú thiết kế (đã ghi vào `docs/02-architecture/network-and-data.md` §2e):** nhận/trả chỉ khi đang mở hội thoại với đúng NPC ở bản đồ hiện tại; thứ tự lỗi khi nhận cố định (`quest_not_found` → `quest_wrong_npc` → `quest_already_active` → `quest_already_done` → `quest_locked` → `quest_too_many`) để câu báo lỗi luôn nói đúng lý do; `progress` chỉ lưu talk/kill/reach, còn `collect` đếm lại từ túi nên không có số nào để lưu; mỗi cờ tính năng chỉ ghi một hàng.
 
-### M6 — Xã hội & PvP (~2,5 tuần) — *kết thúc Alpha* — ✅ ĐÃ XONG (2026-10-21)
+### M6 — Xã hội & PvP (~2,5 tuần) — *kết thúc Alpha* — đang chờ CI cuối + kiểm chứng độc lập
 Nội dung: bạn bè, nhóm, chat thế giới/nhóm/riêng, Lôi Đài 1v1 có xếp hàng chờ và tính điểm, bảng xếp hạng (top cấp, top Lôi Đài), thư hệ thống.
 **Xong khi:** hai người chơi đấu Lôi Đài, điểm được cập nhật, bảng xếp hạng hiển thị đúng; chat thế giới có giới hạn chống spam.
 
 **Đã giao:**
 - **Hợp đồng v6:** opcode `0x0701–0x070d` cho xã hội/thư và `0x0801–0x0806` cho Arena/bảng xếp hạng; thêm `inventory_full` để claim thư khi túi đầy thất bại an toàn. Hằng số giới hạn, Elo và test hợp đồng nằm trong `shared/`.
-- **Server:** migration `0004_social_arena_mail` tạo `friendships`, `character_arena`, `mails`; bạn bè kiểm trần 50 người cho cả hai phía, tổ đội tối đa 4, chat theo kênh, Arena/PvE đặt chỗ nhân vật trước khi chờ DB, bảng xếp hạng giới hạn 20 dòng. Claim thư khóa thư/nhân vật trong transaction; túi đầy giữ thư và quà chưa nhận.
+- **Server:** migration `0004_social_arena_mail` tạo `friendships`, `character_arena`, `mails`; bạn bè kiểm trần 50 người cho cả hai phía và tuần tự hóa lời mời ngược chiều, tổ đội tối đa 4, chat theo kênh, bảng xếp hạng giới hạn 20 dòng. PvE/Arena giữ reservation trong admission và quyết toán; Elo thắng/thua cùng ghi trong một transaction. Claim thư khóa thư/nhân vật trong transaction; túi đầy giữ thư và quà chưa nhận.
 - **Client:** giao diện và trạng thái bạn bè, tổ đội, chat, Arena/bảng xếp hạng và thư; dùng lại khung chiến đấu chung cho PvE/PvP.
-- **Kiểm thử:** 208 server, 266 client, 116 shared, 14 data-validator (604 test); tổng 30 kịch bản e2e, trong đó 5 M6. M6 e2e chạy riêng 5/5; bộ dò giao thức độc lập trên server thật đạt 43/43. Client build ban đầu khoảng 734,54 kB.
-- **CI:** [run 39615135515](https://github.com/DEVfancybear/ninja-school-online/actions/runs/39615135515) xanh trên commit `e6eb77b`; e2e CI 30/30, không có flaky/retry.
+- **Kiểm thử:** 212 server, 266 client, 116 shared, 14 data-validator (**608 test**); server có regression cho admission/cancel/disconnect, lỗi khởi tạo trận và rollback Elo, reservation lúc settlement, bạn bè ngược chiều đồng thời, party full và cooldown chat. Tổng 30 kịch bản e2e, trong đó 5 M6; M6 e2e chạy riêng 5/5 trên Chromium; bộ dò giao thức độc lập trên server thật đạt 43/43. Client build ban đầu khoảng 734,54 kB.
+- **Kiểm chứng cuối tại chỗ:** `validate:data → lint → typecheck → test → build` PASS; 608 test (212 server / 266 client / 116 shared / 14 data-validator); M6 e2e 5/5; probe độc lập 43/43.
+- **CI:** run [39615135515](https://github.com/DEVfancybear/ninja-school-online/actions/runs/39615135515) xanh trên commit `e6eb77b` (604 test, e2e 30/30, không flaky/retry). Đây là revision trước các fix reservation/transaction mới; cần run CI final trên commit sau các fix này.
 
 ### M7 — Bang hội, boss, sự kiện (~2,5 tuần)
 Nội dung: lập bang/tham gia/rời bang, chat bang, cấp bang; boss dã ngoại theo giờ có giới hạn rơi đồ/ngày; sự kiện đầu tiên (đăng nhập nhận quà + nhiệm vụ sự kiện).

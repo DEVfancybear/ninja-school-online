@@ -17,7 +17,7 @@ import {
   type Skill,
 } from '@ninja/shared';
 import { randomUUID } from 'node:crypto';
-import { eq, sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import { characterArena } from '../../db/schema.js';
 import type { TickScheduler } from '../../core/tick.js';
@@ -46,11 +46,19 @@ interface Duel {
   turnEndsAt: number;
 }
 
+interface PairingReservation {
+  readonly cancelled: Set<string>;
+  readonly players: readonly [string, string];
+  readonly queueTimes: readonly [number, number];
+  phase: 'starting' | 'started';
+}
+
 /** Matchmaking + 1v1 PvP. Sát thương/thứ tự lượt dùng chung các hàm thuần của battle/engine.ts. */
 export class ArenaService {
   private readonly queue = new Map<string, number>();
-  private readonly admissions = new Set<string>();
-  private readonly pairings = new Set<string>();
+  private readonly admissions = new Map<string, { cancelled: boolean }>();
+  private readonly pairings = new Map<string, PairingReservation>();
+  private readonly finishing = new Set<string>();
   private readonly duels = new Map<string, Duel>();
   private readonly duelByPlayer = new Map<string, string>();
   private readonly now: () => number;
@@ -76,6 +84,7 @@ export class ArenaService {
     this.queue.clear();
     this.admissions.clear();
     this.pairings.clear();
+    this.finishing.clear();
     this.duels.clear();
     this.duelByPlayer.clear();
   }
@@ -85,12 +94,13 @@ export class ArenaService {
       this.admissions.has(characterId) ||
       this.queue.has(characterId) ||
       this.pairings.has(characterId) ||
+      this.finishing.has(characterId) ||
       this.duelByPlayer.has(characterId)
     );
   }
 
   isDueling(characterId: string): boolean {
-    return this.duelByPlayer.has(characterId);
+    return this.duelByPlayer.has(characterId) || this.finishing.has(characterId);
   }
 
   async state(characterId: string): Promise<ArenaState> {
@@ -109,7 +119,8 @@ export class ArenaService {
       await this.sendState(characterId);
       return;
     }
-    this.admissions.add(characterId);
+    const admission = { cancelled: false };
+    this.admissions.set(characterId, admission);
     try {
       const record = await this.characters.findById(characterId);
       if (!record) {
@@ -125,28 +136,73 @@ export class ArenaService {
         return;
       }
       await this.ensureRating(characterId);
-      if (this.duelByPlayer.has(characterId) || this.pairings.has(characterId)) return;
+      if (admission.cancelled || this.admissions.get(characterId) !== admission) return;
       if (!this.queue.has(characterId)) this.queue.set(characterId, this.now());
       const opponentId = [...this.queue.keys()].find((id) => id !== characterId);
       if (opponentId) {
+        const players = [characterId, opponentId] as const;
+        const pairing: PairingReservation = {
+          cancelled: new Set<string>(),
+          players,
+          queueTimes: [this.queue.get(characterId)!, this.queue.get(opponentId)!],
+          phase: 'starting',
+        };
         this.queue.delete(characterId);
         this.queue.delete(opponentId);
-        this.pairings.add(characterId);
-        this.pairings.add(opponentId);
+        this.pairings.set(characterId, pairing);
+        this.pairings.set(opponentId, pairing);
         try {
-          await this.startDuel(characterId, opponentId);
+          await this.startDuel(characterId, opponentId, pairing);
+        } catch {
+          if (pairing.phase === 'starting') {
+            for (const id of players) {
+              this.sessions
+                .get(id)
+                ?.sendError(ErrorCode.INTERNAL, 'không thể bắt đầu trận Lôi Đài, vui lòng thử lại');
+            }
+          }
         } finally {
-          this.pairings.delete(characterId);
-          this.pairings.delete(opponentId);
+          if (this.pairings.get(characterId) === pairing) this.pairings.delete(characterId);
+          if (this.pairings.get(opponentId) === pairing) this.pairings.delete(opponentId);
+          if (pairing.phase === 'starting') {
+            for (let index = 0; index < players.length; index += 1) {
+              const id = players[index]!;
+              if (!pairing.cancelled.has(id)) this.queue.set(id, pairing.queueTimes[index]!);
+              else await this.sendState(id);
+            }
+            await this.publishQueueStates();
+          }
         }
       }
       await this.publishQueueStates();
     } finally {
-      this.admissions.delete(characterId);
+      if (this.admissions.get(characterId) === admission) this.admissions.delete(characterId);
     }
   }
 
   async cancel(characterId: string): Promise<void> {
+    const pairing = this.pairings.get(characterId);
+    if (pairing) {
+      if (pairing.phase === 'starting') {
+        pairing.cancelled.add(characterId);
+        const admission = this.admissions.get(characterId);
+        if (admission) admission.cancelled = true;
+        await this.sendState(characterId);
+        return;
+      }
+      this.sessions
+        .get(characterId)
+        ?.sendError(ErrorCode.ARENA_NOT_QUEUED, 'bạn không ở hàng chờ Lôi Đài');
+      return;
+    }
+    const admission = this.admissions.get(characterId);
+    if (admission) {
+      admission.cancelled = true;
+      const removed = this.queue.delete(characterId);
+      await this.sendState(characterId);
+      if (removed) await this.publishQueueStates();
+      return;
+    }
     if (!this.queue.delete(characterId)) {
       this.sessions
         .get(characterId)
@@ -160,6 +216,7 @@ export class ArenaService {
   async action(characterId: string, request: BattleAction): Promise<void> {
     const duelId = this.duelByPlayer.get(characterId);
     const duel = duelId ? this.duels.get(duelId) : undefined;
+    if (duel && duel.players.some((player) => this.finishing.has(player.id))) return;
     if (!duel || duel.id !== request.battleId) {
       this.sessions
         .get(characterId)
@@ -199,6 +256,10 @@ export class ArenaService {
 
   async leave(characterId: string): Promise<void> {
     this.queue.delete(characterId);
+    const admission = this.admissions.get(characterId);
+    if (admission) admission.cancelled = true;
+    const pairing = this.pairings.get(characterId);
+    if (pairing?.phase === 'starting') pairing.cancelled.add(characterId);
     const duelId = this.duelByPlayer.get(characterId);
     const duel = duelId ? this.duels.get(duelId) : undefined;
     if (duel) {
@@ -208,7 +269,11 @@ export class ArenaService {
     await this.publishQueueStates();
   }
 
-  private async startDuel(firstId: string, secondId: string): Promise<void> {
+  private async startDuel(
+    firstId: string,
+    secondId: string,
+    pairing: PairingReservation,
+  ): Promise<void> {
     const [firstRecord, secondRecord, firstBonus, secondBonus, firstRating, secondRating] =
       await Promise.all([
         this.characters.findById(firstId),
@@ -218,7 +283,18 @@ export class ArenaService {
         this.ratingFor(firstId),
         this.ratingFor(secondId),
       ]);
-    if (!firstRecord || !secondRecord) return;
+    if (pairing.cancelled.size > 0) return;
+    if (!firstRecord || !secondRecord) {
+      if (!firstRecord) {
+        pairing.cancelled.add(firstId);
+        this.sessions.get(firstId)?.sendError(ErrorCode.NO_CHARACTER, 'không tìm thấy nhân vật');
+      }
+      if (!secondRecord) {
+        pairing.cancelled.add(secondId);
+        this.sessions.get(secondId)?.sendError(ErrorCode.NO_CHARACTER, 'không tìm thấy nhân vật');
+      }
+      return;
+    }
     const first = this.makeCombatant(firstRecord, firstBonus);
     const second = this.makeCombatant(secondRecord, secondBonus);
     const duel: Duel = {
@@ -229,9 +305,11 @@ export class ArenaService {
       actorId: turnOrder([first, second], this.rng)[0] ?? first.id,
       turnEndsAt: this.now() + ARENA_TURN_MS,
     };
+    if (pairing.cancelled.size > 0) return;
     this.duels.set(duel.id, duel);
     this.duelByPlayer.set(first.id, duel.id);
     this.duelByPlayer.set(second.id, duel.id);
+    pairing.phase = 'started';
     const start: BattleStart = {
       battleId: duel.id,
       roundNo: duel.roundNo,
@@ -275,6 +353,7 @@ export class ArenaService {
     skillId: string | undefined,
     timeout: boolean,
   ): Promise<void> {
+    if (duel.players.some((player) => this.finishing.has(player.id))) return;
     let skill: Skill | undefined;
     if (skillId) {
       skill = actor.skills.find((candidate) => candidate.id === skillId);
@@ -345,62 +424,77 @@ export class ArenaService {
   }
 
   private async finish(duel: Duel, winnerId: string, reason: ArenaEnd['reason']): Promise<void> {
-    if (!this.duels.delete(duel.id)) return;
-    for (const player of duel.players) this.duelByPlayer.delete(player.id);
-    const winnerIndex = duel.players[0].id === winnerId ? 0 : 1;
-    const loserIndex = winnerIndex === 0 ? 1 : 0;
-    const before = duel.ratings;
-    const deltas: [number, number] = [
-      arenaDelta(before[0], before[1], winnerIndex === 0),
-      arenaDelta(before[1], before[0], winnerIndex === 1),
-    ];
-    const after: [number, number] = [
-      Math.max(ARENA_RATING_FLOOR, before[0] + deltas[0]),
-      Math.max(ARENA_RATING_FLOOR, before[1] + deltas[1]),
-    ];
-    await Promise.all(
-      duel.players.map((player, index) =>
-        this.db
-          .insert(characterArena)
-          .values({
-            characterId: player.id,
-            rating: after[index]!,
-            wins: index === winnerIndex ? 1 : 0,
-            losses: index === loserIndex ? 1 : 0,
-          })
-          .onConflictDoUpdate({
-            target: characterArena.characterId,
-            set: {
+    if (!this.duels.has(duel.id) || duel.players.some((player) => this.finishing.has(player.id))) {
+      return;
+    }
+    for (const player of duel.players) this.finishing.add(player.id);
+    try {
+      const winnerIndex = duel.players[0].id === winnerId ? 0 : 1;
+      const loserIndex = winnerIndex === 0 ? 1 : 0;
+      const before = duel.ratings;
+      const deltas: [number, number] = [
+        arenaDelta(before[0], before[1], winnerIndex === 0),
+        arenaDelta(before[1], before[0], winnerIndex === 1),
+      ];
+      const after: [number, number] = [
+        Math.max(ARENA_RATING_FLOOR, before[0] + deltas[0]),
+        Math.max(ARENA_RATING_FLOOR, before[1] + deltas[1]),
+      ];
+      const ratings = await this.db.transaction(async (tx) => {
+        for (let index = 0; index < 2; index += 1) {
+          const player = duel.players[index]!;
+          await tx
+            .insert(characterArena)
+            .values({
+              characterId: player.id,
               rating: after[index]!,
-              wins: sql`${characterArena.wins} + ${index === winnerIndex ? 1 : 0}`,
-              losses: sql`${characterArena.losses} + ${index === loserIndex ? 1 : 0}`,
-              updatedAt: new Date(this.now()),
-            },
-          }),
-      ),
-    );
-    for (let index = 0; index < 2; index += 1) {
-      const player = duel.players[index]!;
-      const [row] = await this.db
-        .select()
-        .from(characterArena)
-        .where(eq(characterArena.characterId, player.id))
-        .limit(1);
-      const opponent = duel.players[1 - index]!;
-      const end: ArenaEnd = {
-        battleId: duel.id,
-        outcome: index === winnerIndex ? 'win' : 'loss',
-        reason,
-        ratingBefore: before[index]!,
-        ratingAfter: after[index]!,
-        ratingDelta: after[index]! - before[index]!,
-        opponentName: opponent.name,
-        opponentRatingAfter: after[1 - index]!,
-        wins: row?.wins ?? 0,
-        losses: row?.losses ?? 0,
-      };
-      this.sessions.get(player.id)?.send(Opcode.S2C_ARENA_END, end);
-      await this.sendState(player.id);
+              wins: index === winnerIndex ? 1 : 0,
+              losses: index === loserIndex ? 1 : 0,
+            })
+            .onConflictDoUpdate({
+              target: characterArena.characterId,
+              set: {
+                rating: after[index]!,
+                wins: sql`${characterArena.wins} + ${index === winnerIndex ? 1 : 0}`,
+                losses: sql`${characterArena.losses} + ${index === loserIndex ? 1 : 0}`,
+                updatedAt: new Date(this.now()),
+              },
+            });
+        }
+        return tx
+          .select()
+          .from(characterArena)
+          .where(
+            inArray(
+              characterArena.characterId,
+              duel.players.map((player) => player.id),
+            ),
+          );
+      });
+      const byCharacter = new Map(ratings.map((rating) => [rating.characterId, rating]));
+      this.duels.delete(duel.id);
+      for (const player of duel.players) this.duelByPlayer.delete(player.id);
+      for (let index = 0; index < 2; index += 1) {
+        const player = duel.players[index]!;
+        const row = byCharacter.get(player.id);
+        const opponent = duel.players[1 - index]!;
+        const end: ArenaEnd = {
+          battleId: duel.id,
+          outcome: index === winnerIndex ? 'win' : 'loss',
+          reason,
+          ratingBefore: before[index]!,
+          ratingAfter: after[index]!,
+          ratingDelta: after[index]! - before[index]!,
+          opponentName: opponent.name,
+          opponentRatingAfter: after[1 - index]!,
+          wins: row?.wins ?? 0,
+          losses: row?.losses ?? 0,
+        };
+        this.sessions.get(player.id)?.send(Opcode.S2C_ARENA_END, end);
+        await this.sendState(player.id);
+      }
+    } finally {
+      for (const player of duel.players) this.finishing.delete(player.id);
     }
   }
 

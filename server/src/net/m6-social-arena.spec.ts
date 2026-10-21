@@ -3,6 +3,7 @@ import {
   ErrorCode,
   INVENTORY_CAPACITY,
   MAX_FRIENDS,
+  PARTY_MAX_MEMBERS,
   Opcode,
   type ArenaEnd,
   type ArenaState,
@@ -15,7 +16,7 @@ import {
   type ServerError,
   type SocialUpdate,
 } from '@ninja/shared';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, or } from 'drizzle-orm';
 import { characters, friendships, inventoryItems, mails } from '../db/schema.js';
 import { closeTestDb, getTestDb, resetDatabase } from '../test/database.js';
 import { accountWithCharacter, startTestServer, type TestServer } from '../test/game-server.js';
@@ -215,6 +216,111 @@ describe('M6 realtime server flows', () => {
         ),
       );
     expect(pair.map((row) => row.status)).toEqual(['pending']);
+  });
+
+  it('serializes simultaneous opposite friend requests into one accepted friendship', async () => {
+    const first = await enterWorld();
+    const second = await enterWorld();
+    first.client.send(Opcode.C2S_FRIEND_REQUEST, { name: second.name });
+    second.client.send(Opcode.C2S_FRIEND_REQUEST, { name: first.name });
+
+    const firstUpdate = await first.client.waitFor<SocialUpdate>(
+      Opcode.S2C_SOCIAL_UPDATE,
+      (payload) => (payload as SocialUpdate).friends.some((friend) => friend.name === second.name),
+    );
+    const secondUpdate = await second.client.waitFor<SocialUpdate>(
+      Opcode.S2C_SOCIAL_UPDATE,
+      (payload) => (payload as SocialUpdate).friends.some((friend) => friend.name === first.name),
+    );
+    expect(firstUpdate.friends.map((friend) => friend.name)).toContain(second.name);
+    expect(secondUpdate.friends.map((friend) => friend.name)).toContain(first.name);
+
+    const db = await getTestDb();
+    const pairs = await db
+      .select({
+        requesterId: friendships.requesterId,
+        addresseeId: friendships.addresseeId,
+        status: friendships.status,
+      })
+      .from(friendships)
+      .where(
+        or(
+          and(
+            eq(friendships.requesterId, first.characterId),
+            eq(friendships.addresseeId, second.characterId),
+          ),
+          and(
+            eq(friendships.requesterId, second.characterId),
+            eq(friendships.addresseeId, first.characterId),
+          ),
+        ),
+      );
+    expect(pairs).toHaveLength(1);
+    expect(pairs[0]?.status).toBe('accepted');
+  });
+
+  it('enforces the exact party capacity and returns PARTY_FULL on the next invite', async () => {
+    const players = await Promise.all(
+      Array.from({ length: PARTY_MAX_MEMBERS + 1 }, () => enterWorld()),
+    );
+    const [leader, ...members] = players;
+    expect(leader).toBeDefined();
+    for (const [index, member] of members.slice(0, PARTY_MAX_MEMBERS - 1).entries()) {
+      const inviteMark = member.client.mark();
+      leader!.client.send(Opcode.C2S_PARTY_INVITE, { name: member.name });
+      await member.client.waitForSince<PartyUpdate>(
+        inviteMark,
+        Opcode.S2C_PARTY_UPDATE,
+        (payload) =>
+          (payload as PartyUpdate).invites.some((invite) => invite.fromName === leader!.name),
+      );
+      const acceptMark = leader!.client.mark();
+      member.client.send(Opcode.C2S_PARTY_ACCEPT, { leaderName: leader!.name });
+      const update = await leader!.client.waitForSince<PartyUpdate>(
+        acceptMark,
+        Opcode.S2C_PARTY_UPDATE,
+        (payload) => (payload as PartyUpdate).members.length === index + 2,
+      );
+      expect(update.members).toHaveLength(index + 2);
+    }
+    const state = await leader!.client.waitFor<PartyUpdate>(
+      Opcode.S2C_PARTY_UPDATE,
+      (payload) => (payload as PartyUpdate).members.length === PARTY_MAX_MEMBERS,
+    );
+    expect(state.members).toHaveLength(PARTY_MAX_MEMBERS);
+
+    const fifth = members[PARTY_MAX_MEMBERS - 1]!;
+    const fullMark = leader!.client.mark();
+    leader!.client.send(Opcode.C2S_PARTY_INVITE, { name: fifth.name });
+    const full = await leader!.client.waitForSince<ServerError>(
+      fullMark,
+      Opcode.S2C_ERROR,
+      (payload) => (payload as ServerError).code === ErrorCode.PARTY_FULL,
+    );
+    expect(full.code).toBe(ErrorCode.PARTY_FULL);
+  });
+
+  it('enforces the one-second cooldown on map chat', async () => {
+    const sender = await enterWorld();
+    const recipient = await enterWorld();
+    const recipientMark = recipient.client.mark();
+    const senderMark = sender.client.mark();
+    sender.client.send(Opcode.C2S_CHAT, { channel: 'map', text: 'm6-cooldown-first' });
+    sender.client.send(Opcode.C2S_CHAT, { channel: 'map', text: 'm6-cooldown-too-soon' });
+    const firstMessage = await recipient.client.waitForSince<{ text: string }>(
+      recipientMark,
+      Opcode.S2C_CHAT,
+      (payload) => (payload as { text: string }).text === 'm6-cooldown-first',
+    );
+    expect(firstMessage.text).toBe('m6-cooldown-first');
+
+    const limited = await sender.client.waitForSince<ServerError>(
+      senderMark,
+      Opcode.S2C_ERROR,
+      (payload) => (payload as ServerError).code === ErrorCode.RATE_LIMITED,
+    );
+    expect(limited.code).toBe(ErrorCode.RATE_LIMITED);
+    expect(limited.message).toContain('1 giây');
   });
 
   it('keeps mail rewards unclaimed when the bag is full, then accepts a retry after a slot opens', async () => {

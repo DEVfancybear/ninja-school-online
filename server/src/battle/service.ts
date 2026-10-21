@@ -119,6 +119,7 @@ export interface EngageRequest {
 export class BattleService {
   private readonly battles = new Map<string, ActiveBattle>();
   private readonly admissions = new Set<string>();
+  private readonly settling = new Set<string>();
   private readonly chains = new Map<string, Promise<void>>();
   private readonly now: () => number;
   private readonly rng: Rng;
@@ -140,13 +141,18 @@ export class BattleService {
 
   /** Nhân vật có đang trong trận không (dùng để chặn di chuyển và chặn vào trận thứ hai). */
   isBusy(characterId: string): boolean {
-    return this.admissions.has(characterId) || this.battleOf(characterId) !== undefined;
+    return (
+      this.admissions.has(characterId) ||
+      this.settling.has(characterId) ||
+      this.battleOf(characterId) !== undefined
+    );
   }
 
   dispose(): void {
     this.unsubscribe();
     this.battles.clear();
     this.admissions.clear();
+    this.settling.clear();
   }
 
   /**
@@ -434,11 +440,16 @@ export class BattleService {
           this.resultPayload(battle, actor.id, 'flee', events),
         );
         battle.players.delete(actor.id);
-        await this.settlePlayer(battle, actor, 'fled');
-        if (battle.players.size === 0) {
-          await this.finish(battle, 'fled');
-        } else {
-          this.beginNextTurn(battle, this.now());
+        this.settling.add(actor.id);
+        try {
+          await this.settlePlayer(battle, actor, 'fled');
+          if (battle.players.size === 0) {
+            await this.finish(battle, 'fled');
+          } else {
+            this.beginNextTurn(battle, this.now());
+          }
+        } finally {
+          this.settling.delete(actor.id);
         }
         return;
       }
@@ -595,6 +606,8 @@ export class BattleService {
     if (battle.over) {
       return;
     }
+    const participants = [...battle.players.values()];
+    for (const player of participants) this.settling.add(player.id);
     battle.over = true;
     this.battles.delete(battle.id);
 
@@ -609,8 +622,12 @@ export class BattleService {
       }
     }
 
-    for (const combatant of [...battle.players.values()]) {
-      await this.settlePlayer(battle, combatant, outcome, monster);
+    try {
+      for (const combatant of participants) {
+        await this.settlePlayer(battle, combatant, outcome, monster);
+      }
+    } finally {
+      for (const player of participants) this.settling.delete(player.id);
     }
   }
 

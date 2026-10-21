@@ -21,6 +21,12 @@ import { WorldService } from '../world/world-service.js';
 
 const TRAINING_MAP_ID = 'bai-luyen-tap';
 
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => (resolve = done));
+  return { promise, resolve };
+}
+
 describe('PvE admission reservation', () => {
   let gameData: Awaited<ReturnType<typeof loadGameData>>;
 
@@ -134,6 +140,102 @@ describe('PvE admission reservation', () => {
       expect(battle.isBusy(characterId)).toBe(true);
     } finally {
       release();
+      findById.mockRestore();
+      battle.dispose();
+      rooms.dispose();
+      tick.dispose();
+    }
+  });
+
+  it('keeps a PvE character busy until settlement finishes', async () => {
+    const db = await getTestDb();
+    const [account] = await db
+      .insert(accounts)
+      .values({ username: 'pve_settlement', passwordHash: 'test' })
+      .returning();
+    const [record] = await db
+      .insert(characters)
+      .values({
+        accountId: account!.id,
+        name: 'PveSettlement',
+        school: 'haruna',
+        class: 'dao',
+        level: 3,
+      })
+      .returning();
+    const characterId = record!.id;
+    const inventory = new InventoryService(db, gameData);
+    const characterService = new CharacterService(db, inventory, gameData);
+    const equipment = new EquipmentService(gameData, characterService, inventory);
+    const sessions = new SessionRegistry();
+    const tick = new TickScheduler();
+    const rooms = new RoomManager({ gameData, tick });
+    const messages: { op: number; payload: unknown }[] = [];
+    const session: GameSession = {
+      connectionId: 'pve-settlement',
+      characterId,
+      mapId: TRAINING_MAP_ID,
+      closed: false,
+      send: (op, payload) => messages.push({ op, payload }),
+      sendError: (code, message) =>
+        messages.push({ op: Opcode.S2C_ERROR, payload: { code, message } }),
+      replacedByNewLogin: () => undefined,
+    };
+    sessions.register(characterId, session);
+
+    const room = rooms.getOrCreate(TRAINING_MAP_ID);
+    const monster = room!.monsters()[0]!;
+    const player = createPlayer({
+      character: toCharacterDto(record!),
+      position: { x: monster.x, y: monster.y },
+      channel: session,
+    });
+    room!.addPlayer(player);
+    const battle = new BattleService({
+      gameData,
+      rooms,
+      sessions,
+      characters: characterService,
+      inventory,
+      equipment,
+      tick,
+      onDefeat: () => undefined,
+      rng: () => 0,
+    });
+    const arenaQueue = vi.fn();
+    const world = Object.assign(Object.create(WorldService.prototype), {
+      options: { arena: { queuePlayer: arenaQueue } },
+      battle,
+      locate: () => ({ room: room!, player }),
+    }) as WorldService;
+    const settlementStarted = deferred();
+    const settlementGate = deferred();
+    let settling = false;
+    const originalFindById = characterService.findById.bind(characterService);
+    const findById = vi.spyOn(characterService, 'findById').mockImplementation(async (id) => {
+      if (settling && id === characterId) {
+        settlementStarted.resolve();
+        await settlementGate.promise;
+      }
+      return originalFindById(id);
+    });
+
+    try {
+      await battle.engage({ session, room: room!, player, targetId: monster.id });
+      const start = messages.find((message) => message.op === Opcode.S2C_BATTLE_START)!.payload as {
+        battleId: string;
+      };
+      settling = true;
+      const action = battle.action(session, { battleId: start.battleId, action: 'flee' });
+      await settlementStarted.promise;
+      expect(battle.isBusy(characterId)).toBe(true);
+      await world.arenaQueue(session);
+      expect(arenaQueue).not.toHaveBeenCalled();
+      settlementGate.resolve();
+      await action;
+      expect(battle.isBusy(characterId)).toBe(false);
+    } finally {
+      settlementGate.resolve();
       findById.mockRestore();
       battle.dispose();
       rooms.dispose();

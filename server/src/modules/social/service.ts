@@ -128,34 +128,92 @@ export class SocialService {
       return fail(ErrorCode.FRIEND_SELF, 'bạn không thể kết bạn với chính mình');
     }
 
-    const existing = await this.findPair(characterId, target.id);
-    if (existing?.status === 'accepted') {
-      return fail(ErrorCode.FRIEND_ALREADY, `${target.name} đã có trong danh sách bạn của bạn`);
-    }
-    if (existing?.requesterId === characterId) {
-      return fail(ErrorCode.FRIEND_ALREADY, `bạn đã gửi lời mời cho ${target.name} rồi`);
-    }
-
-    if (existing) {
-      // Ngược chiều và đang chờ: lời mời này chính là đồng ý.
-      const accepted = await this.acceptPair(characterId, target.id);
-      if (!accepted.ok) {
-        return accepted;
+    const result = await this.db.transaction(async (tx) => {
+      const locked = await tx
+        .select({ id: characters.id })
+        .from(characters)
+        .where(inArray(characters.id, [characterId, target.id]))
+        .orderBy(asc(characters.id))
+        .for('update');
+      if (locked.length !== 2) {
+        return fail(ErrorCode.CHARACTER_NOT_FOUND, 'không tìm thấy một trong hai nhân vật');
       }
-      await this.pushTo(characterId, target.id);
-      return { ok: true };
-    }
 
-    if ((await this.countFriends(characterId)) >= MAX_FRIENDS) {
-      return fail(ErrorCode.FRIENDS_FULL, `danh sách bạn đã đủ ${MAX_FRIENDS} người`);
-    }
+      const [existing] = await tx
+        .select({
+          requesterId: friendships.requesterId,
+          addresseeId: friendships.addresseeId,
+          status: friendships.status,
+        })
+        .from(friendships)
+        .where(
+          or(
+            and(eq(friendships.requesterId, characterId), eq(friendships.addresseeId, target.id)),
+            and(eq(friendships.requesterId, target.id), eq(friendships.addresseeId, characterId)),
+          ),
+        )
+        .limit(1);
+      if (existing?.status === 'accepted') {
+        return fail(ErrorCode.FRIEND_ALREADY, `${target.name} đã có trong danh sách bạn của bạn`);
+      }
 
-    await this.db
-      .insert(friendships)
-      .values({ requesterId: characterId, addresseeId: target.id })
-      .onConflictDoNothing();
-    await this.pushTo(characterId, target.id);
-    return { ok: true };
+      const accepted = await tx
+        .select({ requesterId: friendships.requesterId, addresseeId: friendships.addresseeId })
+        .from(friendships)
+        .where(
+          and(
+            eq(friendships.status, 'accepted'),
+            or(
+              inArray(friendships.requesterId, [characterId, target.id]),
+              inArray(friendships.addresseeId, [characterId, target.id]),
+            ),
+          ),
+        );
+      const friendCounts = new Map([
+        [characterId, 0],
+        [target.id, 0],
+      ]);
+      for (const friend of accepted) {
+        if (friendCounts.has(friend.requesterId)) {
+          friendCounts.set(friend.requesterId, friendCounts.get(friend.requesterId)! + 1);
+        }
+        if (friendCounts.has(friend.addresseeId)) {
+          friendCounts.set(friend.addresseeId, friendCounts.get(friend.addresseeId)! + 1);
+        }
+      }
+      if (existing?.requesterId === target.id) {
+        if ([characterId, target.id].some((id) => friendCounts.get(id)! >= MAX_FRIENDS)) {
+          return fail(ErrorCode.FRIENDS_FULL, `danh sách bạn đã đủ ${MAX_FRIENDS} người`);
+        }
+        const [updated] = await tx
+          .update(friendships)
+          .set({ status: 'accepted' })
+          .where(
+            and(
+              eq(friendships.requesterId, target.id),
+              eq(friendships.addresseeId, characterId),
+              eq(friendships.status, 'pending'),
+            ),
+          )
+          .returning({ id: friendships.id });
+        return updated
+          ? { ok: true as const }
+          : fail(ErrorCode.FRIEND_NOT_FOUND, 'lời mời kết bạn không còn tồn tại');
+      }
+      if (existing?.requesterId === characterId) {
+        return fail(ErrorCode.FRIEND_ALREADY, `bạn đã gửi lời mời cho ${target.name} rồi`);
+      }
+      if (friendCounts.get(characterId)! >= MAX_FRIENDS) {
+        return fail(ErrorCode.FRIENDS_FULL, `danh sách bạn đã đủ ${MAX_FRIENDS} người`);
+      }
+      await tx
+        .insert(friendships)
+        .values({ requesterId: characterId, addresseeId: target.id })
+        .onConflictDoNothing();
+      return { ok: true as const };
+    });
+    if (result.ok) await this.pushTo(characterId, target.id);
+    return result;
   }
 
   /** Đồng ý lời mời của một người. */
@@ -294,19 +352,6 @@ export class SocialService {
       )
       .limit(1);
     return row;
-  }
-
-  private async countFriends(characterId: string): Promise<number> {
-    const rows = await this.db
-      .select({ id: friendships.id })
-      .from(friendships)
-      .where(
-        and(
-          eq(friendships.status, 'accepted'),
-          or(eq(friendships.requesterId, characterId), eq(friendships.addresseeId, characterId)),
-        ),
-      );
-    return rows.length;
   }
 
   /**
