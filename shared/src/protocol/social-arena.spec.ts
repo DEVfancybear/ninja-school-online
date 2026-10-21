@@ -10,7 +10,7 @@ import {
   WORLD_CHAT_MIN_INTERVAL_MS,
 } from '../constants/index.js';
 import { decodeClientPacket, decodeServerPacket } from './codec.js';
-import { ErrorCode } from './packets.js';
+import { ErrorCode, ServerErrorSchema } from './packets.js';
 import { Opcode } from './opcodes.js';
 import { PROTOCOL_VERSION } from './version.js';
 
@@ -139,6 +139,14 @@ describe('hợp đồng M6', () => {
   });
 
   describe('hộp thư', () => {
+    it('lỗi nhận thư khi túi đầy có mã được hợp đồng server chấp nhận', () => {
+      expect(ErrorCode.INVENTORY_FULL).toBe('inventory_full');
+      expect(
+        ServerErrorSchema.safeParse({ code: ErrorCode.INVENTORY_FULL, message: 'Túi đồ đã đầy.' })
+          .success,
+      ).toBe(true);
+    });
+
     it('mỗi thư có quà yên và danh sách món, thư đã nhận có cờ riêng', () => {
       const decoded = decodeServerPacket(Opcode.S2C_MAILS, {
         mails: [
@@ -281,9 +289,10 @@ describe('hợp đồng M6', () => {
       );
     });
 
-    it('không bao giờ xuống dưới sàn điểm', () => {
-      expect(arenaDelta(ARENA_RATING_FLOOR, 2_000, false)).toBe(0);
-      expect(arenaDelta(ARENA_RATING_FLOOR + 3, 2_000, false)).toBeGreaterThanOrEqual(-3);
+    it('Elo có thể trừ hơn K/2 khi người điểm cao thua và luôn giữ sàn điểm', () => {
+      expect(arenaDelta(1_200, 1_000, false)).toBe(-24);
+      expect(arenaDelta(ARENA_RATING_FLOOR, 100, false)).toBe(0);
+      expect(arenaDelta(ARENA_RATING_FLOOR + 3, 100, false)).toBe(-3);
     });
 
     it('cấp tối thiểu vào Lôi Đài là 3', () => {

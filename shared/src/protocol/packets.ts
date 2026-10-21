@@ -216,6 +216,7 @@ export const ErrorCode = {
   NOT_UPGRADABLE: 'not_upgradable',
   UPGRADE_MAXED: 'upgrade_maxed',
   NOT_ENOUGH_MATERIAL: 'not_enough_material',
+  INVENTORY_FULL: 'inventory_full',
 
   // Nhiệm vụ (M5): mỗi lý do từ chối một mã riêng để người chơi biết vì sao không nhận/trả được.
   QUEST_NOT_FOUND: 'quest_not_found',

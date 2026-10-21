@@ -18,7 +18,7 @@ export const ARENA_START_RATING = 1_000;
 /** Điểm không bao giờ xuống dưới mức này, để thua nhiều vẫn còn động lực đấu tiếp. */
 export const ARENA_RATING_FLOOR = 100;
 
-/** Hệ số K của công thức Elo: thắng ăn nhiều, thua mất ít hơn khi chênh lệch điểm lớn. */
+/** Hệ số K của công thức Elo: giới hạn biên độ thay đổi mỗi trận trước khi áp dụng sàn điểm. */
 export const ARENA_K_FACTOR = 32;
 
 /** Mỗi lượt trong trận Lôi Đài dài bằng trận PvE; hết giờ thì server tự cho đánh thường. */
@@ -45,8 +45,8 @@ export function arenaExpectedScore(rating: number, opponentRating: number): numb
 /**
  * Điểm cộng/trừ của một trận Lôi Đài, làm tròn về số nguyên.
  *
- * Thắng người mạnh hơn được nhiều điểm, thắng người yếu hơn được ít; thua thì ngược lại. Người thua
- * không bao giờ mất quá `ARENA_K_FACTOR / 2` điểm một trận và không xuống dưới `ARENA_RATING_FLOOR`.
+ * Thắng người mạnh hơn được nhiều điểm hơn, thắng người yếu hơn được ít hơn; thua người yếu hơn mất
+ * nhiều điểm hơn thua người mạnh hơn. Điểm không xuống dưới `ARENA_RATING_FLOOR`.
  */
 export function arenaDelta(rating: number, opponentRating: number, won: boolean): number {
   const expected = arenaExpectedScore(rating, opponentRating);
