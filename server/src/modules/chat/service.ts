@@ -27,10 +27,10 @@ export class ChatService {
   }
 
   /** `true` nếu người chơi được phép gửi; đồng thời ghi nhận thời điểm gửi. */
-  allow(playerId: string): boolean {
+  allow(playerId: string, intervalMs = this.minIntervalMs): boolean {
     const now = this.now();
     const previous = this.lastSentAt.get(playerId);
-    if (previous !== undefined && now - previous < this.minIntervalMs) {
+    if (previous !== undefined && now - previous < intervalMs) {
       return false;
     }
     this.lastSentAt.set(playerId, now);

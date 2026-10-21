@@ -118,6 +118,7 @@ export interface EngageRequest {
  */
 export class BattleService {
   private readonly battles = new Map<string, ActiveBattle>();
+  private readonly admissions = new Set<string>();
   private readonly chains = new Map<string, Promise<void>>();
   private readonly now: () => number;
   private readonly rng: Rng;
@@ -139,12 +140,13 @@ export class BattleService {
 
   /** Nhân vật có đang trong trận không (dùng để chặn di chuyển và chặn vào trận thứ hai). */
   isBusy(characterId: string): boolean {
-    return this.battleOf(characterId) !== undefined;
+    return this.admissions.has(characterId) || this.battleOf(characterId) !== undefined;
   }
 
   dispose(): void {
     this.unsubscribe();
     this.battles.clear();
+    this.admissions.clear();
   }
 
   /**
@@ -173,37 +175,40 @@ export class BattleService {
       return;
     }
 
-    const record = await this.options.characters.findById(player.id);
-    // Ảnh chụp lúc vào trận phải gồm cả trang bị đang mặc, nếu không thì mặc đồ rồi vào trận vẫn yếu.
-    const bonus = record ? await this.options.equipment.bonusFor(record.id) : NO_STATS_BONUS;
-    const combatant = record ? this.playerCombatant(record, bonus) : undefined;
-    if (!combatant) {
-      session.sendError(ErrorCode.INTERNAL, 'không đọc được nhân vật của bạn, hãy vào lại');
-      return;
-    }
-
-    const existing = this.battleForMonster(room.map.id, monster.id);
-    if (existing) {
-      if (existing.players.size >= BATTLE_MAX_PLAYERS) {
-        session.sendError(
-          ErrorCode.INVALID_TARGET,
-          `trận này đã đủ ${BATTLE_MAX_PLAYERS} người, hãy tìm con quái khác`,
-        );
+    // Reserve synchronously before database reads so arena admission cannot pass concurrently.
+    this.admissions.add(player.id);
+    try {
+      const record = await this.options.characters.findById(player.id);
+      const bonus = record ? await this.options.equipment.bonusFor(record.id) : NO_STATS_BONUS;
+      const combatant = record ? this.playerCombatant(record, bonus) : undefined;
+      if (!combatant) {
+        session.sendError(ErrorCode.INTERNAL, 'không đọc được nhân vật của bạn, hãy vào lại');
         return;
       }
-      existing.players.set(combatant.id, combatant);
-      // Vào trận thì đứng yên: đang đi mà bị kéo vào trận sẽ khó hiểu.
-      player.target = undefined;
-      this.broadcast(existing, Opcode.S2C_BATTLE_START, this.startPayload(existing));
-      return;
-    }
 
-    const battle = this.createBattle(room, monster, combatant);
-    player.target = undefined;
-    // Mở lượt trước rồi mới phát `S2C_BATTLE_START`: gói bắt đầu trận đã có sẵn người tới lượt.
-    this.beginNextTurn(battle, this.now(), false);
-    if (!battle.over) {
-      this.broadcast(battle, Opcode.S2C_BATTLE_START, this.startPayload(battle));
+      const existing = this.battleForMonster(room.map.id, monster.id);
+      if (existing) {
+        if (existing.players.size >= BATTLE_MAX_PLAYERS) {
+          session.sendError(
+            ErrorCode.INVALID_TARGET,
+            `trận này đã đủ ${BATTLE_MAX_PLAYERS} người, hãy tìm con quái khác`,
+          );
+          return;
+        }
+        existing.players.set(combatant.id, combatant);
+        player.target = undefined;
+        this.broadcast(existing, Opcode.S2C_BATTLE_START, this.startPayload(existing));
+        return;
+      }
+
+      const battle = this.createBattle(room, monster, combatant);
+      player.target = undefined;
+      this.beginNextTurn(battle, this.now(), false);
+      if (!battle.over) {
+        this.broadcast(battle, Opcode.S2C_BATTLE_START, this.startPayload(battle));
+      }
+    } finally {
+      this.admissions.delete(player.id);
     }
   }
 

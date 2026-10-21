@@ -12,6 +12,11 @@ import { registerAccountRoutes } from './modules/account/routes.js';
 import { CharacterService } from './modules/character/service.js';
 import { registerCharacterRoutes } from './modules/character/routes.js';
 import { ChatService } from './modules/chat/service.js';
+import { SocialService } from './modules/social/service.js';
+import { PartyService } from './modules/party/service.js';
+import { MailService } from './modules/mail/service.js';
+import { LeaderboardService } from './modules/leaderboard/service.js';
+import { ArenaService } from './modules/arena/service.js';
 import { EquipmentService } from './modules/equipment/service.js';
 import { InventoryService } from './modules/inventory/service.js';
 import { NpcService } from './modules/npc/service.js';
@@ -92,7 +97,20 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
   const upgradeService = new UpgradeService(db, gameData, characterService, inventoryService);
   // Nhiệm vụ cần cả nhân vật (kinh nghiệm/cấp) lẫn túi đồ (quà và mục tiêu `collect`) để trả thưởng.
   const questService = new QuestService(db, gameData, characterService, inventoryService);
+  const sessions = new SessionRegistry();
+  const socialService = new SocialService(db, characterService, sessions);
+  const partyService = new PartyService(characterService, sessions);
+  const mailService = new MailService(db, inventoryService, gameData);
+  const leaderboardService = new LeaderboardService(db);
   const tick = new TickScheduler();
+  const arenaService = new ArenaService(
+    db,
+    gameData,
+    characterService,
+    equipmentService,
+    sessions,
+    tick,
+  );
   const rooms = new RoomManager({
     gameData,
     tick,
@@ -117,7 +135,7 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
   const world = new WorldService({
     gameData,
     rooms,
-    sessions: new SessionRegistry(),
+    sessions,
     characters: characterService,
     chat: new ChatService(),
     npcs: new NpcService(shopService),
@@ -126,6 +144,11 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
     shop: shopService,
     upgrade: upgradeService,
     quests: questService,
+    social: socialService,
+    party: partyService,
+    mail: mailService,
+    leaderboard: leaderboardService,
+    arena: arenaService,
     tick,
     verifyToken: verifyAccessToken,
   });
@@ -140,6 +163,7 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
     // Gateway đã tự đóng socket + gỡ listener trong hook `preClose` của nó (xem net/ws-server.ts);
     // ở đây chỉ còn dừng nhịp tick và xoá các room.
     world.battle.dispose();
+    arenaService.dispose();
     rooms.dispose();
     tick.dispose();
   });

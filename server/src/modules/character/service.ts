@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import {
   MAX_CHARACTERS_PER_ACCOUNT,
   type Character,
@@ -117,6 +117,33 @@ export class CharacterService {
       .where(eq(characters.id, characterId))
       .limit(1);
     return row ? toCharacterRecord(row) : undefined;
+  }
+
+  /**
+   * Nhân vật theo **tên** — tên là địa chỉ dùng chung cho mọi gói xã hội, nên so không phân biệt
+   * hoa/thường và bỏ khoảng trắng hai đầu (unique index `characters_name_lower_unique` bảo đảm tên
+   * chỉ khớp tối đa một người). Tên rỗng coi như không tìm thấy.
+   */
+  async findByName(name: string): Promise<CharacterRecord | undefined> {
+    const trimmed = name.trim();
+    if (trimmed === '') {
+      return undefined;
+    }
+    const [row] = await this.db
+      .select()
+      .from(characters)
+      .where(sql`lower(${characters.name}) = lower(${trimmed})`)
+      .limit(1);
+    return row ? toCharacterRecord(row) : undefined;
+  }
+
+  /** Nhiều nhân vật theo id trong **một** câu truy vấn (danh sách bạn, thành viên tổ đội). */
+  async findManyByIds(ids: readonly string[]): Promise<CharacterRecord[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+    const rows = await this.db.select().from(characters).where(inArray(characters.id, [...ids]));
+    return rows.map(toCharacterRecord);
   }
 
   /** Ghi máu/nội lực hiện tại sau trận đấu. Giá trị đã được kẹp trong khoảng hợp lệ ở tầng trận đấu. */

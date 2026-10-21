@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import {
   INVENTORY_CAPACITY,
   sellPrice,
@@ -10,7 +10,7 @@ import {
   type Item,
 } from '@ninja/shared';
 import type { Db } from '../../db/client.js';
-import { inventoryItems } from '../../db/schema.js';
+import { characters, inventoryItems } from '../../db/schema.js';
 import type { GameData } from '../../world/game-data.js';
 
 /**
@@ -55,6 +55,8 @@ export function inventoryItemView(
 
 /** Kết quả cất vật phẩm vào túi. Mọi lý do không cất được đều có tên riêng để người gọi xử lý. */
 export type GrantResult = 'ok' | 'inventory_full' | 'unknown_item';
+
+type InventoryExecutor = Pick<Db, 'select' | 'insert'>;
 
 /**
  * Túi đồ: nguồn sự thật nằm ở bảng `inventory_items`, tên/mô tả/hiệu ứng lấy từ `game-data`.
@@ -115,8 +117,8 @@ export class InventoryService {
   }
 
   /** Số loại vật phẩm **trong túi** (món đang mặc không tính là một ô túi). */
-  async countKinds(characterId: string): Promise<number> {
-    const [row] = await this.db
+  async countKinds(characterId: string, executor: InventoryExecutor = this.db): Promise<number> {
+    const [row] = await executor
       .select({ total: sql<number>`count(*)::int` })
       .from(inventoryItems)
       .where(and(eq(inventoryItems.characterId, characterId), isNull(inventoryItems.equippedSlot)));
@@ -153,47 +155,72 @@ export class InventoryService {
       .where(and(eq(inventoryItems.characterId, characterId), eq(inventoryItems.itemId, itemId)));
   }
 
-  /**
-   * Cất `quantity` món vào túi. Vật phẩm chưa có trong túi thì cần một ô trống; túi đầy thì trả
-   * `inventory_full` và **không** cất gì (đồ rơi bị mất, người chơi tự dọn túi).
-   */
+  /** Cất một món; việc kiểm sức chứa và ghi hàng nằm chung trong transaction. */
   async grant(characterId: string, itemId: string, quantity = 1): Promise<GrantResult> {
-    if (quantity <= 0) {
-      return 'ok';
-    }
-    if (!this.gameData.items.has(itemId)) {
-      // Không thể xảy ra: `checkGameData` bắt mọi quà rơi trỏ tới vật phẩm có thật.
-      return 'unknown_item';
-    }
-
-    const existing = await this.db
-      .select({ id: inventoryItems.id })
-      .from(inventoryItems)
-      .where(and(eq(inventoryItems.characterId, characterId), eq(inventoryItems.itemId, itemId)))
-      .limit(1);
-
-    if (existing.length === 0 && (await this.countKinds(characterId)) >= INVENTORY_CAPACITY) {
-      return 'inventory_full';
-    }
-
-    await this.db
-      .insert(inventoryItems)
-      .values({ characterId, itemId, quantity })
-      .onConflictDoUpdate({
-        target: [inventoryItems.characterId, inventoryItems.itemId],
-        set: { quantity: sql`${inventoryItems.quantity} + ${quantity}` },
-      });
-    return 'ok';
+    return this.grantItems(characterId, [{ itemId, qty: quantity }]);
   }
 
-  /** Cất nhiều món một lượt (đồ khởi đầu của phái), bỏ qua món không cất được. */
+  /**
+   * Cất nhiều món cùng lúc. Nếu gọi độc lập sẽ khóa nhân vật trong transaction để hai lần nhận quà
+   * không cùng vượt qua phép đếm ô trống; người gọi đã ở trong transaction có thể truyền executor.
+   */
   async grantItems(
     characterId: string,
     items: readonly { readonly itemId: string; readonly qty: number }[],
-  ): Promise<void> {
-    for (const item of items) {
-      await this.grant(characterId, item.itemId, item.qty);
+    executor?: InventoryExecutor,
+  ): Promise<GrantResult> {
+    if (executor) {
+      return this.grantItemsWith(executor, characterId, items);
     }
+
+    return this.db.transaction(async (tx) => {
+      await tx
+        .select({ id: characters.id })
+        .from(characters)
+        .where(eq(characters.id, characterId))
+        .for('update');
+      return this.grantItemsWith(tx, characterId, items);
+    });
+  }
+
+  private async grantItemsWith(
+    executor: InventoryExecutor,
+    characterId: string,
+    items: readonly { readonly itemId: string; readonly qty: number }[],
+  ): Promise<GrantResult> {
+    const positiveItems = items.filter((item) => item.qty > 0);
+    for (const item of positiveItems) {
+      if (!this.gameData.items.has(item.itemId)) {
+        return 'unknown_item';
+      }
+    }
+    if (positiveItems.length === 0) {
+      return 'ok';
+    }
+
+    const itemIds = [...new Set(positiveItems.map((item) => item.itemId))];
+    const existing = await executor
+      .select({ itemId: inventoryItems.itemId })
+      .from(inventoryItems)
+      .where(
+        and(eq(inventoryItems.characterId, characterId), inArray(inventoryItems.itemId, itemIds)),
+      );
+    const existingIds = new Set(existing.map((row) => row.itemId));
+    const newKinds = itemIds.filter((itemId) => !existingIds.has(itemId)).length;
+    if ((await this.countKinds(characterId, executor)) + newKinds > INVENTORY_CAPACITY) {
+      return 'inventory_full';
+    }
+
+    for (const item of positiveItems) {
+      await executor
+        .insert(inventoryItems)
+        .values({ characterId, itemId: item.itemId, quantity: item.qty })
+        .onConflictDoUpdate({
+          target: [inventoryItems.characterId, inventoryItems.itemId],
+          set: { quantity: sql`${inventoryItems.quantity} + ${item.qty}` },
+        });
+    }
+    return 'ok';
   }
 
   /**

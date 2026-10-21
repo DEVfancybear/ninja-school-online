@@ -12,6 +12,7 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 import {
+  ARENA_START_RATING,
   CLASSES,
   EQUIP_SLOTS,
   QUEST_STATUSES,
@@ -233,3 +234,104 @@ export const characterFeatures = pgTable(
 
 export type CharacterQuestRow = typeof characterQuests.$inferSelect;
 export type CharacterFeatureRow = typeof characterFeatures.$inferSelect;
+
+/** Hai trạng thái của một hàng `friendships`: lời mời đang chờ, hoặc đã thành bạn. */
+export const FRIENDSHIP_STATUSES = ['pending', 'accepted'] as const;
+export type FriendshipStatus = (typeof FRIENDSHIP_STATUSES)[number];
+
+const friendshipStatusValues = sql.raw(FRIENDSHIP_STATUSES.map((status) => `'${status}'`).join(', '));
+
+/**
+ * Quan hệ bạn bè: **một hàng cho một cặp**, có hướng theo người mời.
+ *
+ * `pending` là lời mời chưa trả lời; `accepted` là đã là bạn. Bạn bè được đọc theo **cả hai chiều**
+ * (`requester_id` hoặc `addressee_id`), nên mời lại người đã mời mình chỉ là đổi `status` của hàng
+ * đang có chứ không bao giờ sinh hàng thứ hai cho cùng một cặp.
+ */
+export const friendships = pgTable(
+  'friendships',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    requesterId: uuid('requester_id')
+      .notNull()
+      .references(() => characters.id, { onDelete: 'cascade' }),
+    addresseeId: uuid('addressee_id')
+      .notNull()
+      .references(() => characters.id, { onDelete: 'cascade' }),
+    status: varchar('status', { length: 16 })
+      .$type<FriendshipStatus>()
+      .notNull()
+      .default('pending'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('friendships_requester_addressee_unique').on(table.requesterId, table.addresseeId),
+    index('friendships_addressee_idx').on(table.addresseeId),
+    check('friendships_status_valid', sql`${table.status} in (${friendshipStatusValues})`),
+    check('friendships_not_self', sql`${table.requesterId} <> ${table.addresseeId}`),
+  ],
+);
+
+/**
+ * Điểm Lôi Đài của một nhân vật. Chưa đấu trận nào thì **chưa có hàng** — điểm khởi đầu
+ * (`ARENA_START_RATING`) là mặc định của cột, nên không phải tạo hàng cho mọi nhân vật mới.
+ */
+export const characterArena = pgTable(
+  'character_arena',
+  {
+    characterId: uuid('character_id')
+      .primaryKey()
+      .references(() => characters.id, { onDelete: 'cascade' }),
+    rating: integer('rating').notNull().default(ARENA_START_RATING),
+    wins: integer('wins').notNull().default(0),
+    losses: integer('losses').notNull().default(0),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // Bảng xếp hạng `arena` đọc theo đúng thứ tự này.
+    index('character_arena_rating_idx').on(table.rating),
+    check('character_arena_rating_non_negative', sql`${table.rating} >= 0`),
+    check('character_arena_wins_non_negative', sql`${table.wins} >= 0`),
+    check('character_arena_losses_non_negative', sql`${table.losses} >= 0`),
+  ],
+);
+
+/** Một món quà trong thư, đúng dạng gửi cho client (`MailItem`). */
+export interface MailItemRow {
+  readonly itemId: string;
+  readonly qty: number;
+}
+
+/**
+ * Hộp thư của nhân vật. `mail_key` là khoá nghiệp vụ để **không gửi trùng** một lá thư hệ thống
+ * (thư chào mừng): unique `(character_id, mail_key)` và `on conflict do nothing` lo phần đó, còn thư
+ * không có khoá (`null`) thì gửi bao nhiêu cũng được.
+ */
+export const mails = pgTable(
+  'mails',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    characterId: uuid('character_id')
+      .notNull()
+      .references(() => characters.id, { onDelete: 'cascade' }),
+    mailKey: varchar('mail_key', { length: 32 }),
+    subject: varchar('subject', { length: 80 }).notNull(),
+    body: varchar('body', { length: 500 }).notNull().default(''),
+    yen: integer('yen').notNull().default(0),
+    items: jsonb('items')
+      .$type<MailItemRow[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    claimedAt: timestamp('claimed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('mails_character_mail_key_unique').on(table.characterId, table.mailKey),
+    index('mails_character_created_idx').on(table.characterId, table.createdAt),
+    check('mails_yen_non_negative', sql`${table.yen} >= 0`),
+  ],
+);
+
+export type FriendshipRow = typeof friendships.$inferSelect;
+export type CharacterArenaRow = typeof characterArena.$inferSelect;
+export type MailRow = typeof mails.$inferSelect;

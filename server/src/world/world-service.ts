@@ -1,5 +1,6 @@
 import {
   CHAT_MIN_INTERVAL_MS,
+  WORLD_CHAT_MIN_INTERVAL_MS,
   ErrorCode,
   Opcode,
   PROTOCOL_VERSION,
@@ -7,7 +8,9 @@ import {
   type AttackMob,
   type BattleAction,
   type Character,
+  type ChatMessage,
   type ChatSend,
+  type LeaderboardRequest,
   type ClientHello,
   type EnterMap,
   type Equip,
@@ -31,6 +34,11 @@ import type { RoomManager } from '../core/room-manager.js';
 import type { TickScheduler } from '../core/tick.js';
 import type { ChatService } from '../modules/chat/service.js';
 import type { CharacterService } from '../modules/character/service.js';
+import type { SocialService } from '../modules/social/service.js';
+import type { PartyService } from '../modules/party/service.js';
+import type { MailService } from '../modules/mail/service.js';
+import type { LeaderboardService } from '../modules/leaderboard/service.js';
+import type { ArenaService } from '../modules/arena/service.js';
 import { characterStatsPayload, skillsOf } from '../modules/character/stats.js';
 import type { EquipmentService } from '../modules/equipment/service.js';
 import type { InventoryService } from '../modules/inventory/service.js';
@@ -67,6 +75,12 @@ export interface WorldServiceOptions {
   upgrade: UpgradeService;
   /** Nhiệm vụ (M5): luật nhận/trả, tiến độ và thưởng đều nằm trong service này. */
   quests: QuestService;
+  /** Các hệ thống xã hội M6; optional giữ tương thích với fixture kiểm thử tách lẻ. */
+  social?: SocialService;
+  party?: PartyService;
+  mail?: MailService;
+  leaderboard?: LeaderboardService;
+  arena?: ArenaService;
   /** Nhịp dùng chung: trận đấu đếm lượt và hết giờ trên cùng nhịp với phần còn lại của server. */
   tick: TickScheduler;
   /** Xác thực access token (dùng `app.jwt`); trả `undefined` nếu token sai hoặc hết hạn. */
@@ -202,6 +216,20 @@ export class WorldService {
     await this.options.quests.progressReach(character.id, room.map.id);
     // Chỉ số và túi đồ gửi ngay sau bản đồ: HUD cần chúng trước khi người chơi kịp đánh con quái nào.
     await this.sendCharacterState(session, character.id);
+    if (this.options.mail) {
+      await this.options.mail.ensureWelcome(character.id);
+      session.send(Opcode.S2C_MAILS, await this.options.mail.list(character.id));
+    }
+    if (this.options.social) {
+      session.send(Opcode.S2C_SOCIAL_UPDATE, await this.options.social.list(character.id));
+      await this.options.social.announcePresence(character.id);
+    }
+    if (this.options.party) {
+      session.send(Opcode.S2C_PARTY_UPDATE, await this.options.party.stateOf(character.id));
+    }
+    if (this.options.arena) {
+      session.send(Opcode.S2C_ARENA_STATE, await this.options.arena.state(character.id));
+    }
   }
 
   /**
@@ -216,7 +244,7 @@ export class WorldService {
     }
     const { room, player } = located;
 
-    if (this.battle.isBusy(player.id)) {
+    if (this.battle.isBusy(player.id) || this.options.arena?.isDueling(player.id)) {
       // Trong trận thì đứng yên: đánh nhau mà chạy lung tung sẽ phá vỡ luật khoảng cách của trận.
       session.sendError(ErrorCode.IN_BATTLE, 'đang trong trận đấu, không di chuyển được');
       return;
@@ -244,6 +272,10 @@ export class WorldService {
       return;
     }
     const { room, player } = located;
+    if (this.options.arena?.isDueling(player.id)) {
+      session.sendError(ErrorCode.IN_BATTLE, 'đang trong trận Lôi Đài, không thể chuyển bản đồ');
+      return;
+    }
 
     const portal = room.map.portalAt(player.x, player.y);
     if (!portal || portal.toMap !== request.mapId) {
@@ -271,24 +303,121 @@ export class WorldService {
     this.transfer(room, player, portal, session);
   }
 
-  /** `C2S_CHAT`: giới hạn tần suất theo từng người, rồi phát cho cả room kèm lịch sử gần nhất. */
-  chat(session: GameSession, chat: ChatSend): void {
+  /** `C2S_CHAT`: phát tin theo kênh bản đồ, thế giới, tổ đội hoặc riêng tư. */
+  async chat(session: GameSession, chat: ChatSend): Promise<void> {
     const located = this.locate(session);
     if (!located) {
       this.rejectNotInWorld(session);
       return;
     }
     const { room, player } = located;
-
-    if (!this.options.chat.allow(player.id)) {
+    const channel = chat.channel ?? 'map';
+    const interval = channel === 'world' ? WORLD_CHAT_MIN_INTERVAL_MS : CHAT_MIN_INTERVAL_MS;
+    if (!this.options.chat.allow(player.id, interval)) {
       session.sendError(
         ErrorCode.RATE_LIMITED,
-        `chậm thôi — mỗi ${CHAT_MIN_INTERVAL_MS / 1000} giây chỉ gửi được một tin nhắn`,
+        `chậm thôi — mỗi ${interval / 1000} giây chỉ gửi được một tin nhắn`,
       );
       return;
     }
 
-    room.sendChat(this.options.chat.mapMessage(player, chat.text, this.now()));
+    if (channel === 'map') {
+      room.sendChat(this.options.chat.mapMessage(player, chat.text, this.now()));
+      return;
+    }
+
+    const message: ChatMessage = {
+      channel,
+      fromId: player.id,
+      fromName: player.name,
+      text: chat.text,
+      at: this.now(),
+      ...(channel === 'private' && chat.to ? { toName: chat.to.trim() } : {}),
+    };
+    if (channel === 'world') {
+      for (const [, recipient] of this.options.sessions.entries()) {
+        recipient.send(Opcode.S2C_CHAT, message);
+      }
+      return;
+    }
+    if (channel === 'party') {
+      const members = this.options.party?.membersOf(player.id) ?? [];
+      if (members.length === 0) {
+        session.sendError(ErrorCode.NOT_IN_PARTY, 'bạn chưa ở trong tổ đội nào');
+        return;
+      }
+      for (const memberId of members) {
+        this.options.sessions.get(memberId)?.send(Opcode.S2C_CHAT, message);
+      }
+      return;
+    }
+
+    const target = chat.to ? await this.options.characters.findByName(chat.to) : undefined;
+    const recipient = target ? this.options.sessions.get(target.id) : undefined;
+    if (!target || !recipient) {
+      session.sendError(ErrorCode.CHARACTER_NOT_FOUND, `không tìm thấy người chơi đang trực tuyến "${chat.to ?? ''}"`);
+      return;
+    }
+    const privateMessage: ChatMessage = { ...message, toName: target.name };
+    recipient.send(Opcode.S2C_CHAT, privateMessage);
+    session.send(Opcode.S2C_CHAT, privateMessage);
+  }
+
+  /** Lệnh bạn bè. Tên nhân vật là địa chỉ; luật kiểm tra nằm trong SocialService. */
+  async friend(session: GameSession, action: 'request' | 'accept' | 'decline' | 'remove', name: string): Promise<void> {
+    const id = session.characterId;
+    const service = this.options.social;
+    if (!id || !service) { this.rejectNotInWorld(session); return; }
+    const result = await service[action](id, name);
+    if (!result.ok) session.sendError(result.code, result.message);
+  }
+
+  /** Lệnh tổ đội và các lời mời của đội. */
+  async partyCommand(session: GameSession, action: 'invite' | 'accept' | 'decline' | 'leave' | 'kick', name = ''): Promise<void> {
+    const id = session.characterId;
+    const service = this.options.party;
+    if (!id || !service) { this.rejectNotInWorld(session); return; }
+    const result = action === 'invite'
+      ? await service.invite(id, name)
+      : action === 'accept'
+        ? await service.accept(id, name)
+        : action === 'decline'
+          ? await service.decline(id, name)
+          : action === 'kick'
+            ? await service.kick(id, name)
+            : await service.leave(id);
+    if (!result.ok) session.sendError(result.code, result.message);
+  }
+
+  /** Nhận quà thư đúng một lần rồi cập nhật các phần trạng thái có thay đổi. */
+  async claimMail(session: GameSession, mailId: string): Promise<void> {
+    const id = session.characterId;
+    const service = this.options.mail;
+    if (!id || !service) { this.rejectNotInWorld(session); return; }
+    const result = await service.claim(id, mailId);
+    if (!result.ok) { session.sendError(result.code, result.message); return; }
+    session.send(Opcode.S2C_NOTIFY, { message: `Đã nhận ${result.yen} yên và ${result.items.length} vật phẩm.` } satisfies Notify);
+    session.send(Opcode.S2C_MAILS, await service.list(id));
+    await this.sendInventory(session, id);
+    await this.sendCharacterStats(session, id);
+  }
+
+  async leaderboard(session: GameSession, request: LeaderboardRequest): Promise<void> {
+    if (!this.options.leaderboard) { this.rejectNotInWorld(session); return; }
+    session.send(Opcode.S2C_LEADERBOARD, await this.options.leaderboard.top(request));
+  }
+
+  async arenaQueue(session: GameSession): Promise<void> {
+    const id = session.characterId;
+    if (!id || !this.locate(session) || !this.options.arena) { this.rejectNotInWorld(session); return; }
+    if (this.battle.isBusy(id)) { session.sendError(ErrorCode.IN_BATTLE, 'không thể vào Lôi Đài khi đang chiến đấu'); return; }
+    await this.options.arena.queuePlayer(id);
+  }
+
+  async arenaCancel(session: GameSession): Promise<void> {
+    const id = session.characterId;
+    if (!id || !this.options.arena) { this.rejectNotInWorld(session); return; }
+    await this.options.arena.cancel(id);
   }
 
   /**
@@ -524,7 +653,7 @@ export class WorldService {
 
   /** Nhận/trả nhiệm vụ khi đang đánh nhau là không được: hội thoại đã đóng lúc vào trận. */
   private rejectWhileDoingQuest(session: GameSession, characterId: string): boolean {
-    if (!this.battle.isBusy(characterId)) {
+    if (!this.battle.isBusy(characterId) && !this.options.arena?.isDueling(characterId)) {
       return false;
     }
     session.sendError(ErrorCode.IN_BATTLE, 'đang trong trận đấu, không nhận hay trả nhiệm vụ được');
@@ -698,6 +827,10 @@ export class WorldService {
       this.rejectNotInWorld(session);
       return;
     }
+    if (this.options.arena?.isEngaged(located.player.id)) {
+      session.sendError(ErrorCode.IN_BATTLE, 'không thể đánh quái khi đang xếp hàng hoặc đấu Lôi Đài');
+      return;
+    }
     void this.battle.engage({
       session,
       room: located.room,
@@ -708,11 +841,21 @@ export class WorldService {
 
   /** `C2S_BATTLE_ACTION`: hành động trong lượt của người chơi. */
   battleAction(session: GameSession, request: BattleAction): void {
+    const id = session.characterId;
+    if (id && this.options.arena?.isEngaged(id)) {
+      void this.options.arena.action(id, request);
+      return;
+    }
     void this.battle.action(session, request);
   }
 
   /** `C2S_USE_ITEM`: dùng vật phẩm hồi phục khi đang rảnh (trong trận phải đi qua lượt). */
   useItem(session: GameSession, request: UseItem): void {
+    const id = session.characterId;
+    if (id && this.options.arena?.isDueling(id)) {
+      session.sendError(ErrorCode.IN_BATTLE, 'không thể dùng vật phẩm trong trận Lôi Đài');
+      return;
+    }
     void this.battle.useItem(session, request);
   }
 
@@ -775,6 +918,13 @@ export class WorldService {
     // Rời trận trước khi rời bản đồ: người chơi biến khỏi trận, quái còn sống thì hồi đầy máu.
     this.battle.leave(characterId);
     this.options.sessions.release(characterId, session);
+    if (this.options.arena) void this.options.arena.leave(characterId);
+    if (this.options.social) {
+      void this.options.social.announcePresence(characterId);
+    }
+    if (this.options.party) {
+      void this.options.party.disconnect(characterId);
+    }
 
     if (!mapId) {
       return;
@@ -838,7 +988,7 @@ export class WorldService {
    * ở M3: chỉ số lúc vào trận là chỉ số dùng suốt trận, không đổi giữa chừng.
    */
   private rejectWhileInBattle(session: GameSession, characterId: string): boolean {
-    if (!this.battle.isBusy(characterId)) {
+    if (!this.battle.isBusy(characterId) && !this.options.arena?.isDueling(characterId)) {
       return false;
     }
     session.sendError(

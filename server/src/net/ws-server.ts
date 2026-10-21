@@ -19,6 +19,11 @@ import {
   type Move,
   type NpcTalk,
   type Ping,
+  type PersonName,
+  type PartyInvite,
+  type PartyReply,
+  type MailClaim,
+  type LeaderboardRequest,
   type QuestAccept,
   type QuestComplete,
   type ShopBuy,
@@ -358,7 +363,7 @@ export class WebSocketGateway {
         // Tin quá dài và gửi quá nhanh đều là vi phạm giới hạn tần suất → cùng mã `rate_limited`.
         const chat = this.decode<ChatSend>(session, op, payload, ErrorCode.RATE_LIMITED);
         if (chat) {
-          world.chat(session, chat);
+          await world.chat(session, chat);
         }
         return;
       }
@@ -397,6 +402,12 @@ export class WebSocketGateway {
         }
         return;
       }
+      case Opcode.C2S_ARENA_QUEUE:
+        if (this.decode(session, op, payload)) await world.arenaQueue(session);
+        return;
+      case Opcode.C2S_ARENA_CANCEL:
+        if (this.decode(session, op, payload)) await world.arenaCancel(session);
+        return;
       case Opcode.C2S_USE_ITEM: {
         const use = this.decode<UseItem>(session, op, payload);
         if (use) {
@@ -437,6 +448,44 @@ export class WebSocketGateway {
         if (request) {
           await world.upgrade(session, request);
         }
+        return;
+      }
+      case Opcode.C2S_FRIEND_REQUEST:
+      case Opcode.C2S_FRIEND_ACCEPT:
+      case Opcode.C2S_FRIEND_DECLINE:
+      case Opcode.C2S_FRIEND_REMOVE: {
+        const request = this.decode<PersonName>(session, op, payload);
+        if (request) {
+          const action = op === Opcode.C2S_FRIEND_REQUEST ? 'request'
+            : op === Opcode.C2S_FRIEND_ACCEPT ? 'accept'
+              : op === Opcode.C2S_FRIEND_DECLINE ? 'decline' : 'remove';
+          await world.friend(session, action, request.name);
+        }
+        return;
+      }
+      case Opcode.C2S_PARTY_INVITE:
+      case Opcode.C2S_PARTY_KICK: {
+        const request = this.decode<PartyInvite>(session, op, payload);
+        if (request) await world.partyCommand(session, op === Opcode.C2S_PARTY_INVITE ? 'invite' : 'kick', request.name);
+        return;
+      }
+      case Opcode.C2S_PARTY_ACCEPT:
+      case Opcode.C2S_PARTY_DECLINE: {
+        const request = this.decode<PartyReply>(session, op, payload);
+        if (request) await world.partyCommand(session, op === Opcode.C2S_PARTY_ACCEPT ? 'accept' : 'decline', request.leaderName);
+        return;
+      }
+      case Opcode.C2S_PARTY_LEAVE:
+        if (this.decode(session, op, payload)) await world.partyCommand(session, 'leave');
+        return;
+      case Opcode.C2S_MAIL_CLAIM: {
+        const request = this.decode<MailClaim>(session, op, payload);
+        if (request) await world.claimMail(session, request.mailId);
+        return;
+      }
+      case Opcode.C2S_LEADERBOARD: {
+        const request = this.decode<LeaderboardRequest>(session, op, payload);
+        if (request) await world.leaderboard(session, request);
         return;
       }
       case Opcode.C2S_HELLO:

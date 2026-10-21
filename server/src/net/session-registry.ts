@@ -27,6 +27,11 @@ export class SessionRegistry {
     }
   }
 
+  /** Mọi phiên đang hoạt động — kênh chat thế giới phát cho **tất cả** những người đang online. */
+  entries(): IterableIterator<readonly [string, GameSession]> {
+    return this.byCharacter.entries();
+  }
+
   get size(): number {
     return this.byCharacter.size;
   }
