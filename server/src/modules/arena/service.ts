@@ -153,6 +153,7 @@ export class ArenaService {
         ?.sendError(ErrorCode.ARENA_NOT_QUEUED, 'bạn không ở hàng chờ Lôi Đài');
       return;
     }
+    await this.sendState(characterId);
     await this.publishQueueStates();
   }
 

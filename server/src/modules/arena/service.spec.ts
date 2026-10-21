@@ -82,6 +82,20 @@ describe('Arena admission reservation', () => {
     }
     const tick = new TickScheduler();
     const arena = new ArenaService(db, gameData, characterService, equipment, sessions, tick);
+    await arena.queuePlayer(ids[1]!);
+    const beforeCancel = received.get(ids[1]!)!.length;
+    await arena.cancel(ids[1]!);
+    expect(
+      received
+        .get(ids[1]!)!
+        .slice(beforeCancel)
+        .some(
+          (packet) =>
+            packet.op === Opcode.S2C_ARENA_STATE &&
+            (packet.payload as { queued: boolean }).queued === false,
+        ),
+    ).toBe(true);
+    for (const packets of received.values()) packets.length = 0;
     const queueGate = deferred();
     const queueStarted = deferred();
     const pairGate = deferred();
