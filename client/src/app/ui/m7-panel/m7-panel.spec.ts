@@ -90,4 +90,18 @@ describe('M7Panel', () => {
     expect(text).toContain('Bạn đã nhận vật phẩm boss hôm nay (UTC).');
     expect(text).not.toContain('Giới hạn: 1 vật phẩm / ngày UTC / nhân vật.');
   });
+
+  it('disables the login reward claim after the server marks it claimed', async () => {
+    await TestBed.configureTestingModule({ imports: [M7Panel] }).compileComponents();
+    fixture = TestBed.createComponent(M7Panel);
+    fixture.componentRef.setInput('state', {
+      ...state,
+      event: { ...state.event, loginClaimed: true },
+    });
+    fixture.detectChanges();
+
+    const button = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('.action');
+    expect(button?.disabled).toBe(true);
+    expect(button?.textContent?.trim()).toBe('Đã nhận quà hôm nay');
+  });
 });
