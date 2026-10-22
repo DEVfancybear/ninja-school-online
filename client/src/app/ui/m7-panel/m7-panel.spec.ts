@@ -114,6 +114,24 @@ describe('M7Panel', () => {
     expect(text).not.toContain('15 phút đầu mỗi giờ UTC');
   });
 
+  it('reveals boss loot from the server after the loading state', async () => {
+    await TestBed.configureTestingModule({ imports: [M7Panel] }).compileComponents();
+    fixture = TestBed.createComponent(M7Panel);
+    fixture.detectChanges();
+
+    let text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).not.toContain('Vật phẩm đặc biệt:');
+
+    fixture.componentRef.setInput('state', {
+      ...state,
+      boss: { ...state.boss, lootQty: 2, lootItemId: 'item-server-response' },
+    });
+    fixture.detectChanges();
+
+    text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Vật phẩm đặc biệt: 2 × item-server-response.');
+  });
+
   it('shows the server-owned daily loot claim state', async () => {
     await TestBed.configureTestingModule({ imports: [M7Panel] }).compileComponents();
     fixture = TestBed.createComponent(M7Panel);
