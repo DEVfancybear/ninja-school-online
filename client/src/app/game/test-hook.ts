@@ -17,6 +17,7 @@ declare global {
 
 /** Một con quái đang vẽ trên bản đồ, đủ để e2e kiểm tra thanh máu. */
 export interface NinjaTestMonster {
+  readonly id: string;
   readonly name: string;
   readonly hp: number;
   readonly maxHp: number;
@@ -233,6 +234,8 @@ export interface NinjaWorldTestHook {
    * game thì bấm theo vị trí, nhưng nhiều con cùng loại có cùng tên nên kiểm thử cần quy ước này).
    */
   attackMonster(name: string): void;
+  /** Bấm vào đúng quái theo ID do máy chủ cấp; dùng khi nhiều client cùng nhắm một thực thể. */
+  attackMonsterById(id: string): void;
   /** Bấm vào con quái thứ `index` trong danh sách đang vẽ, kể cả con đã gục (bấm theo vị trí). */
   attackMonsterAt(index: number): void;
   battle(): NinjaTestBattle | null;
@@ -269,6 +272,8 @@ export interface NinjaWorldTestActions {
   /** Mô phỏng đúng việc người chơi bấm chuột vào một thực thể. */
   clickEntity(name: string): void;
   attackMonster(name: string): void;
+  /** Bấm vào đúng quái theo ID do máy chủ cấp; dùng khi nhiều client cùng nhắm một thực thể. */
+  attackMonsterById(id: string): void;
   /** Bấm vào con quái thứ `index` trong danh sách đang vẽ, kể cả con đã gục (bấm theo vị trí). */
   attackMonsterAt(index: number): void;
   useItem(itemId: string): void;
@@ -323,6 +328,9 @@ export class WorldTestHook {
       },
       attackMonster: (name) => {
         actions.attackMonster(name);
+      },
+      attackMonsterById: (id) => {
+        actions.attackMonsterById(id);
       },
       attackMonsterAt: (index) => {
         actions.attackMonsterAt(index);
@@ -397,6 +405,7 @@ export class WorldTestHook {
       .entities()
       .filter((entity) => entity.kind === 'monster')
       .map((entity) => ({
+        id: entity.id,
         name: entity.name,
         hp: entity.hp ?? 0,
         maxHp: entity.maxHp ?? 0,

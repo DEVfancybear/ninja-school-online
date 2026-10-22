@@ -366,6 +366,10 @@ export class Play implements OnInit, OnDestroy {
           this.onAttackMonster(monster.id);
         }
       },
+      attackMonsterById: (id) => {
+        const monster = this.world.entities().find((entity) => entity.id === id && entity.kind === 'monster');
+        if (monster) this.onAttackMonster(monster.id);
+      },
       attackMonsterAt: (index) => {
         const monster = this.world.entities().filter((entity) => entity.kind === 'monster')[index];
         if (monster) {
