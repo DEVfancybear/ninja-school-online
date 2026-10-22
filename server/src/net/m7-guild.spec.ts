@@ -135,6 +135,33 @@ describe('bang hội M7', () => {
     const members = await guildService.stateOf(leader.characterId);
     expect(members.guild?.members).toHaveLength(3);
   });
+
+  it('refreshes online presence for guild members on login and disconnect', async () => {
+    const leader = await connectPlayer('Lead');
+    suffix += 1;
+    const memberName = `M7P${String(suffix).padStart(4, '0')}`;
+    const memberAccount = await accountWithCharacter(server.app, `m7presence${suffix}`, memberName);
+
+    const createMark = leader.client.mark();
+    leader.client.send(Opcode.C2S_GUILD_CREATE, { name: 'Presence Guild' });
+    await leader.client.waitForSince(createMark, Opcode.S2C_GUILD_UPDATE, (payload) => (payload as { guild?: { name?: string } }).guild?.name === 'Presence Guild');
+
+    await guildService.join(memberAccount.characterId, 'Presence Guild');
+
+    const memberClient = await TestGameClient.connect(server.wsUrl);
+    clients.push(memberClient);
+    const onlineMark = leader.client.mark();
+    await memberClient.hello({ access: memberAccount.access, characterId: memberAccount.characterId });
+    await leader.client.waitForSince(onlineMark, Opcode.S2C_GUILD_UPDATE, (payload) =>
+      (payload as { guild?: { members?: Array<{ name: string; online: boolean }> } }).guild?.members?.some((member) => member.name === memberName && member.online) === true,
+    );
+
+    const disconnectedMark = leader.client.mark();
+    await memberClient.close();
+    await leader.client.waitForSince(disconnectedMark, Opcode.S2C_GUILD_UPDATE, (payload) =>
+      (payload as { guild?: { members?: Array<{ name: string; online: boolean }> } }).guild?.members?.some((member) => member.name === memberName && !member.online) === true,
+    );
+  });
 });
 
 describe('event đầu tiên và boss field M7', () => {

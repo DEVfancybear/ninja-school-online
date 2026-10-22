@@ -125,6 +125,11 @@ export class GuildService {
     return membership ? this.memberIds(membership.guildId) : [];
   }
 
+  async announcePresence(characterId: string, excludeCharacterId?: string): Promise<void> {
+    const memberIds = await this.membersOf(characterId);
+    await this.push(...memberIds.filter((memberId) => memberId !== excludeCharacterId));
+  }
+
   async stateOf(characterId: string): Promise<GuildUpdate> {
     const [membership] = await this.db.select({ guildId: guildMembers.guildId }).from(guildMembers).where(eq(guildMembers.characterId, characterId)).limit(1);
     if (!membership) return { guild: null, maxMembers: GUILD_MAX_MEMBERS };

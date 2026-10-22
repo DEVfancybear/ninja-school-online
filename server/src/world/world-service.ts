@@ -244,6 +244,7 @@ export class WorldService {
     }
     if (this.options.guild) {
       session.send(Opcode.S2C_GUILD_UPDATE, await this.options.guild.stateOf(character.id));
+      await this.options.guild.announcePresence(character.id, character.id);
     }
     if (this.options.m7) {
       session.send(Opcode.S2C_M7_STATE, await this.options.m7.state(character.id));
@@ -978,6 +979,9 @@ export class WorldService {
     if (this.options.arena) void this.options.arena.leave(characterId);
     if (this.options.social) {
       void this.options.social.announcePresence(characterId);
+    }
+    if (this.options.guild) {
+      void this.options.guild.announcePresence(characterId, characterId);
     }
     if (this.options.party) {
       void this.options.party.disconnect(characterId);
