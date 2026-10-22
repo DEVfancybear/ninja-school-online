@@ -181,7 +181,7 @@ export class BattleService {
 
     const monster = room.monsters().find((candidate) => candidate.id === targetId);
     if (monster?.monsterId === FIELD_BOSS_ID && !this.options.isFieldBossActive?.()) {
-      session.sendError(ErrorCode.BOSS_CLOSED, 'Thú Vương chỉ xuất hiện trong 15 phút đầu mỗi giờ UTC');
+      session.sendError(ErrorCode.BOSS_CLOSED, 'Thú Vương hiện không xuất hiện theo lịch; hãy quay lại trong khung giờ hoạt động');
       return;
     }
     if (!monster || !monster.alive) {
@@ -212,7 +212,7 @@ export class BattleService {
           return;
         }
         if (currentMonster.monsterId === FIELD_BOSS_ID && !this.options.isFieldBossActive?.()) {
-          session.sendError(ErrorCode.BOSS_CLOSED, 'Thú Vương chỉ xuất hiện trong 15 phút đầu mỗi giờ UTC');
+          session.sendError(ErrorCode.BOSS_CLOSED, 'Thú Vương hiện không xuất hiện theo lịch; hãy quay lại trong khung giờ hoạt động');
           return;
         }
         if (distance(player.x, player.y, currentMonster.x, currentMonster.y) > MONSTER_ENGAGE_RANGE_PX) {

@@ -31,6 +31,7 @@ describe('nạp game-data', () => {
       'mob-bui-nhon',
       'mob-chuot-dong',
       'mob-heo-rung',
+      'mob-thu-vuong',
     ]);
     expect([...data.classes.keys()].sort()).toEqual(['haruna', 'hirosaki', 'ookaza']);
     expect(data.items.size).toBeGreaterThan(0);

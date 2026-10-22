@@ -65,15 +65,16 @@ describe('ChatPanel', () => {
     return element().querySelector<HTMLButtonElement>('.chat-send');
   }
 
-  it('có đủ bốn kênh với nhãn tiếng Việt và mặc định là kênh bản đồ', async () => {
+  it('có đủ năm kênh với nhãn tiếng Việt và mặc định là kênh bản đồ', async () => {
     fixture = await setup();
 
     const options = [...element().querySelectorAll<HTMLOptionElement>('.chat-channel option')];
-    expect(options.map((option) => option.value)).toEqual(['map', 'world', 'party', 'private']);
+    expect(options.map((option) => option.value)).toEqual(['map', 'world', 'party', 'guild', 'private']);
     expect(options.map((option) => option.textContent?.trim())).toEqual([
       'Bản đồ',
       'Thế giới',
       'Tổ đội',
+      'Bang',
       'Riêng',
     ]);
     expect(element().querySelector<HTMLSelectElement>('.chat-channel')?.value).toBe('map');

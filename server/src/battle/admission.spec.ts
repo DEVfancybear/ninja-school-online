@@ -193,8 +193,11 @@ describe('PvE admission reservation', () => {
     });
     try {
       await battle.engage({ session, room, player, targetId: boss!.id });
-      expect(messages.filter((message) => message.op === Opcode.S2C_ERROR).map((message) => (message.payload as { code: ErrorCode }).code))
-        .toEqual([ErrorCode.BOSS_CLOSED]);
+      const errors = messages.filter((message) => message.op === Opcode.S2C_ERROR);
+      expect(errors.map((message) => (message.payload as { code: ErrorCode }).code)).toEqual([ErrorCode.BOSS_CLOSED]);
+      expect(errors.map((message) => (message.payload as { message: string }).message)).toEqual([
+        'Thú Vương hiện không xuất hiện theo lịch; hãy quay lại trong khung giờ hoạt động',
+      ]);
       expect(messages.some((message) => message.op === Opcode.S2C_BATTLE_START)).toBe(false);
     } finally {
       battle.dispose();
