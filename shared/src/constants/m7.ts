@@ -28,6 +28,9 @@ export const DEFAULT_FIELD_BOSS_SCHEDULE: FieldBossSchedule = {
   windowMinutes: FIELD_BOSS_WINDOW_MINUTES,
   startOffsetMinutes: FIELD_BOSS_START_MINUTE_UTC,
 };
+/** Scheduled field boss battles support a three-player guild co-op; ordinary PvE stays at two. */
+export const FIELD_BOSS_MAX_PLAYERS = 3;
+
 export const FIELD_BOSS_DAILY_LOOT = { itemId: 'item-da-vun', qty: 1 } as const;
 
 /** UTC calendar date used for all M7 daily claim keys; never depends on server local timezone. */

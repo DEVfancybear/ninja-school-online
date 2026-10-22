@@ -5,6 +5,7 @@ import {
   ErrorCode,
   FIELD_BOSS_DAILY_LOOT,
   FIELD_BOSS_ID,
+  FIELD_BOSS_MAX_PLAYERS,
   MONSTER_ENGAGE_RANGE_PX,
   MONSTER_TURN_DELAY_MS,
   Opcode,
@@ -166,7 +167,7 @@ export class BattleService {
 
   /**
    * `C2S_ATTACK_MOB`: chạm vào một con quái để vào trận. Quái đã có trận thì **vào chung** trận đó
-   * (tối đa `BATTLE_MAX_PLAYERS` người), chưa có thì mở trận mới.
+   * (PvE tối đa `BATTLE_MAX_PLAYERS`, boss dã ngoại tối đa `FIELD_BOSS_MAX_PLAYERS`), chưa có thì mở trận mới.
    */
   async engage(request: EngageRequest): Promise<void> {
     const { session, room, player, targetId } = request;
@@ -207,10 +208,11 @@ export class BattleService {
 
       const existing = this.battleForMonster(room.map.id, monster.id);
       if (existing) {
-        if (existing.players.size >= BATTLE_MAX_PLAYERS) {
+        const playerLimit = monster.monsterId === FIELD_BOSS_ID ? FIELD_BOSS_MAX_PLAYERS : BATTLE_MAX_PLAYERS;
+        if (existing.players.size >= playerLimit) {
           session.sendError(
             ErrorCode.INVALID_TARGET,
-            `trận này đã đủ ${BATTLE_MAX_PLAYERS} người, hãy tìm con quái khác`,
+            `trận này đã đủ ${playerLimit} người, hãy tìm con quái khác`,
           );
           return;
         }

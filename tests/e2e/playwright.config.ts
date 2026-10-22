@@ -1,14 +1,21 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const SERVER_PORT = Number(process.env.NINJA_E2E_SERVER_PORT ?? 3000);
+const DEDICATED_DATABASE_URL = process.env.NINJA_E2E_DATABASE_URL;
+const DEDICATED_DATABASE_NAME = DEDICATED_DATABASE_URL
+  ? new URL(DEDICATED_DATABASE_URL).pathname.slice(1)
+  : undefined;
+if (DEDICATED_DATABASE_URL && DEDICATED_DATABASE_NAME !== 'ninja_m7_e2e') {
+  throw new Error('Dedicated E2E database must be exactly `ninja_m7_e2e`; refusing to run.');
+}
+
+const SERVER_PORT = Number(process.env.NINJA_E2E_SERVER_PORT ?? (DEDICATED_DATABASE_URL ? 3307 : 3000));
 const SERVER_URL = `http://127.0.0.1:${SERVER_PORT}`;
 /**
- * Cổng server/client khi chạy E2E. Dùng `NINJA_E2E_SERVER_PORT` và `NINJA_E2E_CLIENT_PORT` để
- * tránh chạm dev server người dùng; proxy của client trỏ vào đúng server-port này.
+ * Cổng server/client khi chạy E2E. Chế độ DB riêng mặc định tránh cổng dev; có thể ghi đè bằng
+ * `NINJA_E2E_SERVER_PORT` / `NINJA_E2E_CLIENT_PORT` để cùng proxy trỏ vào đúng server-port này.
  */
-const CLIENT_PORT = Number(process.env.NINJA_E2E_CLIENT_PORT ?? 4200);
+const CLIENT_PORT = Number(process.env.NINJA_E2E_CLIENT_PORT ?? (DEDICATED_DATABASE_URL ? 4307 : 4200));
 const CLIENT_URL = `http://127.0.0.1:${CLIENT_PORT}`;
-const DEDICATED_DATABASE_URL = process.env.NINJA_E2E_DATABASE_URL;
 const REUSE_SERVER = !process.env.CI && !DEDICATED_DATABASE_URL;
 
 /**
@@ -39,7 +46,14 @@ export default defineConfig({
         HOST: '127.0.0.1',
         PORT: String(SERVER_PORT),
         CORS_ORIGIN: CLIENT_URL,
-        ...(DEDICATED_DATABASE_URL ? { DATABASE_URL: DEDICATED_DATABASE_URL } : {}),
+        ...(DEDICATED_DATABASE_URL
+          ? {
+              DATABASE_URL: DEDICATED_DATABASE_URL,
+              FIELD_BOSS_INTERVAL_MINUTES: '1',
+              FIELD_BOSS_WINDOW_MINUTES: '1',
+              FIELD_BOSS_START_OFFSET_MINUTES: '0',
+            }
+          : {}),
       },
       reuseExistingServer: REUSE_SERVER,
       timeout: 120_000,
