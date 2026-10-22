@@ -58,4 +58,22 @@ describe('M7Panel', () => {
     expect(text).toContain('10:03 UTC–10:04 UTC');
     expect(text).not.toContain('15 phút đầu mỗi giờ UTC');
   });
+
+  it('renders a configured boss window that crosses UTC midnight', async () => {
+    await TestBed.configureTestingModule({ imports: [M7Panel] }).compileComponents();
+    fixture = TestBed.createComponent(M7Panel);
+    fixture.componentRef.setInput('state', {
+      ...state,
+      boss: {
+        ...state.boss,
+        windowStartsAt: Date.parse('2026-10-22T23:59:00.000Z'),
+        windowEndsAt: Date.parse('2026-10-23T00:14:00.000Z'),
+      },
+    });
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('23:59 UTC–00:14 UTC');
+    expect(text).not.toContain('15 phút đầu mỗi giờ UTC');
+  });
 });
