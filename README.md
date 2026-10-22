@@ -2,7 +2,7 @@
 
 Dự án game **nhập vai 2D nhiều người chơi (MMORPG nhẹ)**, chiến đấu theo lượt, **chơi trực tiếp trên trình duyệt** (máy tính + mobile web), lấy cảm hứng từ dòng game "Ninja School Online" nổi tiếng ở Việt Nam.
 
-> **Trạng thái:** đã triển khai các mốc M0–M6; M6 kết thúc Alpha sau CI trình duyệt cuối và kiểm chứng độc lập. M0–M3 là nền tảng/MVP, M4 trang bị/shop/cường hóa, M5 nhiệm vụ chương 1, M6 xã hội và PvP. Mốc tiếp theo là M7 (bang hội, boss, sự kiện).
+> **Trạng thái:** đã triển khai các mốc M0–M7; M6 kết thúc Alpha sau CI trình duyệt cuối và kiểm chứng độc lập. M0–M3 là nền tảng/MVP, M4 trang bị/shop/cường hóa, M5 nhiệm vụ chương 1, M6 xã hội và PvP, M7 bang hội/boss/sự kiện. M7 đã qua CI, browser E2E cô lập và kiểm chứng độc lập.
 > Chơi được trên web: đăng ký/đăng nhập, tạo nhân vật, vào thế giới 2D bằng WebSocket, đi lại và chat; nói chuyện với NPC, làm nhiệm vụ; mua/bán, mặc trang bị và cường hóa; chiến đấu PvE/PvP theo lượt; kết bạn, lập tổ đội, chat thế giới/tổ đội/riêng, vào Lôi Đài xếp hạng, xem bảng xếp hạng và nhận thư hệ thống. Dữ liệu tài khoản/nhân vật/túi đồ/xã hội/Arena lưu hoặc được đồng bộ từ PostgreSQL.
 
 ## Lệnh nhanh
@@ -92,7 +92,7 @@ Các thư mục `client/`, `server/`, `shared/`, `tools/data-validator/` đã c�
 - [x] **M4:** trang bị theo ô, shop mua/bán và cường hóa.
 - [x] **M5:** nhiệm vụ chính tuyến chương 1.
 - [x] **M6 — kết thúc Alpha:** bạn bè, tổ đội, chat thế giới/tổ đội/riêng, Lôi Đài 1v1 và Elo, bảng xếp hạng, thư hệ thống. Migration, tests, E2E và CI: [roadmap](docs/03-plan/roadmap.md).
-- [ ] **M7:** bang hội, boss và sự kiện.
+- [x] **M7:** bang hội (tạo/tham gia/rời/chat/cấp), boss dã ngoại co-op có giới hạn quà/ngày, sự kiện quà đăng nhập + nhiệm vụ. Mặc định triển khai và kiểm chứng: [M7 details](docs/03-plan/m7-guild-boss-event.md).
 - [ ] Quyết định có đổi tên sản phẩm hay không (xem mục 6).
 
 ## 6. Lưu ý bản quyền (đọc kỹ)

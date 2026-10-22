@@ -359,23 +359,27 @@ describe('luật trong trận', () => {
     const start = await client.waitFor<BattleStart>(Opcode.S2C_BATTLE_START);
 
     // Gửi hai lệnh trong cùng một lượt: lệnh thứ hai chắc chắn không còn là lượt của mình.
+    const firstActionMark = client.mark();
     client.send(Opcode.C2S_BATTLE_ACTION, {
       battleId: start.battleId,
       action: 'attack',
       targetId: SCARECROW_ID,
     });
-    await client.waitFor<BattleResult>(Opcode.S2C_BATTLE_RESULT);
-    client.send(Opcode.C2S_BATTLE_ACTION, {
-      battleId: start.battleId,
-      action: 'attack',
-      targetId: SCARECROW_ID,
-    });
+    await client.waitForSince<BattleResult>(firstActionMark, Opcode.S2C_BATTLE_RESULT);
 
-    const error = await client.waitForError(ErrorCode.NOT_YOUR_TURN, 8000).catch(async () => {
-      // Nếu quái vừa được tới lượt thì lệnh bị từ chối vì đang là lượt của quái — cùng ý nghĩa.
-      return (await client.waitForError()) as ServerError;
+    const rejectedActionMark = client.mark();
+    client.send(Opcode.C2S_BATTLE_ACTION, {
+      battleId: start.battleId,
+      action: 'attack',
+      targetId: SCARECROW_ID,
     });
-    expect([ErrorCode.NOT_YOUR_TURN]).toContain(error.code);
+    const error = await client.waitForSince<ServerError>(
+      rejectedActionMark,
+      Opcode.S2C_ERROR,
+      (payload) => (payload as ServerError).code === ErrorCode.NOT_YOUR_TURN,
+      8000,
+    );
+    expect(error.code).toBe(ErrorCode.NOT_YOUR_TURN);
     expect(characterId).toBeTruthy();
   });
 
