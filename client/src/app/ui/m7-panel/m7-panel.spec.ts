@@ -6,7 +6,7 @@ import {
   M7_EVENT_ID,
   M7_EVENT_QUEST_ID,
 } from '@ninja/shared';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { M7Panel } from './m7-panel';
 
 const state: M7State = {
@@ -103,6 +103,21 @@ describe('M7Panel', () => {
     const button = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('.action');
     expect(button?.disabled).toBe(true);
     expect(button?.textContent?.trim()).toBe('Đã nhận quà hôm nay');
+  });
+
+  it('emits one login-claim request when the enabled button is clicked', async () => {
+    await TestBed.configureTestingModule({ imports: [M7Panel] }).compileComponents();
+    fixture = TestBed.createComponent(M7Panel);
+    fixture.componentRef.setInput('state', state);
+    fixture.detectChanges();
+
+    const onClaim = vi.fn();
+    fixture.componentInstance.claimLogin.subscribe(onClaim);
+    const button = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('.action');
+    expect(button).not.toBeNull();
+    expect(button!.disabled).toBe(false);
+    button!.click();
+    expect(onClaim).toHaveBeenCalledTimes(1);
   });
 
   it('shows server-reported quest progress before completion', async () => {
