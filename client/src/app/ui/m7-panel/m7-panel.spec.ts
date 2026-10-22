@@ -71,6 +71,20 @@ describe('M7Panel', () => {
     expect(text).not.toContain('15 phút đầu mỗi giờ UTC');
   });
 
+  it('renders the server-reported active boss status', async () => {
+    await TestBed.configureTestingModule({ imports: [M7Panel] }).compileComponents();
+    fixture = TestBed.createComponent(M7Panel);
+    fixture.componentRef.setInput('state', {
+      ...state,
+      boss: { ...state.boss, active: true },
+    });
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Đang mở · 2026-10-22 10:03 UTC–2026-10-22 10:04 UTC');
+    expect(text).not.toContain('Đang đóng');
+  });
+
   it('renders a configured boss window that crosses UTC midnight', async () => {
     await TestBed.configureTestingModule({ imports: [M7Panel] }).compileComponents();
     fixture = TestBed.createComponent(M7Panel);
