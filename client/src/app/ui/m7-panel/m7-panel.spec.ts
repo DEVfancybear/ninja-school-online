@@ -142,13 +142,13 @@ describe('M7Panel', () => {
       ...state,
       event: {
         ...state.event,
-        quest: { ...state.event.quest, progress: 0, complete: false, rewarded: false },
+        quest: { ...state.event.quest, progress: 1, target: 2, complete: false, rewarded: false },
       },
     });
     fixture.detectChanges();
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('Tiến độ: 0 / 1 · Đang thực hiện');
+    expect(text).toContain('Tiến độ: 1 / 2 · Đang thực hiện');
     expect(text).toContain('Phần thưởng tự gửi vào hộp thư khi hoàn thành.');
   });
 
