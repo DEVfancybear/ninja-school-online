@@ -117,12 +117,18 @@ describe('M7Panel', () => {
     fixture = TestBed.createComponent(M7Panel);
     fixture.componentRef.setInput('state', {
       ...state,
-      boss: { ...state.boss, dailyLootClaimed: true },
+      boss: {
+        ...state.boss,
+        dailyLootClaimed: true,
+        lootQty: 4,
+        lootItemId: 'item-claimed-loot',
+      },
     });
     fixture.detectChanges();
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('Bạn đã nhận vật phẩm boss hôm nay (UTC).');
+    expect(text).toContain('Vật phẩm đặc biệt: 4 × item-claimed-loot.');
     expect(text).not.toContain('Giới hạn: 1 vật phẩm / ngày UTC / nhân vật.');
   });
 
