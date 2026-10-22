@@ -36,6 +36,13 @@
       "when": 1792575631662,
       "tag": "0004_social_arena_mail",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792662031662,
+      "tag": "0005_m7_guild_boss_events",
+      "breakpoints": true
     }
   ]
 }

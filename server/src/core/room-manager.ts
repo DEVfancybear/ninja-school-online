@@ -2,12 +2,14 @@ import type { GameData } from '../world/game-data.js';
 import { MapInstance, type MapPortal } from '../world/map.js';
 import { Room, type RoomPlayer } from '../world/room.js';
 import type { TickScheduler } from './tick.js';
+import { FIELD_BOSS_MAP_ID, isFieldBossActive, type FieldBossSchedule } from '@ninja/shared';
 
 export interface RoomManagerOptions {
   gameData: GameData;
   tick: TickScheduler;
   /** Đồng hồ dùng để hẹn giờ quái sống lại; kiểm thử truyền đồng hồ giả. */
   now?: () => number;
+  fieldBossSchedule?: FieldBossSchedule;
   /** Báo lỗi khi một room hỏng trong nhịp tick — một room lỗi không được làm chết cả server. */
   onError?: (error: unknown, mapId: string) => void;
   /**
@@ -50,7 +52,8 @@ export class RoomManager {
     if (!map) {
       return undefined;
     }
-    const room = new Room(map, this.options.gameData.npcs, this.options.gameData.monsters);
+    const active = mapId === FIELD_BOSS_MAP_ID && isFieldBossActive((this.options.now ?? Date.now)(), this.options.fieldBossSchedule);
+    const room = new Room(map, this.options.gameData.npcs, this.options.gameData.monsters, active);
     this.rooms.set(mapId, room);
     return room;
   }
@@ -84,9 +87,11 @@ export class RoomManager {
   private tickAll(): void {
     for (const room of [...this.rooms.values()]) {
       try {
+        const now = (this.options.now ?? Date.now)();
+        if (room.map.id === FIELD_BOSS_MAP_ID) room.setFieldBossActive(isFieldBossActive(now, this.options.fieldBossSchedule));
         // Một room có thể bị xoá trong lúc xử lý cổng (người cuối cùng vừa đi khỏi), nên duyệt
         // trên bản sao danh sách room.
-        for (const crossing of room.tick((this.options.now ?? Date.now)())) {
+        for (const crossing of room.tick(now)) {
           this.options.onPortal?.(room, crossing.player, crossing.portal);
         }
       } catch (error) {

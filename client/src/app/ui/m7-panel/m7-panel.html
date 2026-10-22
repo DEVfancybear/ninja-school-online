@@ -1,0 +1,35 @@
+<section class="m7-panel" role="region" aria-labelledby="m7-title">
+  <header>
+    <h2 id="m7-title">Sự kiện & Thú Vương</h2>
+    <button class="close" type="button" aria-label="Đóng bảng sự kiện" (click)="closed.emit()">Đóng</button>
+  </header>
+  @if (state(); as current) {
+    <section aria-labelledby="event-title">
+      <h3 id="event-title">Sự kiện đầu tiên</h3>
+      @if (current.event.enabled) {
+        <p>Ngày tính thưởng: {{ current.event.utcDay }} (UTC). Mốc làm mới hằng ngày: 00:00 UTC.</p>
+        <button class="action" type="button" [disabled]="current.event.loginClaimed" (click)="claimLogin.emit()">
+          {{ current.event.loginClaimed ? 'Đã nhận quà hôm nay' : 'Nhận quà đăng nhập' }}
+        </button>
+        <p>Quà gửi vào hộp thư: {{ current.event.loginReward.yen }} yên và {{ current.event.loginReward.items[0]?.qty ?? 0 }} vật phẩm.</p>
+        <div class="quest">
+          <strong>{{ current.event.quest.name }}</strong>
+          <p>{{ current.event.quest.description }}</p>
+          <p>Tiến độ: {{ current.event.quest.progress }} / {{ current.event.quest.target }} · {{ current.event.quest.complete ? 'Hoàn thành' : 'Đang thực hiện' }}</p>
+          <p>{{ current.event.quest.rewarded ? 'Thưởng đã gửi vào hộp thư.' : 'Phần thưởng tự gửi vào hộp thư khi hoàn thành.' }}</p>
+        </div>
+      } @else {
+        <p>Event hiện đang tạm đóng.</p>
+      }
+    </section>
+    <section aria-labelledby="boss-title">
+      <h3 id="boss-title">{{ current.boss.name }}</h3>
+      <p>Bản đồ: {{ current.boss.mapId }}</p>
+      <p>{{ current.boss.active ? 'Đang mở' : 'Đang đóng' }} · {{ utcTime(current.boss.windowStartsAt) }}–{{ utcTime(current.boss.windowEndsAt) }}</p>
+      <p>Lịch: 15 phút đầu mỗi giờ UTC. Vật phẩm đặc biệt: {{ current.boss.lootQty }} × {{ current.boss.lootItemId }}.</p>
+      <p>{{ current.boss.dailyLootClaimed ? 'Bạn đã nhận vật phẩm boss hôm nay (UTC).' : 'Giới hạn: 1 vật phẩm / ngày UTC / nhân vật.' }}</p>
+    </section>
+  } @else {
+    <p role="status">Đang tải trạng thái sự kiện…</p>
+  }
+</section>

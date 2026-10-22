@@ -3,9 +3,11 @@ import { ArenaState } from '../net/arena-state';
 import { BattleState } from '../net/battle-state';
 import { MailState } from '../net/mail-state';
 import { PartyState } from '../net/party-state';
+import { GuildState } from '../net/guild-state';
+import { M7ClientState } from '../net/m7-state';
 import { SocialState } from '../net/social-state';
 import { WorldState } from '../net/world-state';
-import type { SocialPerson } from '@ninja/shared';
+import type { GuildUpdate, M7State, SocialPerson } from '@ninja/shared';
 import type { Point } from './world-logic';
 
 declare global {
@@ -17,6 +19,7 @@ declare global {
 
 /** Một con quái đang vẽ trên bản đồ, đủ để e2e kiểm tra thanh máu. */
 export interface NinjaTestMonster {
+  readonly id: string;
   readonly name: string;
   readonly hp: number;
   readonly maxHp: number;
@@ -233,6 +236,8 @@ export interface NinjaWorldTestHook {
    * game thì bấm theo vị trí, nhưng nhiều con cùng loại có cùng tên nên kiểm thử cần quy ước này).
    */
   attackMonster(name: string): void;
+  /** Bấm vào đúng quái theo ID do máy chủ cấp; dùng khi nhiều client cùng nhắm một thực thể. */
+  attackMonsterById(id: string): void;
   /** Bấm vào con quái thứ `index` trong danh sách đang vẽ, kể cả con đã gục (bấm theo vị trí). */
   attackMonsterAt(index: number): void;
   battle(): NinjaTestBattle | null;
@@ -259,6 +264,10 @@ export interface NinjaWorldTestHook {
   social(): NinjaTestSocial;
   /** Tổ đội đang vẽ. */
   party(): NinjaTestParty;
+  /** Bang hội do server trả về. */
+  guild(): GuildUpdate;
+  /** Trạng thái event/boss do server trả về; null đến khi handshake hoàn tất. */
+  m7(): M7State | null;
   /** Hàng chờ và điểm Lôi Đài đang vẽ. */
   arena(): NinjaTestArena;
   /** Hộp thư đang vẽ, kèm quà của từng lá. */
@@ -269,6 +278,8 @@ export interface NinjaWorldTestActions {
   /** Mô phỏng đúng việc người chơi bấm chuột vào một thực thể. */
   clickEntity(name: string): void;
   attackMonster(name: string): void;
+  /** Bấm vào đúng quái theo ID do máy chủ cấp; dùng khi nhiều client cùng nhắm một thực thể. */
+  attackMonsterById(id: string): void;
   /** Bấm vào con quái thứ `index` trong danh sách đang vẽ, kể cả con đã gục (bấm theo vị trí). */
   attackMonsterAt(index: number): void;
   useItem(itemId: string): void;
@@ -295,6 +306,8 @@ export class WorldTestHook {
   private readonly battleState = inject(BattleState);
   private readonly socialState = inject(SocialState);
   private readonly partyState = inject(PartyState);
+  private readonly guildState = inject(GuildState);
+  private readonly m7State = inject(M7ClientState);
   private readonly arenaState = inject(ArenaState);
   private readonly mailState = inject(MailState);
   private installed = false;
@@ -323,6 +336,9 @@ export class WorldTestHook {
       },
       attackMonster: (name) => {
         actions.attackMonster(name);
+      },
+      attackMonsterById: (id) => {
+        actions.attackMonsterById(id);
       },
       attackMonsterAt: (index) => {
         actions.attackMonsterAt(index);
@@ -386,6 +402,8 @@ export class WorldTestHook {
       lastError: () => actions.lastError(),
       social: () => this.social(),
       party: () => this.party(),
+      guild: () => this.guildState.snapshot(),
+      m7: () => this.m7State.snapshot(),
       arena: () => this.arena(),
       mails: () => this.mails(),
     };
@@ -397,6 +415,7 @@ export class WorldTestHook {
       .entities()
       .filter((entity) => entity.kind === 'monster')
       .map((entity) => ({
+        id: entity.id,
         name: entity.name,
         hp: entity.hp ?? 0,
         maxHp: entity.maxHp ?? 0,

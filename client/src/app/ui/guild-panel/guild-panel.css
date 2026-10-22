@@ -1,0 +1,15 @@
+:host { position: fixed; z-index: 18; top: 50%; left: 50%; display: block; transform: translate(-50%, -50%); }
+.guild-panel { width: min(36rem, calc(100vw - 2rem)); max-height: min(76vh, 46rem); overflow: auto; padding: 1rem; color: #f4efe2; background: #211d1a; border: 1px solid #b9955d; border-radius: .75rem; box-shadow: 0 1rem 3rem #0009; }
+header { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+h2, h3, p { margin: .35rem 0 .75rem; }
+h3 span { margin-left: .5rem; color: #e2bd78; font-size: .9em; }
+.close, .action { min-height: 44px; padding: .6rem .9rem; border: 1px solid #ad8a57; border-radius: .4rem; color: inherit; background: #40352a; cursor: pointer; }
+.action:disabled { opacity: .55; cursor: not-allowed; }
+form { display: grid; gap: .5rem; margin: 1rem 0; }
+input { min-height: 44px; padding: .5rem .7rem; border: 1px solid #8c795d; border-radius: .35rem; color: #191613; background: #fff8e9; }
+ul { display: grid; gap: .3rem; max-height: 13rem; overflow: auto; padding-left: 1.5rem; }
+li { padding: .25rem; }
+.status { display: inline-block; width: .65rem; height: .65rem; margin-right: .45rem; border-radius: 50%; background: #766e63; }
+.status.online { background: #57c779; }
+.hint { color: #d3c6ad; font-size: .9rem; }
+@media (max-width: 36rem) { .guild-panel { width: calc(100vw - 1rem); padding: .75rem; } }

@@ -6,6 +6,16 @@ import { CHAT_MAX_LENGTH, MAX_MOVE_DISTANCE_PX } from '../constants/world.js';
 import { MAX_ACTIVE_QUESTS, QUEST_OBJECTIVE_KINDS, QUEST_VIEW_STATES } from '../constants/quest.js';
 import { MAX_FRIENDS, PARTY_MAX_MEMBERS } from '../constants/social.js';
 import { LEADERBOARD_MAX_ENTRIES, LEADERBOARDS, MAIL_MAX_ENTRIES } from '../constants/arena.js';
+import {
+  FIELD_BOSS_DAILY_LOOT,
+  FIELD_BOSS_ID,
+  FIELD_BOSS_MAP_ID,
+  GUILD_MAX_LEVEL,
+  GUILD_MAX_MEMBERS,
+  GUILD_NAME_MAX_LENGTH,
+  M7_EVENT_ID,
+  M7_EVENT_QUEST_ID,
+} from '../constants/m7.js';
 import { ITEM_KINDS } from '../schemas/item.js';
 import { MONSTER_SHAPES } from '../schemas/monster.js';
 import { StatBlockSchema } from '../schemas/school.js';
@@ -248,6 +258,17 @@ export const ErrorCode = {
   ARENA_NO_FLEE: 'arena_no_flee',
   MAIL_NOT_FOUND: 'mail_not_found',
   MAIL_CLAIMED: 'mail_claimed',
+
+  // Bang, boss và event đầu tiên (M7): nguyên nhân từ chối tách biệt để client hiện đúng lý do.
+  GUILD_NAME_INVALID: 'guild_name_invalid',
+  GUILD_NAME_TAKEN: 'guild_name_taken',
+  GUILD_NOT_FOUND: 'guild_not_found',
+  GUILD_ALREADY_MEMBER: 'guild_already_member',
+  GUILD_NOT_MEMBER: 'guild_not_member',
+  GUILD_FULL: 'guild_full',
+  BOSS_CLOSED: 'boss_closed',
+  EVENT_ALREADY_CLAIMED: 'event_already_claimed',
+  EVENT_DISABLED: 'event_disabled',
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 
@@ -742,6 +763,70 @@ export const PartyUpdateSchema = z.object({
 });
 export type PartyUpdate = z.infer<typeof PartyUpdateSchema>;
 
+// ----------------------------------------------------------- bang (M7)
+
+export const GuildNameSchema = z.object({
+  name: z.string().trim().min(3).max(GUILD_NAME_MAX_LENGTH).regex(/^[\p{L}\p{N} _-]+$/u),
+});
+export type GuildName = z.infer<typeof GuildNameSchema>;
+
+export const GuildSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(3).max(GUILD_NAME_MAX_LENGTH),
+  level: z.number().int().min(1).max(GUILD_MAX_LEVEL),
+  exp: z.number().int().min(0),
+  expToNext: z.number().int().min(0),
+  leaderName: z.string().min(1),
+  members: z.array(SocialPersonSchema).max(GUILD_MAX_MEMBERS),
+});
+export type Guild = z.infer<typeof GuildSchema>;
+
+export const GuildUpdateSchema = z.object({
+  guild: GuildSchema.nullable(),
+  maxMembers: z.number().int().min(1).default(GUILD_MAX_MEMBERS),
+});
+export type GuildUpdate = z.infer<typeof GuildUpdateSchema>;
+
+// ------------------------------------------------------ event + field boss (M7)
+
+const RewardItemSchema = z.object({ itemId: z.string().min(1), qty: z.number().int().min(1) });
+const RewardSchema = z.object({ yen: z.number().int().min(0), items: z.array(RewardItemSchema) });
+
+export const M7StateSchema = z.object({
+  event: z.object({
+    id: z.literal(M7_EVENT_ID),
+    enabled: z.boolean(),
+    utcDay: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    loginClaimed: z.boolean(),
+    loginReward: RewardSchema,
+    quest: z.object({
+      id: z.literal(M7_EVENT_QUEST_ID),
+      name: z.string().min(1),
+      description: z.string().min(1),
+      progress: z.number().int().min(0),
+      target: z.number().int().min(1),
+      complete: z.boolean(),
+      rewarded: z.boolean(),
+      reward: RewardSchema,
+    }),
+  }),
+  boss: z.object({
+    id: z.literal(FIELD_BOSS_ID),
+    mapId: z.literal(FIELD_BOSS_MAP_ID),
+    name: z.string().min(1),
+    active: z.boolean(),
+    windowStartsAt: z.number().int().min(0),
+    windowEndsAt: z.number().int().min(0),
+    dailyLootClaimed: z.boolean(),
+    lootItemId: z.literal(FIELD_BOSS_DAILY_LOOT.itemId),
+    lootQty: z.literal(FIELD_BOSS_DAILY_LOOT.qty),
+  }),
+});
+export type M7State = z.infer<typeof M7StateSchema>;
+
+export const EventLoginClaimSchema = z.object({});
+export type EventLoginClaim = z.infer<typeof EventLoginClaimSchema>;
+
 /** Một món quà trong thư. */
 export const MailItemSchema = z.object({
   itemId: z.string().min(1),
@@ -865,6 +950,11 @@ export const CLIENT_PACKETS: PacketSchemaTable = {
   [Opcode.C2S_PARTY_LEAVE]: z.object({}),
   [Opcode.C2S_PARTY_KICK]: PartyKickSchema,
   [Opcode.C2S_MAIL_CLAIM]: MailClaimSchema,
+  [Opcode.C2S_GUILD_CREATE]: GuildNameSchema,
+  [Opcode.C2S_GUILD_JOIN]: GuildNameSchema,
+  [Opcode.C2S_GUILD_LEAVE]: z.object({}),
+  [Opcode.C2S_M7_STATE]: z.object({}),
+  [Opcode.C2S_EVENT_LOGIN_CLAIM]: EventLoginClaimSchema,
   [Opcode.C2S_ARENA_QUEUE]: z.object({}),
   [Opcode.C2S_ARENA_CANCEL]: z.object({}),
   [Opcode.C2S_LEADERBOARD]: LeaderboardRequestSchema,
@@ -895,6 +985,8 @@ export const SERVER_PACKETS: PacketSchemaTable = {
   [Opcode.S2C_SOCIAL_UPDATE]: SocialUpdateSchema,
   [Opcode.S2C_PARTY_UPDATE]: PartyUpdateSchema,
   [Opcode.S2C_MAILS]: MailsSchema,
+  [Opcode.S2C_GUILD_UPDATE]: GuildUpdateSchema,
+  [Opcode.S2C_M7_STATE]: M7StateSchema,
   [Opcode.S2C_ARENA_STATE]: ArenaStateSchema,
   [Opcode.S2C_ARENA_END]: ArenaEndSchema,
   [Opcode.S2C_LEADERBOARD]: LeaderboardSchema,

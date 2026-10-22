@@ -41,6 +41,8 @@ import { BattleState } from '../../net/battle-state';
 import { GameSocket, type SocketError } from '../../net/game-socket';
 import { MailState } from '../../net/mail-state';
 import { PartyState } from '../../net/party-state';
+import { GuildState } from '../../net/guild-state';
+import { M7ClientState } from '../../net/m7-state';
 import { SocialState } from '../../net/social-state';
 import { type Facing } from '../../net/world-types';
 import { WorldState } from '../../net/world-state';
@@ -51,6 +53,8 @@ import { EquipmentPanel } from '../../ui/equipment-panel/equipment-panel';
 import { Hud } from '../../ui/hud/hud';
 import { InventoryPanel } from '../../ui/inventory-panel/inventory-panel';
 import { MailPanel } from '../../ui/mail-panel/mail-panel';
+import { GuildPanel } from '../../ui/guild-panel/guild-panel';
+import { M7Panel } from '../../ui/m7-panel/m7-panel';
 import { NoticeBar } from '../../ui/notice-bar/notice-bar';
 import { NpcDialogPanel, type NpcDialogOption } from '../../ui/npc-dialog/npc-dialog';
 import { QuestLog } from '../../ui/quest-log/quest-log';
@@ -85,6 +89,7 @@ export const SNAPSHOT_FALLBACK_DELAY = new InjectionToken<number>('ninja.snapsho
 const CHAT_ERROR_CODES: ReadonlySet<string> = new Set<string>([
   ErrorCode.RATE_LIMITED,
   ErrorCode.NOT_IN_PARTY,
+  ErrorCode.GUILD_NOT_MEMBER,
   ErrorCode.CHARACTER_NOT_FOUND,
 ]);
 
@@ -112,6 +117,8 @@ const CHAT_ERROR_CODES: ReadonlySet<string> = new Set<string>([
     SocialPanel,
     ArenaPanel,
     MailPanel,
+    GuildPanel,
+    M7Panel,
   ],
   templateUrl: './play.html',
   styleUrl: './play.css',
@@ -125,6 +132,8 @@ export class Play implements OnInit, OnDestroy {
   private readonly battleState = inject(BattleState);
   private readonly socialState = inject(SocialState);
   private readonly partyState = inject(PartyState);
+  private readonly guildState = inject(GuildState);
+  private readonly m7State = inject(M7ClientState);
   private readonly mailState = inject(MailState);
   private readonly arenaState = inject(ArenaState);
   private readonly testHook = inject(WorldTestHook);
@@ -147,12 +156,14 @@ export class Play implements OnInit, OnDestroy {
   /** Mở/đóng nhật ký nhiệm vụ; nhật ký chỉ để xem nên mở ra cũng không sợ lỡ tay. */
   readonly questOpen = signal(false);
   /**
-   * Ba bảng của M6 (xã hội, Lôi Đài, thư) loại trừ nhau.
+   * Các bảng xã hội, bang, Lôi Đài, thư và sự kiện loại trừ nhau.
    *
    * Chúng cùng đặt ở giữa màn hình dưới thanh HUD — chỗ duy nhất còn trống mà không che nút HUD.
    * Mở ba bảng chồng lên nhau thì cái dưới không bấm được nữa, nên mở bảng nào là đóng hai bảng kia.
    */
   readonly socialOpen = signal(false);
+  readonly guildOpen = signal(false);
+  readonly m7Open = signal(false);
   readonly arenaOpen = signal(false);
   readonly mailOpen = signal(false);
   readonly notice = signal<string | null>(null);
@@ -189,6 +200,8 @@ export class Play implements OnInit, OnDestroy {
   readonly friendRequestsSent = this.socialState.outgoing;
   readonly maxFriends = this.socialState.maxFriends;
   readonly party = this.partyState.snapshot;
+  readonly guildSnapshot = this.guildState.snapshot;
+  readonly m7Snapshot = this.m7State.snapshot;
   readonly mails = this.mailState.mails;
   readonly mailCapacity = this.mailState.maxEntries;
   readonly arena = this.arenaState.state;
@@ -283,6 +296,8 @@ export class Play implements OnInit, OnDestroy {
         this.battleState.reset();
         this.socialState.reset();
         this.partyState.reset();
+        this.guildState.reset();
+        this.m7State.reset();
         this.mailState.reset();
         this.arenaState.reset();
         this.movement.reset();
@@ -294,6 +309,8 @@ export class Play implements OnInit, OnDestroy {
         this.equipmentOpen.set(false);
         this.questOpen.set(false);
         this.socialOpen.set(false);
+        this.guildOpen.set(false);
+        this.m7Open.set(false);
         this.arenaOpen.set(false);
         this.mailOpen.set(false);
         this.announcedFeatures.clear();
@@ -365,6 +382,10 @@ export class Play implements OnInit, OnDestroy {
         if (monster) {
           this.onAttackMonster(monster.id);
         }
+      },
+      attackMonsterById: (id) => {
+        const monster = this.world.entities().find((entity) => entity.id === id && entity.kind === 'monster');
+        if (monster) this.onAttackMonster(monster.id);
       },
       attackMonsterAt: (index) => {
         const monster = this.world.entities().filter((entity) => entity.kind === 'monster')[index];
@@ -528,17 +549,23 @@ export class Play implements OnInit, OnDestroy {
    * nữa. Đóng bảng Lôi Đài cũng là "đã đọc xong kết quả" — xoá `result` theo đúng hợp đồng
    * ("giữ tới khi người chơi đóng bảng").
    */
-  private openExclusivePanel(panel: 'social' | 'arena' | 'mail' | null, open: boolean): void {
+  private openExclusivePanel(panel: 'social' | 'guild' | 'arena' | 'mail' | 'm7' | null, open: boolean): void {
     const show = open ? panel : null;
     this.socialOpen.set(show === 'social');
+    this.guildOpen.set(show === 'guild');
     this.arenaOpen.set(show === 'arena');
     this.mailOpen.set(show === 'mail');
+    this.m7Open.set(show === 'm7');
     if (show === 'arena') {
       // Bảng vừa mở: xin bảng xếp hạng đang xem để số liệu không cũ từ lần mở trước.
       this.socket.requestLeaderboard(this.arenaState.board());
       return;
     }
     this.arenaState.closeResult();
+    if (show === 'm7') {
+      this.socket.requestM7State();
+      return;
+    }
   }
 
   toggleInventory(): void {
@@ -572,6 +599,27 @@ export class Play implements OnInit, OnDestroy {
   setSocialOpen(open: boolean): void {
     this.openExclusivePanel('social', open);
   }
+
+  toggleGuild(): void {
+    this.openExclusivePanel('guild', !this.guildOpen());
+  }
+
+  setGuildOpen(open: boolean): void {
+    this.openExclusivePanel('guild', open);
+  }
+
+  toggleM7(): void {
+    this.openExclusivePanel('m7', !this.m7Open());
+  }
+
+  setM7Open(open: boolean): void {
+    this.openExclusivePanel('m7', open);
+  }
+
+  onGuildCreate(name: string): void { this.socket.createGuild(name); }
+  onGuildJoin(name: string): void { this.socket.joinGuild(name); }
+  onGuildLeave(): void { this.socket.leaveGuild(); }
+  onM7LoginClaim(): void { this.socket.claimEventLogin(); }
 
   toggleArena(): void {
     this.setArenaOpen(!this.arenaOpen());
@@ -750,6 +798,8 @@ export class Play implements OnInit, OnDestroy {
       this.arenaState.applyPacket(op, payload) ||
       this.socialState.applyPacket(op, payload) ||
       this.partyState.applyPacket(op, payload) ||
+      this.guildState.applyPacket(op, payload) ||
+      this.m7State.applyPacket(op, payload) ||
       this.mailState.applyPacket(op, payload)
     ) {
       return;

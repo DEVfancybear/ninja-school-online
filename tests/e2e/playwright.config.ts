@@ -1,18 +1,20 @@
 import { defineConfig, devices } from '@playwright/test';
+import { validateE2eSafety } from './config/safety.js';
 
-const SERVER_URL = 'http://127.0.0.1:3000';
-/**
- * Cổng của client khi chạy e2e. Mặc định 4200; đổi bằng `NINJA_E2E_CLIENT_PORT` khi cổng đó đang
- * bận (ví dụ một dự án khác đang chạy dev server) — `reuseExistingServer` sẽ tưởng nhầm là app của
- * mình và kiểm thử sẽ chạy trên nhầm trang.
- */
-const CLIENT_PORT = Number(process.env.NINJA_E2E_CLIENT_PORT ?? 4200);
+const DEDICATED_DATABASE_URL = process.env.NINJA_E2E_DATABASE_URL;
+const { serverPort: SERVER_PORT, clientPort: CLIENT_PORT } = validateE2eSafety({
+  databaseUrl: DEDICATED_DATABASE_URL,
+  serverPort: Number(process.env.NINJA_E2E_SERVER_PORT ?? 3307),
+  clientPort: Number(process.env.NINJA_E2E_CLIENT_PORT ?? 4307),
+});
+const SERVER_URL = `http://127.0.0.1:${SERVER_PORT}`;
 const CLIENT_URL = `http://127.0.0.1:${CLIENT_PORT}`;
+const REUSE_SERVER = false;
 
 /**
- * Kiểm thử đầu-cuối bằng trình duyệt thật.
- * Dùng đúng cấu hình phát triển (server đọc .env ở gốc repo, client chạy ng serve với proxy /api).
- * Mỗi lần chạy dùng tên tài khoản/nhân vật sinh ngẫu nhiên nên không cần xoá dữ liệu cũ.
+ * Kiểm thử đầu-cuối bằng trình duyệt thật; luôn yêu cầu DB disposable chính xác `ninja_m7_e2e`,
+ * cổng non-dev, và server không được tái sử dụng. Mỗi lần chạy vẫn tạo tên duy nhất, nhưng không
+ * coi dữ liệu của DB dùng chung là dữ liệu có thể xoá.
  */
 export default defineConfig({
   testDir: './src',
@@ -32,15 +34,29 @@ export default defineConfig({
     {
       command: 'pnpm --filter @ninja/server dev',
       url: `${SERVER_URL}/health`,
-      reuseExistingServer: !process.env.CI,
+      env: {
+        HOST: '127.0.0.1',
+        PORT: String(SERVER_PORT),
+        CORS_ORIGIN: CLIENT_URL,
+        ...(DEDICATED_DATABASE_URL
+          ? {
+              DATABASE_URL: DEDICATED_DATABASE_URL,
+              FIELD_BOSS_INTERVAL_MINUTES: '1',
+              FIELD_BOSS_WINDOW_MINUTES: '1',
+              FIELD_BOSS_START_OFFSET_MINUTES: '0',
+            }
+          : {}),
+      },
+      reuseExistingServer: REUSE_SERVER,
       timeout: 120_000,
       stdout: 'pipe',
     },
     {
       // --host 0.0.0.0: mặc định của Angular chỉ bind IPv6 [::1] nên 127.0.0.1 không kết nối được.
-      command: `pnpm --filter @ninja/client dev --host 0.0.0.0 --port ${CLIENT_PORT}`,
+      command: `pnpm --filter @ninja/client dev --host 0.0.0.0 --port ${CLIENT_PORT} --proxy-config proxy.e2e.conf.cjs`,
       url: CLIENT_URL,
-      reuseExistingServer: !process.env.CI,
+      env: { NINJA_E2E_SERVER_PORT: String(SERVER_PORT) },
+      reuseExistingServer: REUSE_SERVER,
       timeout: 180_000,
       stdout: 'pipe',
     },

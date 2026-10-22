@@ -1,5 +1,6 @@
 import {
   CHAT_BACKLOG_SIZE,
+  FIELD_BOSS_ID,
   Opcode,
   type Character,
   type ChatMessage,
@@ -157,12 +158,15 @@ export class Room {
   private readonly npcsById = new Map<string, RoomNpc>();
   private readonly monstersById = new Map<string, RoomMonster>();
   private readonly backlog: ServerEnterMap['chatBacklog'] = [];
+  private fieldBossActive: boolean;
 
   constructor(
     readonly map: MapInstance,
     npcs: ReadonlyMap<string, Npc>,
     monsters: ReadonlyMap<string, Monster>,
+    fieldBossActive = true,
   ) {
+    this.fieldBossActive = fieldBossActive;
     for (const [index, placement] of (map.data.monsters ?? []).entries()) {
       const data = monsters.get(placement.id);
       if (!data) {
@@ -188,6 +192,13 @@ export class Room {
         alive: true,
         respawnAt: undefined,
       });
+      if (data.id === FIELD_BOSS_ID && !this.fieldBossActive) {
+        const boss = this.monstersById.get(monsterEntityId(map.id, index));
+        if (boss) {
+          boss.alive = false;
+          boss.hp = 0;
+        }
+      }
     }
     for (const placement of map.data.npcs) {
       const data = npcs.get(placement.id);
@@ -226,6 +237,19 @@ export class Room {
   /** Mọi con quái của bản đồ, kể cả con đang chết chờ sống lại. */
   monsters(): RoomMonster[] {
     return [...this.monstersById.values()];
+  }
+
+  /** Boss field được reset khi mở cửa sổ UTC và đóng ngoài lịch; không dùng respawn của room. */
+  setFieldBossActive(active: boolean): void {
+    if (this.fieldBossActive === active) return;
+    this.fieldBossActive = active;
+    for (const monster of this.monstersById.values()) {
+      if (monster.monsterId !== FIELD_BOSS_ID) continue;
+      monster.alive = active;
+      monster.hp = active ? monster.maxHp : 0;
+      monster.respawnAt = undefined;
+      this.broadcast(Opcode.S2C_ENTITY_ADD, { entity: monsterView(monster) });
+    }
   }
 
   /**
@@ -361,7 +385,12 @@ export class Room {
   /** Quái hết thời gian chờ thì sống lại đầy máu và hiện ra với mọi người trong bản đồ. */
   private respawnMonsters(now: number): void {
     for (const monster of this.monstersById.values()) {
-      if (monster.alive || monster.respawnAt === undefined || now < monster.respawnAt) {
+      if (
+        monster.alive ||
+        (monster.monsterId === FIELD_BOSS_ID && !this.fieldBossActive) ||
+        monster.respawnAt === undefined ||
+        now < monster.respawnAt
+      ) {
         continue;
       }
       monster.alive = true;

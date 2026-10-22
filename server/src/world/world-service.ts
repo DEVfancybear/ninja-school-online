@@ -5,6 +5,8 @@ import {
   Opcode,
   PROTOCOL_VERSION,
   TICK_RATE_MS,
+  isFieldBossActive,
+  type FieldBossSchedule,
   type AttackMob,
   type BattleAction,
   type Character,
@@ -39,6 +41,8 @@ import type { PartyService } from '../modules/party/service.js';
 import type { MailService } from '../modules/mail/service.js';
 import type { LeaderboardService } from '../modules/leaderboard/service.js';
 import type { ArenaService } from '../modules/arena/service.js';
+import type { GuildService } from '../modules/guild/service.js';
+import type { M7Service } from '../modules/m7/service.js';
 import { characterStatsPayload, skillsOf } from '../modules/character/stats.js';
 import type { EquipmentService } from '../modules/equipment/service.js';
 import type { InventoryService } from '../modules/inventory/service.js';
@@ -81,6 +85,10 @@ export interface WorldServiceOptions {
   mail?: MailService;
   leaderboard?: LeaderboardService;
   arena?: ArenaService;
+  /** M7: guild membership/chat/level and server-owned event claims/progress. */
+  guild?: GuildService;
+  m7?: M7Service;
+  fieldBossSchedule?: FieldBossSchedule;
   /** Nhịp dùng chung: trận đấu đếm lượt và hết giờ trên cùng nhịp với phần còn lại của server. */
   tick: TickScheduler;
   /** Xác thực access token (dùng `app.jwt`); trả `undefined` nếu token sai hoặc hết hạn. */
@@ -135,7 +143,11 @@ export class WorldService {
       // thực thể trong room nên nhiệm vụ sống sót qua mọi lần quái hồi sinh.
       onMonsterKilled: (characterId, monsterId) => {
         void this.noteKill(characterId, monsterId);
+        void this.options.m7?.onMonsterKilled(characterId);
       },
+      isFieldBossActive: () => isFieldBossActive(this.now(), this.options.fieldBossSchedule),
+      grantBossLoot: (characterId) => this.options.m7?.grantBossLoot(characterId) ?? Promise.resolve('capped'),
+      onBossVictory: (characterIds) => this.options.guild?.awardBossVictory(characterIds) ?? Promise.resolve(),
       now: this.now,
     });
 
@@ -230,6 +242,12 @@ export class WorldService {
     if (this.options.arena) {
       session.send(Opcode.S2C_ARENA_STATE, await this.options.arena.state(character.id));
     }
+    if (this.options.guild) {
+      session.send(Opcode.S2C_GUILD_UPDATE, await this.options.guild.stateOf(character.id));
+    }
+    if (this.options.m7) {
+      session.send(Opcode.S2C_M7_STATE, await this.options.m7.state(character.id));
+    }
   }
 
   /**
@@ -312,6 +330,11 @@ export class WorldService {
     }
     const { room, player } = located;
     const channel = chat.channel ?? 'map';
+    const guildMembers = channel === 'guild' ? await this.options.guild?.membersOf(player.id) ?? [] : undefined;
+    if (channel === 'guild' && guildMembers?.length === 0) {
+      session.sendError(ErrorCode.GUILD_NOT_MEMBER, 'bạn chưa ở trong bang nào');
+      return;
+    }
     const interval = channel === 'world' ? WORLD_CHAT_MIN_INTERVAL_MS : CHAT_MIN_INTERVAL_MS;
     if (!this.options.chat.allow(player.id, interval)) {
       session.sendError(
@@ -351,6 +374,12 @@ export class WorldService {
       }
       return;
     }
+    if (channel === 'guild') {
+      for (const memberId of guildMembers ?? []) {
+        this.options.sessions.get(memberId)?.send(Opcode.S2C_CHAT, message);
+      }
+      return;
+    }
 
     const target = chat.to ? await this.options.characters.findByName(chat.to) : undefined;
     const recipient = target ? this.options.sessions.get(target.id) : undefined;
@@ -386,6 +415,34 @@ export class WorldService {
           : action === 'kick'
             ? await service.kick(id, name)
             : await service.leave(id);
+    if (!result.ok) session.sendError(result.code, result.message);
+  }
+
+  /** Tạo/gia nhập/rời bang M7; kết quả và trạng thái đều do `GuildService` quyết định. */
+  async guildCommand(session: GameSession, action: 'create' | 'join' | 'leave', name = ''): Promise<void> {
+    const id = session.characterId;
+    const service = this.options.guild;
+    if (!id || !service) { this.rejectNotInWorld(session); return; }
+    const result = action === 'create'
+      ? await service.create(id, name)
+      : action === 'join'
+        ? await service.join(id, name)
+        : await service.leave(id);
+    if (!result.ok) session.sendError(result.code, result.message);
+  }
+
+  async sendM7State(session: GameSession): Promise<void> {
+    const id = session.characterId;
+    const service = this.options.m7;
+    if (!id || !service) { this.rejectNotInWorld(session); return; }
+    session.send(Opcode.S2C_M7_STATE, await service.state(id));
+  }
+
+  async claimM7Login(session: GameSession): Promise<void> {
+    const id = session.characterId;
+    const service = this.options.m7;
+    if (!id || !service) { this.rejectNotInWorld(session); return; }
+    const result = await service.claimLogin(id);
     if (!result.ok) session.sendError(result.code, result.message);
   }
 

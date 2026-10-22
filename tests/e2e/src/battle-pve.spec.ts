@@ -24,6 +24,7 @@ interface HookApi {
   monsters(): HookMonster[];
   monsterNames(): string[];
   attackMonster(name: string): void;
+  attackMonsterById(id: string): void;
   attackMonsterAt(index: number): void;
   battle(): HookBattle | null;
   closeBattle(): void;
@@ -73,6 +74,7 @@ interface HookCharacter {
 }
 
 interface HookMonster {
+  readonly id: string;
   readonly name: string;
   readonly hp: number;
   readonly maxHp: number;
@@ -163,6 +165,25 @@ async function attackMonster(page: Page, name: string): Promise<void> {
 }
 
 /** Bấm vào con quái thứ `index` trong danh sách đang vẽ (kể cả con đã gục). */
+async function attackMonsterById(page: Page, id: string): Promise<void> {
+  await page.evaluate((targetId) => {
+    (globalThis as unknown as { __ninjaWorld?: HookApi }).__ninjaWorld?.attackMonsterById(targetId);
+  }, id);
+}
+
+async function commonLiveMonsterId(pageA: Page, pageB: Page, name: string): Promise<string> {
+  let sharedId: string | undefined;
+  await expect
+    .poll(async () => {
+      const [a, b] = await Promise.all([monsters(pageA), monsters(pageB)]);
+      const idsB = new Set(b.filter((monster) => monster.name === name && monster.alive).map((monster) => monster.id));
+      sharedId = a.find((monster) => monster.name === name && monster.alive && idsB.has(monster.id))?.id;
+      return sharedId;
+    }, { message: `chờ hai người cùng nhìn thấy một ${name} còn sống` })
+    .toBeTruthy();
+  return sharedId!;
+}
+
 async function attackMonsterAt(page: Page, index: number): Promise<void> {
   await page.evaluate((target) => {
     (globalThis as unknown as { __ninjaWorld?: HookApi }).__ninjaWorld?.attackMonsterAt(target);
@@ -328,13 +349,14 @@ test('hai người chơi cùng đánh chung một con quái', async ({ browser }
     await enterTrainingGround(pageA);
     await enterTrainingGround(pageB);
 
-    await attackMonster(pageA, SCARECROW);
+    const sharedMonsterId = await commonLiveMonsterId(pageA, pageB, SCARECROW);
+    await attackMonsterById(pageA, sharedMonsterId);
     await waitForBattle(pageA);
     const firstBattle = await battle(pageA);
     expect(firstBattle?.participants).toHaveLength(2);
 
     // Người thứ hai cũng chạm đúng con quái đó: vào **chung** trận, không mở trận mới.
-    await attackMonster(pageB, SCARECROW);
+    await attackMonsterById(pageB, sharedMonsterId);
     await waitForBattle(pageB);
     const secondBattle = await battle(pageB);
     expect(secondBattle?.battleId).toBe(firstBattle?.battleId);

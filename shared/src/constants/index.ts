@@ -8,3 +8,4 @@ export * from './equipment.js';
 export * from './quest.js';
 export * from './social.js';
 export * from './arena.js';
+export * from './m7.js';

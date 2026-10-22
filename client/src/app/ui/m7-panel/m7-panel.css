@@ -1,0 +1,9 @@
+:host { position: fixed; z-index: 18; top: 50%; left: 50%; display: block; transform: translate(-50%, -50%); }
+.m7-panel { width: min(38rem, calc(100vw - 2rem)); max-height: min(76vh, 48rem); overflow: auto; padding: 1rem; color: #f4efe2; background: #211d1a; border: 1px solid #b9955d; border-radius: .75rem; box-shadow: 0 1rem 3rem #0009; }
+header { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+h2, h3, p { margin: .4rem 0 .75rem; }
+section + section { margin-top: 1.25rem; padding-top: .5rem; border-top: 1px solid #74634b; }
+.close, .action { min-height: 44px; padding: .6rem .9rem; border: 1px solid #ad8a57; border-radius: .4rem; color: inherit; background: #40352a; cursor: pointer; }
+.action:disabled { opacity: .55; cursor: not-allowed; }
+.quest { padding: .75rem; border-left: 3px solid #d8a654; background: #ffffff0a; }
+@media (max-width: 36rem) { .m7-panel { width: calc(100vw - 1rem); padding: .75rem; } }

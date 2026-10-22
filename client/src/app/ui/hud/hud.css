@@ -43,7 +43,8 @@
 }
 
 .ghost {
-  padding: 0.25rem 0.65rem;
+  min-height: 44px;
+  padding: 0.4rem 0.65rem;
   border: 1px solid var(--accent);
   border-radius: 999px;
   background: rgba(11, 18, 24, 0.6);

@@ -14,6 +14,7 @@ import {
 import {
   ARENA_START_RATING,
   CLASSES,
+  GUILD_MAX_LEVEL,
   EQUIP_SLOTS,
   QUEST_STATUSES,
   SCHOOLS,
@@ -335,3 +336,90 @@ export const mails = pgTable(
 export type FriendshipRow = typeof friendships.$inferSelect;
 export type CharacterArenaRow = typeof characterArena.$inferSelect;
 export type MailRow = typeof mails.$inferSelect;
+
+/** Bang có cấp/kinh nghiệm; tên duy nhất không phân biệt hoa thường. */
+export const guilds = pgTable(
+  'guilds',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    name: varchar('name', { length: 24 }).notNull(),
+    leaderCharacterId: uuid('leader_character_id')
+      .notNull()
+      .references(() => characters.id, { onDelete: 'restrict' }),
+    level: integer('level').notNull().default(1),
+    exp: integer('exp').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('guilds_name_lower_unique').on(sql`lower(${table.name})`),
+    check('guilds_level_valid', sql`${table.level} between 1 and ${sql.raw(String(GUILD_MAX_LEVEL))}`),
+    check('guilds_exp_non_negative', sql`${table.exp} >= 0`),
+  ],
+);
+
+/** Character thuộc tối đa một bang; thứ tự joined_at dùng để chuyển trưởng khi thủ lĩnh rời bang. */
+export const guildMembers = pgTable(
+  'guild_members',
+  {
+    characterId: uuid('character_id')
+      .primaryKey()
+      .references(() => characters.id, { onDelete: 'cascade' }),
+    guildId: uuid('guild_id')
+      .notNull()
+      .references(() => guilds.id, { onDelete: 'cascade' }),
+    joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('guild_members_guild_joined_idx').on(table.guildId, table.joinedAt)],
+);
+
+/** One unique claim per character, boss and UTC date; the unique key is the race-safe loot cap. */
+export const bossLootClaims = pgTable(
+  'boss_loot_claims',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    characterId: uuid('character_id')
+      .notNull()
+      .references(() => characters.id, { onDelete: 'cascade' }),
+    bossId: varchar('boss_id', { length: 48 }).notNull(),
+    utcDay: varchar('utc_day', { length: 10 }).notNull(),
+    claimedAt: timestamp('claimed_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('boss_loot_character_boss_day_unique').on(table.characterId, table.bossId, table.utcDay),
+  ],
+);
+
+/** Login mail claim is unique for event + UTC day; progress is never accepted from a client packet. */
+export const eventLoginClaims = pgTable(
+  'event_login_claims',
+  {
+    characterId: uuid('character_id')
+      .notNull()
+      .references(() => characters.id, { onDelete: 'cascade' }),
+    eventId: varchar('event_id', { length: 48 }).notNull(),
+    utcDay: varchar('utc_day', { length: 10 }).notNull(),
+    claimedAt: timestamp('claimed_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('event_login_character_event_day_unique').on(table.characterId, table.eventId, table.utcDay),
+  ],
+);
+
+export const eventQuests = pgTable(
+  'event_quests',
+  {
+    characterId: uuid('character_id')
+      .notNull()
+      .references(() => characters.id, { onDelete: 'cascade' }),
+    eventId: varchar('event_id', { length: 48 }).notNull(),
+    questId: varchar('quest_id', { length: 48 }).notNull(),
+    progress: integer('progress').notNull().default(0),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    rewardedAt: timestamp('rewarded_at', { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex('event_quest_character_event_quest_unique').on(table.characterId, table.eventId, table.questId),
+    check('event_quest_progress_non_negative', sql`${table.progress} >= 0`),
+    check('event_quest_completion_consistent', sql`${table.completedAt} is null or ${table.progress} >= 1`),
+  ],
+);

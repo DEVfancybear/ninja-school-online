@@ -1,0 +1,16 @@
+{
+  "id": "mob-thu-vuong",
+  "name": "Thú Vương",
+  "shape": "beast",
+  "color": "#933b52",
+  "level": 12,
+  "maxHp": 1400,
+  "attack": 42,
+  "defense": 18,
+  "speed": 7,
+  "expReward": 280,
+  "yenMin": 120,
+  "yenMax": 180,
+  "drops": [],
+  "respawnMs": 600000
+}

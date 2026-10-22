@@ -108,6 +108,17 @@ export const Opcode = {
   S2C_MAILS: 0x070c,
   /** Nhận quà trong một lá thư. */
   C2S_MAIL_CLAIM: 0x070d,
+  /** Tạo, gia nhập, rời bang; chat bang dùng C2S_CHAT channel=guild. */
+  C2S_GUILD_CREATE: 0x0710,
+  C2S_GUILD_JOIN: 0x0711,
+  C2S_GUILD_LEAVE: 0x0712,
+  /** Toàn bộ trạng thái bang của nhân vật; server gửi sau bắt tay và mỗi lần đổi. */
+  S2C_GUILD_UPDATE: 0x0713,
+  /** Lấy trạng thái event và boss; server gửi sau bắt tay/claim/progress. */
+  C2S_M7_STATE: 0x0714,
+  S2C_M7_STATE: 0x0715,
+  /** Nhận thư đăng nhập hằng ngày của event; phần thưởng do server quyết định. */
+  C2S_EVENT_LOGIN_CLAIM: 0x0716,
 
   /** Vào hàng chờ Lôi Đài 1v1. */
   C2S_ARENA_QUEUE: 0x0801,
@@ -134,9 +145,9 @@ export const OPCODE_NAMES: Record<number, string> = Object.fromEntries(
  * Kênh chat. M2 chỉ có `map` (phát cho room hiện tại) và `system` (server tự gửi); M6 thêm `world`
  * (mọi người đang online), `party` (tổ đội) và `private` (một người).
  */
-export const CHAT_CHANNELS = ['map', 'world', 'party', 'private', 'system'] as const;
+export const CHAT_CHANNELS = ['map', 'world', 'party', 'guild', 'private', 'system'] as const;
 export type ChatChannel = (typeof CHAT_CHANNELS)[number];
 
 /** Kênh client được phép gửi lên — `system` chỉ server dùng. */
-export const CHAT_SEND_CHANNELS = ['map', 'world', 'party', 'private'] as const;
+export const CHAT_SEND_CHANNELS = ['map', 'world', 'party', 'guild', 'private'] as const;
 export type ChatSendChannel = (typeof CHAT_SEND_CHANNELS)[number];
