@@ -12,7 +12,8 @@ export class M7Panel {
   readonly closed = output<void>();
   readonly claimLogin = output<void>();
 
-  utcTime(timestamp: number): string {
-    return new Date(timestamp).toISOString().slice(11, 16) + ' UTC';
+  utcDateTime(timestamp: number): string {
+    const iso = new Date(timestamp).toISOString();
+    return `${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC`;
   }
 }

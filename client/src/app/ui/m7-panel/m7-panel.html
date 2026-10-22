@@ -25,7 +25,7 @@
     <section aria-labelledby="boss-title">
       <h3 id="boss-title">{{ current.boss.name }}</h3>
       <p>Bản đồ: {{ current.boss.mapId }}</p>
-      <p>{{ current.boss.active ? 'Đang mở' : 'Đang đóng' }} · {{ utcTime(current.boss.windowStartsAt) }}–{{ utcTime(current.boss.windowEndsAt) }}</p>
+      <p>{{ current.boss.active ? 'Đang mở' : 'Đang đóng' }} · {{ utcDateTime(current.boss.windowStartsAt) }}–{{ utcDateTime(current.boss.windowEndsAt) }}</p>
       <p>Vật phẩm đặc biệt: {{ current.boss.lootQty }} × {{ current.boss.lootItemId }}.</p>
       <p>{{ current.boss.dailyLootClaimed ? 'Bạn đã nhận vật phẩm boss hôm nay (UTC).' : 'Giới hạn: 1 vật phẩm / ngày UTC / nhân vật.' }}</p>
     </section>

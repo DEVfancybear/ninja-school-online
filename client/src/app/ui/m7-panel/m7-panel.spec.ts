@@ -55,7 +55,7 @@ describe('M7Panel', () => {
     fixture.detectChanges();
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('10:03 UTC–10:04 UTC');
+    expect(text).toContain('2026-10-22 10:03 UTC–2026-10-22 10:04 UTC');
     expect(text).not.toContain('15 phút đầu mỗi giờ UTC');
   });
 
@@ -73,7 +73,7 @@ describe('M7Panel', () => {
     fixture.detectChanges();
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('23:59 UTC–00:14 UTC');
+    expect(text).toContain('2026-10-22 23:59 UTC–2026-10-23 00:14 UTC');
     expect(text).not.toContain('15 phút đầu mỗi giờ UTC');
   });
 
