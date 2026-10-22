@@ -245,7 +245,7 @@ Nội dung: bạn bè, nhóm, chat thế giới/nhóm/riêng, Lôi Đài 1v1 có
 Nội dung: lập bang/tham gia/rời bang, chat bang, cấp bang; boss dã ngoại theo giờ có giới hạn rơi đồ/ngày; sự kiện đầu tiên (đăng nhập nhận quà + nhiệm vụ sự kiện).
 **Xong khi:** lập bang 3 người, cùng đánh boss theo giờ, nhận quà sự kiện; bot/script không phá được giới hạn ngày.
 
-**Trạng thái M7:** browser E2E cô lập trên `ninja_m7_e2e` PASS 2/2 (gồm boss victory/co-op); `pnpm run ci` PASS trên `main`. Đang chờ verifier độc lập xác nhận revision cuối; chưa đánh dấu M7 hoàn tất trước kết quả đó.
+**Trạng thái M7:** browser E2E cô lập trên `ninja_m7_e2e` PASS 2/2 (gồm boss victory/co-op); `pnpm run ci` PASS trên `main`. Verifier độc lập PASS trên revision `6b83edb7e01e0932d7b63c10312fa7eb7b630cd2`; M7 acceptance đã được xác minh trên checkout tích hợp.
 
 ### M8 — Hoàn thiện & triển khai (~2 tuần) — *kết thúc Beta*
 Nội dung: âm thanh + hoạt ảnh đầy đủ, tối ưu mobile web (PWA), kiểm thử tải 200 CCU bằng k6, triển khai VPS (nginx + TLS + tên miền), sao lưu DB, trang trạng thái bảo trì.
