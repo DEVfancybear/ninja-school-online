@@ -120,6 +120,21 @@ describe('M7Panel', () => {
     expect(onClaim).toHaveBeenCalledTimes(1);
   });
 
+  it('hides login and quest actions when the server disables the event', async () => {
+    await TestBed.configureTestingModule({ imports: [M7Panel] }).compileComponents();
+    fixture = TestBed.createComponent(M7Panel);
+    fixture.componentRef.setInput('state', {
+      ...state,
+      event: { ...state.event, enabled: false },
+    });
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.textContent).toContain('Event hiện đang tạm đóng.');
+    expect(element.querySelector('.action')).toBeNull();
+    expect(element.querySelector('.quest')).toBeNull();
+  });
+
   it('shows server-reported quest progress before completion', async () => {
     await TestBed.configureTestingModule({ imports: [M7Panel] }).compileComponents();
     fixture = TestBed.createComponent(M7Panel);
