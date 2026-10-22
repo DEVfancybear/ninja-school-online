@@ -48,6 +48,17 @@ describe('M7Panel', () => {
     fixture = undefined;
   });
 
+  it('does not expose event actions before the server state loads', async () => {
+    await TestBed.configureTestingModule({ imports: [M7Panel] }).compileComponents();
+    fixture = TestBed.createComponent(M7Panel);
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.querySelector('[role="status"]')?.textContent?.trim()).toBe('Đang tải trạng thái sự kiện…');
+    expect(element.querySelector('.action')).toBeNull();
+    expect(element.querySelector('.quest')).toBeNull();
+  });
+
   it('renders the configured server-provided boss window in UTC', async () => {
     await TestBed.configureTestingModule({ imports: [M7Panel] }).compileComponents();
     fixture = TestBed.createComponent(M7Panel);
