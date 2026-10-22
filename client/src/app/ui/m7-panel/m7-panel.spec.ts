@@ -57,6 +57,7 @@ describe('M7Panel', () => {
     expect(element.querySelector('[role="status"]')?.textContent?.trim()).toBe('Đang tải trạng thái sự kiện…');
     expect(element.querySelector('.action')).toBeNull();
     expect(element.querySelector('.quest')).toBeNull();
+    expect(element.querySelector('#boss-title')).toBeNull();
   });
 
   it('renders the configured server-provided boss window in UTC', async () => {
