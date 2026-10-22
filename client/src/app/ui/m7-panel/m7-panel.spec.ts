@@ -1,0 +1,61 @@
+import { type ComponentFixture, TestBed } from '@angular/core/testing';
+import {
+  FIELD_BOSS_ID,
+  FIELD_BOSS_MAP_ID,
+  type M7State,
+  M7_EVENT_ID,
+  M7_EVENT_QUEST_ID,
+} from '@ninja/shared';
+import { afterEach, describe, expect, it } from 'vitest';
+import { M7Panel } from './m7-panel';
+
+const state: M7State = {
+  event: {
+    id: M7_EVENT_ID,
+    enabled: true,
+    utcDay: '2026-10-22',
+    loginClaimed: false,
+    loginReward: { yen: 100, items: [{ itemId: 'item-banh-bao', qty: 1 }] },
+    quest: {
+      id: M7_EVENT_QUEST_ID,
+      name: 'Hạ quái đầu tiên',
+      description: 'Hạ một quái.',
+      progress: 0,
+      target: 1,
+      complete: false,
+      rewarded: false,
+      reward: { yen: 250, items: [{ itemId: 'item-tra-rung', qty: 1 }] },
+    },
+  },
+  boss: {
+    id: FIELD_BOSS_ID,
+    mapId: FIELD_BOSS_MAP_ID,
+    name: 'Thú Vương',
+    active: false,
+    windowStartsAt: Date.parse('2026-10-22T10:03:00.000Z'),
+    windowEndsAt: Date.parse('2026-10-22T10:04:00.000Z'),
+    dailyLootClaimed: false,
+    lootItemId: 'item-da-vun',
+    lootQty: 1,
+  },
+};
+
+describe('M7Panel', () => {
+  let fixture: ComponentFixture<M7Panel> | undefined;
+
+  afterEach(() => {
+    fixture?.destroy();
+    fixture = undefined;
+  });
+
+  it('renders the configured server-provided boss window in UTC', async () => {
+    await TestBed.configureTestingModule({ imports: [M7Panel] }).compileComponents();
+    fixture = TestBed.createComponent(M7Panel);
+    fixture.componentRef.setInput('state', state);
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('10:03 UTC–10:04 UTC');
+    expect(text).not.toContain('15 phút đầu mỗi giờ UTC');
+  });
+});
