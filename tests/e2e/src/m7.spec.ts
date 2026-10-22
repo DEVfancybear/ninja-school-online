@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { Pool } from 'pg';
+import { createDedicatedE2ePool, validateDedicatedE2eDatabaseUrl } from '../config/safety.js';
 
 const PASSWORD = 'Ninja!Test123';
 const START_MAP_NAME = 'Làng Khởi Nguồn';
@@ -88,15 +89,11 @@ function dedicatedE2eDatabaseUrl(): string {
   const connectionString = process.env.NINJA_E2E_DATABASE_URL;
   test.skip(!connectionString, 'Boss-victory fixture requires a disposable NINJA_E2E_DATABASE_URL.');
   if (!connectionString) throw new Error('NINJA_E2E_DATABASE_URL is required for the boss-victory fixture.');
-  const databaseName = new URL(connectionString).pathname.slice(1);
-  if (databaseName !== 'ninja_m7_e2e') {
-    throw new Error(`Refusing boss-victory fixture on database ${databaseName}; only ninja_m7_e2e is allowed.`);
-  }
-  return connectionString;
+  return validateDedicatedE2eDatabaseUrl(connectionString);
 }
 
 async function prepareBossTestCharacters(connectionString: string, names: readonly string[]): Promise<void> {
-  const pool = new Pool({ connectionString, max: 1 });
+  const pool = createDedicatedE2ePool(connectionString, Pool);
   try {
     const result = await pool.query(
       'UPDATE characters SET level = 60, exp = 0, hp = NULL, mp = NULL, updated_at = now() WHERE name = ANY($1::varchar[])',

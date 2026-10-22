@@ -18,4 +18,33 @@
 - Unit: UTC schedule start/end, UTC day reset, cấu hình boss.
 - Server integration trên `ninja_test`: guild error codes, 20-member cap/leader transfer, 3 người chat bang, XP lên cấp, login duplicate + UTC reset, event disable, quest mail idempotency, và 8 settlement đồng thời chỉ cấp 1 boss item.
 - Server admission regressions: concurrent join xác nhận đúng 3 người vào boss và người thứ tư bị `invalid_target`; ordinary PvE concurrent join vẫn đúng 2 người, người thứ ba nhận `invalid_target`; boss ngoài cửa sổ trả đúng `boss_closed` và không mở trận.
-- Browser E2E chạy trên DB disposable `ninja_m7_e2e` sau khi migration áp dụng tường minh. Fixture chỉ đặt nhân vật test lên cấp 60 và HP/MP đầy trong DB này; mọi tấn công/đánh lượt diễn ra qua browser. Dedicated Playwright config buộc đúng tên DB, dùng cổng riêng (3307/4307 mặc định) và lịch boss 1/1 phút chỉ trên server E2E. Kết quả: `pnpm --filter @ninja/e2e e2e --grep "M7:" --trace=off --workers=1 --reporter=line --timeout=120000` — 2/2 passed; gồm thắng trận, một `item-da-vun` mỗi nhân vật/ngày, 25 XP cho bang, hoàn tất nhiệm vụ tiến độ 1 và đúng một thư thưởng nhiệm vụ mỗi người. Không dùng DB dev `ninja` hoặc cổng 3000/4200.
+- Browser E2E được báo cáo đã chạy trên DB disposable `ninja_m7_e2e` sau khi migration áp dụng tường minh. Fixture chỉ đặt nhân vật test lên cấp 60 và HP/MP đầy trong DB này; mọi tấn công/đánh lượt diễn ra qua browser. Dedicated Playwright config buộc đúng tên DB, dùng cổng riêng (3307/4307 mặc định) và lịch boss 1/1 phút chỉ trên server E2E. Báo cáo trên nhánh coder: `pnpm --filter @ninja/e2e e2e --grep "M7:" --trace=off --workers=1 --reporter=line --timeout=120000` — 2/2 passed; gồm thắng trận, một `item-da-vun` mỗi nhân vật/ngày, 25 XP cho bang, hoàn tất nhiệm vụ tiến độ 1 và đúng một thư thưởng nhiệm vụ mỗi người. Đây là kết quả được báo cáo trên nhánh, chưa được xác minh độc lập trên revision tích hợp; E2E không chạy lại cho delta safety hiện tại và CI/verifier vẫn pending. Không dùng DB dev `ninja` hoặc cổng 3000/4200.
+
+### DB disposable cho browser E2E (PowerShell)
+
+Chỉ dùng PostgreSQL loopback `127.0.0.1:5432` và database có tên chính xác `ninja_m7_e2e`. Trước khi tạo, migrate, chạy hoặc xóa, xác nhận host/cổng và tên DB bằng lệnh bên dưới; nếu kết quả không khớp, dừng lại. Không chạy lệnh xóa trên database `ninja`, `ninja_test` hay bất kỳ DB nào khác. Mật khẩu ở ví dụ là giá trị dev trong `infra/README.md`; thay bằng mật khẩu local của bạn nếu khác.
+
+```powershell
+$env:PGPASSWORD = 'ninja_dev_password'
+# Xác nhận đúng PostgreSQL loopback trước khi tạo DB:
+psql -h 127.0.0.1 -p 5432 -U ninja -d postgres -c 'SELECT current_database(), inet_server_addr(), inet_server_port();'
+# Chỉ chạy nếu ninja_m7_e2e chưa tồn tại; nếu đã tồn tại, bỏ qua lệnh này và kiểm tra DB bên dưới (không xóa/tạo lại):
+createdb -h 127.0.0.1 -p 5432 -U ninja ninja_m7_e2e
+$env:NINJA_E2E_DATABASE_URL = 'postgresql://ninja:ninja_dev_password@127.0.0.1:5432/ninja_m7_e2e'
+$env:DATABASE_URL = $env:NINJA_E2E_DATABASE_URL
+# Trước khi migrate, xác nhận đích chính xác; nếu sai database/host/cổng, dừng:
+psql -h 127.0.0.1 -p 5432 -U ninja -d ninja_m7_e2e -c 'SELECT current_database(), inet_server_addr(), inet_server_port();'
+pnpm db:migrate
+# Xác nhận lại đích sau migration rồi chạy E2E; Playwright dùng riêng cổng 3307/4307 và không tái sử dụng server:
+psql -h 127.0.0.1 -p 5432 -U ninja -d ninja_m7_e2e -c 'SELECT current_database(), inet_server_addr(), inet_server_port();'
+pnpm --filter @ninja/e2e e2e --grep 'M7:' --trace=off --workers=1 --reporter=line --timeout=120000
+```
+
+Để dọn DB, trước hết dừng hẳn Playwright/E2E và mọi server E2E; xác nhận lại đúng `ninja_m7_e2e` trên `127.0.0.1:5432`, rồi chỉ chạy lệnh `dropdb` hard-code tên dedicated dưới đây. Không thay tên DB trong lệnh bằng `ninja` và không xóa DB khi E2E còn chạy.
+
+```powershell
+psql -h 127.0.0.1 -p 5432 -U ninja -d ninja_m7_e2e -c 'SELECT current_database(), inet_server_addr(), inet_server_port();'
+# Chỉ chạy nếu kết quả xác nhận chính xác ninja_m7_e2e / 127.0.0.1 / 5432:
+dropdb -h 127.0.0.1 -p 5432 -U ninja ninja_m7_e2e
+Remove-Item Env:NINJA_E2E_DATABASE_URL, Env:DATABASE_URL, Env:PGPASSWORD
+```
