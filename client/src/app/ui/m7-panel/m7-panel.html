@@ -16,7 +16,13 @@
           <strong>{{ current.event.quest.name }}</strong>
           <p>{{ current.event.quest.description }}</p>
           <p>Tiến độ: {{ current.event.quest.progress }} / {{ current.event.quest.target }} · {{ current.event.quest.complete ? 'Hoàn thành' : 'Đang thực hiện' }}</p>
-          <p>{{ current.event.quest.rewarded ? 'Thưởng đã gửi vào hộp thư.' : 'Phần thưởng tự gửi vào hộp thư khi hoàn thành.' }}</p>
+          @if (current.event.quest.rewarded) {
+            <p>Thưởng đã gửi vào hộp thư.</p>
+          } @else if (current.event.quest.complete) {
+            <p>Nhiệm vụ đã hoàn thành; phần thưởng đang được xử lý.</p>
+          } @else {
+            <p>Phần thưởng tự gửi vào hộp thư khi hoàn thành.</p>
+          }
         </div>
       } @else {
         <p>Event hiện đang tạm đóng.</p>

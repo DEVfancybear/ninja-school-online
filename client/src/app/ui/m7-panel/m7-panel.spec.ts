@@ -137,6 +137,24 @@ describe('M7Panel', () => {
     expect(text).toContain('Phần thưởng tự gửi vào hộp thư khi hoàn thành.');
   });
 
+  it('distinguishes completed quest from pending reward mail', async () => {
+    await TestBed.configureTestingModule({ imports: [M7Panel] }).compileComponents();
+    fixture = TestBed.createComponent(M7Panel);
+    fixture.componentRef.setInput('state', {
+      ...state,
+      event: {
+        ...state.event,
+        quest: { ...state.event.quest, progress: 1, complete: true, rewarded: false },
+      },
+    });
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Tiến độ: 1 / 1 · Hoàn thành');
+    expect(text).toContain('Nhiệm vụ đã hoàn thành; phần thưởng đang được xử lý.');
+    expect(text).not.toContain('Thưởng đã gửi vào hộp thư.');
+  });
+
   it('shows the server-owned event quest completion and mailed reward', async () => {
     await TestBed.configureTestingModule({ imports: [M7Panel] }).compileComponents();
     fixture = TestBed.createComponent(M7Panel);
