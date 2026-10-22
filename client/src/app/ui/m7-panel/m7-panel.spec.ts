@@ -58,6 +58,8 @@ describe('M7Panel', () => {
     expect(element.querySelector('.action')).toBeNull();
     expect(element.querySelector('.quest')).toBeNull();
     expect(element.querySelector('#boss-title')).toBeNull();
+    expect(element.textContent).not.toContain('Vật phẩm đặc biệt:');
+    expect(element.textContent).not.toContain(state.boss.lootItemId);
   });
 
   it('renders the configured server-provided boss window in UTC', async () => {
