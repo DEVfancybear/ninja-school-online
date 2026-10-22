@@ -76,4 +76,18 @@ describe('M7Panel', () => {
     expect(text).toContain('23:59 UTC–00:14 UTC');
     expect(text).not.toContain('15 phút đầu mỗi giờ UTC');
   });
+
+  it('shows the server-owned daily loot claim state', async () => {
+    await TestBed.configureTestingModule({ imports: [M7Panel] }).compileComponents();
+    fixture = TestBed.createComponent(M7Panel);
+    fixture.componentRef.setInput('state', {
+      ...state,
+      boss: { ...state.boss, dailyLootClaimed: true },
+    });
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Bạn đã nhận vật phẩm boss hôm nay (UTC).');
+    expect(text).not.toContain('Giới hạn: 1 vật phẩm / ngày UTC / nhân vật.');
+  });
 });
