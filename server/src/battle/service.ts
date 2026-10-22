@@ -129,6 +129,7 @@ export interface EngageRequest {
 export class BattleService {
   private readonly battles = new Map<string, ActiveBattle>();
   private readonly admissions = new Set<string>();
+  private readonly admissionQueues = new Map<string, Promise<void>>();
   private readonly settling = new Set<string>();
   private readonly chains = new Map<string, Promise<void>>();
   private readonly now: () => number;
@@ -162,6 +163,7 @@ export class BattleService {
     this.unsubscribe();
     this.battles.clear();
     this.admissions.clear();
+    this.admissionQueues.clear();
     this.settling.clear();
   }
 
@@ -195,41 +197,91 @@ export class BattleService {
       return;
     }
 
-    // Reserve synchronously before database reads so arena admission cannot pass concurrently.
+    // Reserve synchronously so this character cannot race into another activity while queued.
     this.admissions.add(player.id);
+    const admissionKey = `${room.map.id}:${monster.id}`;
     try {
-      const record = await this.options.characters.findById(player.id);
-      const bonus = record ? await this.options.equipment.bonusFor(record.id) : NO_STATS_BONUS;
-      const combatant = record ? this.playerCombatant(record, bonus) : undefined;
-      if (!combatant) {
-        session.sendError(ErrorCode.INTERNAL, 'không đọc được nhân vật của bạn, hãy vào lại');
-        return;
-      }
-
-      const existing = this.battleForMonster(room.map.id, monster.id);
-      if (existing) {
-        const playerLimit = monster.monsterId === FIELD_BOSS_ID ? FIELD_BOSS_MAX_PLAYERS : BATTLE_MAX_PLAYERS;
-        if (existing.players.size >= playerLimit) {
+      await this.withAdmissionLock(admissionKey, async () => {
+        // The target and its schedule may have changed while this request waited behind another admission.
+        const currentMonster = room.monsters().find((candidate) => candidate.id === targetId);
+        if (!currentMonster || !currentMonster.alive) {
           session.sendError(
-            ErrorCode.INVALID_TARGET,
-            `trận này đã đủ ${playerLimit} người, hãy tìm con quái khác`,
+            ErrorCode.MONSTER_GONE,
+            'không có con quái này ở đây — có thể nó vừa bị hạ, chờ nó sống lại',
           );
           return;
         }
-        existing.players.set(combatant.id, combatant);
-        player.target = undefined;
-        this.broadcast(existing, Opcode.S2C_BATTLE_START, this.startPayload(existing));
-        return;
-      }
+        if (currentMonster.monsterId === FIELD_BOSS_ID && !this.options.isFieldBossActive?.()) {
+          session.sendError(ErrorCode.BOSS_CLOSED, 'Thú Vương chỉ xuất hiện trong 15 phút đầu mỗi giờ UTC');
+          return;
+        }
+        if (distance(player.x, player.y, currentMonster.x, currentMonster.y) > MONSTER_ENGAGE_RANGE_PX) {
+          session.sendError(ErrorCode.OUT_OF_RANGE, 'bạn ở quá xa con quái này, hãy lại gần rồi đánh');
+          return;
+        }
 
-      const battle = this.createBattle(room, monster, combatant);
-      player.target = undefined;
-      this.beginNextTurn(battle, this.now(), false);
-      if (!battle.over) {
-        this.broadcast(battle, Opcode.S2C_BATTLE_START, this.startPayload(battle));
-      }
+        const record = await this.options.characters.findById(player.id);
+        const bonus = record ? await this.options.equipment.bonusFor(record.id) : NO_STATS_BONUS;
+        const combatant = record ? this.playerCombatant(record, bonus) : undefined;
+        if (!combatant) {
+          session.sendError(ErrorCode.INTERNAL, 'không đọc được nhân vật của bạn, hãy vào lại');
+          return;
+        }
+
+        // Recheck after database reads: the room monster could have been defeated while this was queued.
+        if (!currentMonster.alive) {
+          session.sendError(
+            ErrorCode.MONSTER_GONE,
+            'không có con quái này ở đây — có thể nó vừa bị hạ, chờ nó sống lại',
+          );
+          return;
+        }
+        const existing = this.battleForMonster(room.map.id, currentMonster.id);
+        if (existing) {
+          const playerLimit = currentMonster.monsterId === FIELD_BOSS_ID ? FIELD_BOSS_MAX_PLAYERS : BATTLE_MAX_PLAYERS;
+          if (existing.players.size >= playerLimit) {
+            session.sendError(
+              ErrorCode.INVALID_TARGET,
+              `trận này đã đủ ${playerLimit} người, hãy tìm con quái khác`,
+            );
+            return;
+          }
+          existing.players.set(combatant.id, combatant);
+          player.target = undefined;
+          this.broadcast(existing, Opcode.S2C_BATTLE_START, this.startPayload(existing));
+          return;
+        }
+
+        const battle = this.createBattle(room, currentMonster, combatant);
+        player.target = undefined;
+        this.beginNextTurn(battle, this.now(), false);
+        if (!battle.over) {
+          this.broadcast(battle, Opcode.S2C_BATTLE_START, this.startPayload(battle));
+        }
+      });
     } finally {
       this.admissions.delete(player.id);
+    }
+  }
+
+  /** Serialize all asynchronous admission work for one map monster, including the first battle creation. */
+  private async withAdmissionLock<T>(key: string, task: () => Promise<T>): Promise<T> {
+    const previous = this.admissionQueues.get(key) ?? Promise.resolve();
+    let release!: () => void;
+    const current = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const queued = previous.then(() => current);
+    this.admissionQueues.set(key, queued);
+
+    await previous;
+    try {
+      return await task();
+    } finally {
+      release();
+      if (this.admissionQueues.get(key) === queued) {
+        this.admissionQueues.delete(key);
+      }
     }
   }
 

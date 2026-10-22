@@ -141,6 +141,8 @@ async function defeatBossThroughBrowser(pages: readonly Page[]): Promise<HookBat
 }
 
 test('M7: three guild members chat together and first event login reward is claimable once', async ({ browser }) => {
+  test.skip(!process.env.NINJA_E2E_DATABASE_URL, 'Requires the dedicated disposable ninja_m7_e2e database.');
+  dedicatedE2eDatabaseUrl();
   const suffix = await uniqueSuffix();
   const contexts = await Promise.all([browser.newContext(), browser.newContext(), browser.newContext()]);
   const pages = await Promise.all(contexts.map((context) => context.newPage()));

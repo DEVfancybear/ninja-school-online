@@ -269,6 +269,13 @@ describe('PvE admission reservation', () => {
       );
       expect(admittedPlayers).toHaveLength(FIELD_BOSS_MAX_PLAYERS);
       expect(deniedPlayers).toHaveLength(1);
+      const startPayloads = admittedPlayers.flatMap((participant) =>
+        (messages.get(participant.record.id) ?? [])
+          .filter((message) => message.op === Opcode.S2C_BATTLE_START)
+          .map((message) => message.payload as { battleId: string }),
+      );
+      expect(new Set(startPayloads.map((payload) => payload.battleId)).size).toBe(1);
+      expect(battle.activeCount).toBe(1);
       const participantIds = (messages.get(admittedPlayers.at(-1)!.record.id) ?? [])
         .filter((message) => message.op === Opcode.S2C_BATTLE_START)
         .flatMap((message) => (message.payload as { participants: { id: string; kind: string }[] }).participants)
@@ -364,6 +371,13 @@ describe('PvE admission reservation', () => {
       );
       expect(admittedPlayers).toHaveLength(BATTLE_MAX_PLAYERS);
       expect(deniedPlayers).toHaveLength(1);
+      const startPayloads = admittedPlayers.flatMap((participant) =>
+        (messages.get(participant.record.id) ?? [])
+          .filter((message) => message.op === Opcode.S2C_BATTLE_START)
+          .map((message) => message.payload as { battleId: string }),
+      );
+      expect(new Set(startPayloads.map((payload) => payload.battleId)).size).toBe(1);
+      expect(battle.activeCount).toBe(1);
       const errors = (messages.get(deniedPlayers[0]!.record.id) ?? [])
         .filter((message) => message.op === Opcode.S2C_ERROR);
       expect(errors).toHaveLength(1);

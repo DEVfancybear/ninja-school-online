@@ -1,28 +1,20 @@
 import { defineConfig, devices } from '@playwright/test';
+import { validateE2eSafety } from './config/safety.js';
 
 const DEDICATED_DATABASE_URL = process.env.NINJA_E2E_DATABASE_URL;
-const DEDICATED_DATABASE_NAME = DEDICATED_DATABASE_URL
-  ? new URL(DEDICATED_DATABASE_URL).pathname.slice(1)
-  : undefined;
-if (DEDICATED_DATABASE_URL && DEDICATED_DATABASE_NAME !== 'ninja_m7_e2e') {
-  throw new Error('Dedicated E2E database must be exactly `ninja_m7_e2e`; refusing to run.');
-}
-
-const SERVER_PORT = Number(process.env.NINJA_E2E_SERVER_PORT ?? (DEDICATED_DATABASE_URL ? 3307 : 3000));
+const { serverPort: SERVER_PORT, clientPort: CLIENT_PORT } = validateE2eSafety({
+  databaseUrl: DEDICATED_DATABASE_URL,
+  serverPort: Number(process.env.NINJA_E2E_SERVER_PORT ?? 3307),
+  clientPort: Number(process.env.NINJA_E2E_CLIENT_PORT ?? 4307),
+});
 const SERVER_URL = `http://127.0.0.1:${SERVER_PORT}`;
-/**
- * Cổng server/client khi chạy E2E. Chế độ DB riêng mặc định tránh cổng dev; có thể ghi đè bằng
- * `NINJA_E2E_SERVER_PORT` / `NINJA_E2E_CLIENT_PORT` để cùng proxy trỏ vào đúng server-port này.
- */
-const CLIENT_PORT = Number(process.env.NINJA_E2E_CLIENT_PORT ?? (DEDICATED_DATABASE_URL ? 4307 : 4200));
 const CLIENT_URL = `http://127.0.0.1:${CLIENT_PORT}`;
-const REUSE_SERVER = !process.env.CI && !DEDICATED_DATABASE_URL;
+const REUSE_SERVER = false;
 
 /**
- * Kiểm thử đầu-cuối bằng trình duyệt thật.
- * Chế độ thường dùng cấu hình phát triển. Để kiểm thử cô lập, đặt `NINJA_E2E_DATABASE_URL` vào DB
- * disposable và hai biến port ở trên; cấu hình sẽ không tái sử dụng server đang chạy. Mỗi lần chạy
- * vẫn tạo tên duy nhất, nhưng không coi dữ liệu của DB dùng chung là dữ liệu có thể xoá.
+ * Kiểm thử đầu-cuối bằng trình duyệt thật; luôn yêu cầu DB disposable chính xác `ninja_m7_e2e`,
+ * cổng non-dev, và server không được tái sử dụng. Mỗi lần chạy vẫn tạo tên duy nhất, nhưng không
+ * coi dữ liệu của DB dùng chung là dữ liệu có thể xoá.
  */
 export default defineConfig({
   testDir: './src',
