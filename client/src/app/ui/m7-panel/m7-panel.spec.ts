@@ -104,4 +104,21 @@ describe('M7Panel', () => {
     expect(button?.disabled).toBe(true);
     expect(button?.textContent?.trim()).toBe('Đã nhận quà hôm nay');
   });
+
+  it('shows the server-owned event quest completion and mailed reward', async () => {
+    await TestBed.configureTestingModule({ imports: [M7Panel] }).compileComponents();
+    fixture = TestBed.createComponent(M7Panel);
+    fixture.componentRef.setInput('state', {
+      ...state,
+      event: {
+        ...state.event,
+        quest: { ...state.event.quest, progress: 1, complete: true, rewarded: true },
+      },
+    });
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Tiến độ: 1 / 1 · Hoàn thành');
+    expect(text).toContain('Thưởng đã gửi vào hộp thư.');
+  });
 });
