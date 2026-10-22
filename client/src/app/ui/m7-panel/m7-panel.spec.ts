@@ -144,6 +144,8 @@ describe('M7Panel', () => {
     expect(element.textContent).toContain('Event hiện đang tạm đóng.');
     expect(element.querySelector('.action')).toBeNull();
     expect(element.querySelector('.quest')).toBeNull();
+    expect(element.querySelector('#boss-title')?.textContent?.trim()).toBe(state.boss.name);
+    expect(element.textContent).toContain('2026-10-22 10:03 UTC–2026-10-22 10:04 UTC');
   });
 
   it('shows server-reported quest progress before completion', async () => {
