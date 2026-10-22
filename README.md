@@ -92,7 +92,7 @@ Các thư mục `client/`, `server/`, `shared/`, `tools/data-validator/` đã c�
 - [x] **M4:** trang bị theo ô, shop mua/bán và cường hóa.
 - [x] **M5:** nhiệm vụ chính tuyến chương 1.
 - [x] **M6 — kết thúc Alpha:** bạn bè, tổ đội, chat thế giới/tổ đội/riêng, Lôi Đài 1v1 và Elo, bảng xếp hạng, thư hệ thống. Migration, tests, E2E và CI: [roadmap](docs/03-plan/roadmap.md).
-- [x] **M7:** bang hội (tạo/tham gia/rời/chat/cấp), boss dã ngoại co-op có giới hạn quà/ngày, sự kiện quà đăng nhập + nhiệm vụ. Mặc định triển khai và kiểm chứng: [M7 details](docs/03-plan/m7-guild-boss-event.md).
+- [x] **M7:** bang hội (tạo/tham gia/rời/chat/cấp, presence online realtime), boss dã ngoại co-op có giới hạn quà/ngày, sự kiện quà đăng nhập + nhiệm vụ. Mặc định triển khai và kiểm chứng: [M7 details](docs/03-plan/m7-guild-boss-event.md).
 - [ ] Quyết định có đổi tên sản phẩm hay không (xem mục 6).
 
 ## 6. Lưu ý bản quyền (đọc kỹ)
