@@ -54,8 +54,10 @@
         [equipmentOpen]="equipmentOpen()"
         [questOpen]="questOpen()"
         [socialOpen]="socialOpen()"
+        [guildOpen]="guildOpen()"
         [arenaOpen]="arenaOpen()"
         [mailOpen]="mailOpen()"
+        [m7Open]="m7Open()"
         [socialBadge]="socialBadge()"
         [mailBadge]="mailBadge()"
         (toggleChat)="toggleChat()"
@@ -63,8 +65,10 @@
         (toggleEquipment)="toggleEquipment()"
         (toggleQuest)="toggleQuest()"
         (toggleSocial)="toggleSocial()"
+        (toggleGuild)="toggleGuild()"
         (toggleArena)="toggleArena()"
         (toggleMail)="toggleMail()"
+        (toggleM7)="toggleM7()"
       />
 
       @if (chatVisible()) {
@@ -122,6 +126,16 @@
         />
       }
 
+      @if (guildOpen()) {
+        <app-guild-panel
+          [state]="guildSnapshot()"
+          (closed)="setGuildOpen(false)"
+          (create)="onGuildCreate($event)"
+          (join)="onGuildJoin($event)"
+          (leave)="onGuildLeave()"
+        />
+      }
+
       @if (arenaOpen()) {
         <app-arena-panel
           [state]="arena()"
@@ -142,6 +156,14 @@
           [maxEntries]="mailCapacity()"
           (claim)="onMailClaim($event)"
           (closed)="setMailOpen(false)"
+        />
+      }
+
+      @if (m7Open()) {
+        <app-m7-panel
+          [state]="m7Snapshot()"
+          (closed)="setM7Open(false)"
+          (claimLogin)="onM7LoginClaim()"
         />
       }
 

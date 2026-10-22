@@ -24,7 +24,7 @@ export interface ChatDraft {
   readonly to?: string;
 }
 
-/** Bốn kênh người chơi chọn được, kèm nhãn tiếng Việt. `system` chỉ server dùng. */
+/** Năm kênh người chơi chọn được, kèm nhãn tiếng Việt. `system` chỉ server dùng. */
 export const CHAT_CHANNEL_OPTIONS: readonly {
   readonly value: ChatSendChannel;
   readonly label: string;
@@ -34,6 +34,7 @@ export const CHAT_CHANNEL_OPTIONS: readonly {
   { value: 'map', label: 'Bản đồ', prefix: null },
   { value: 'world', label: 'Thế giới', prefix: 'Thế giới' },
   { value: 'party', label: 'Tổ đội', prefix: 'Tổ đội' },
+  { value: 'guild', label: 'Bang', prefix: 'Bang' },
   { value: 'private', label: 'Riêng', prefix: 'Riêng' },
 ];
 

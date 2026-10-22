@@ -23,6 +23,7 @@ import {
   type PartyInvite,
   type PartyReply,
   type MailClaim,
+  type GuildName,
   type LeaderboardRequest,
   type QuestAccept,
   type QuestComplete,
@@ -483,6 +484,21 @@ export class WebSocketGateway {
         if (request) await world.claimMail(session, request.mailId);
         return;
       }
+      case Opcode.C2S_GUILD_CREATE:
+      case Opcode.C2S_GUILD_JOIN: {
+        const request = this.decode<GuildName>(session, op, payload);
+        if (request) await world.guildCommand(session, op === Opcode.C2S_GUILD_CREATE ? 'create' : 'join', request.name);
+        return;
+      }
+      case Opcode.C2S_GUILD_LEAVE:
+        if (this.decode(session, op, payload)) await world.guildCommand(session, 'leave');
+        return;
+      case Opcode.C2S_M7_STATE:
+        if (this.decode(session, op, payload)) await world.sendM7State(session);
+        return;
+      case Opcode.C2S_EVENT_LOGIN_CLAIM:
+        if (this.decode(session, op, payload)) await world.claimM7Login(session);
+        return;
       case Opcode.C2S_LEADERBOARD: {
         const request = this.decode<LeaderboardRequest>(session, op, payload);
         if (request) await world.leaderboard(session, request);

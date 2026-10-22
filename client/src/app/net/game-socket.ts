@@ -252,6 +252,26 @@ export class GameSocket {
     return this.send(Opcode.C2S_MAIL_CLAIM, { mailId });
   }
 
+  createGuild(name: string): boolean {
+    return this.send(Opcode.C2S_GUILD_CREATE, { name });
+  }
+
+  joinGuild(name: string): boolean {
+    return this.send(Opcode.C2S_GUILD_JOIN, { name });
+  }
+
+  leaveGuild(): boolean {
+    return this.send(Opcode.C2S_GUILD_LEAVE, {});
+  }
+
+  requestM7State(): boolean {
+    return this.send(Opcode.C2S_M7_STATE, {});
+  }
+
+  claimEventLogin(): boolean {
+    return this.send(Opcode.C2S_EVENT_LOGIN_CLAIM, {});
+  }
+
   arenaQueue(): boolean {
     return this.send(Opcode.C2S_ARENA_QUEUE, {});
   }

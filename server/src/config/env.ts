@@ -19,8 +19,20 @@ const EnvSchema = z
     JWT_SECRET: z.string().min(16, 'JWT_SECRET phải có ít nhất 16 ký tự').default(DEV_JWT_SECRET),
     JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().positive().default(900),
     JWT_REFRESH_TTL_DAYS: z.coerce.number().int().positive().default(30),
+    /** M7 event is on by default; operators can disable claims/progress without a code deploy. */
+    M7_EVENT_ENABLED: z.enum(['true', 'false']).default('true').transform((value) => value === 'true'),
+    /** Field boss repeats on this UTC-minute interval; defaults to the first 15 minutes of each hour. */
+    FIELD_BOSS_INTERVAL_MINUTES: z.coerce.number().int().min(1).max(1440).default(60),
+    FIELD_BOSS_WINDOW_MINUTES: z.coerce.number().int().min(1).max(120).default(15),
+    FIELD_BOSS_START_OFFSET_MINUTES: z.coerce.number().int().min(0).max(1439).default(0),
   })
   .superRefine((value, ctx) => {
+    if (value.FIELD_BOSS_WINDOW_MINUTES > value.FIELD_BOSS_INTERVAL_MINUTES) {
+      ctx.addIssue({ code: 'custom', path: ['FIELD_BOSS_WINDOW_MINUTES'], message: 'cửa sổ boss không được dài hơn chu kỳ' });
+    }
+    if (value.FIELD_BOSS_START_OFFSET_MINUTES >= value.FIELD_BOSS_INTERVAL_MINUTES) {
+      ctx.addIssue({ code: 'custom', path: ['FIELD_BOSS_START_OFFSET_MINUTES'], message: 'mốc mở boss phải nằm trong chu kỳ UTC' });
+    }
     if (value.NODE_ENV === 'production' && value.JWT_SECRET === DEV_JWT_SECRET) {
       ctx.addIssue({
         code: 'custom',

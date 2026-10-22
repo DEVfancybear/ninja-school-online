@@ -3,9 +3,11 @@ import { ArenaState } from '../net/arena-state';
 import { BattleState } from '../net/battle-state';
 import { MailState } from '../net/mail-state';
 import { PartyState } from '../net/party-state';
+import { GuildState } from '../net/guild-state';
+import { M7ClientState } from '../net/m7-state';
 import { SocialState } from '../net/social-state';
 import { WorldState } from '../net/world-state';
-import type { SocialPerson } from '@ninja/shared';
+import type { GuildUpdate, M7State, SocialPerson } from '@ninja/shared';
 import type { Point } from './world-logic';
 
 declare global {
@@ -262,6 +264,10 @@ export interface NinjaWorldTestHook {
   social(): NinjaTestSocial;
   /** Tổ đội đang vẽ. */
   party(): NinjaTestParty;
+  /** Bang hội do server trả về. */
+  guild(): GuildUpdate;
+  /** Trạng thái event/boss do server trả về; null đến khi handshake hoàn tất. */
+  m7(): M7State | null;
   /** Hàng chờ và điểm Lôi Đài đang vẽ. */
   arena(): NinjaTestArena;
   /** Hộp thư đang vẽ, kèm quà của từng lá. */
@@ -300,6 +306,8 @@ export class WorldTestHook {
   private readonly battleState = inject(BattleState);
   private readonly socialState = inject(SocialState);
   private readonly partyState = inject(PartyState);
+  private readonly guildState = inject(GuildState);
+  private readonly m7State = inject(M7ClientState);
   private readonly arenaState = inject(ArenaState);
   private readonly mailState = inject(MailState);
   private installed = false;
@@ -394,6 +402,8 @@ export class WorldTestHook {
       lastError: () => actions.lastError(),
       social: () => this.social(),
       party: () => this.party(),
+      guild: () => this.guildState.snapshot(),
+      m7: () => this.m7State.snapshot(),
       arena: () => this.arena(),
       mails: () => this.mails(),
     };

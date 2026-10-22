@@ -1,0 +1,35 @@
+<section class="guild-panel" role="region" aria-labelledby="guild-title">
+  <header>
+    <h2 id="guild-title">Bang hội</h2>
+    <button type="button" class="close" aria-label="Đóng bảng bang hội" (click)="closed.emit()">Đóng</button>
+  </header>
+
+  @if (state().guild; as guild) {
+    <div class="guild-summary">
+      <h3>{{ guild.name }} <span>Cấp {{ guild.level }}</span></h3>
+      <p>Trưởng bang: {{ guild.leaderName }}</p>
+      <p>Kinh nghiệm: {{ guild.exp }} / {{ guild.expToNext || 'Tối đa' }}</p>
+      <p>{{ guild.members.length }} / {{ state().maxMembers }} thành viên</p>
+    </div>
+    <ul aria-label="Thành viên bang">
+      @for (member of guild.members; track member.name) {
+        <li><span class="status" [class.online]="member.online" aria-hidden="true"></span>{{ member.name }} · cấp {{ member.level }} @if (member.name === guild.leaderName) { <strong>Trưởng bang</strong> }</li>
+      }
+    </ul>
+    <p class="hint">Chọn kênh “Bang” trong khung chat để trò chuyện cùng thành viên.</p>
+    <button class="action" type="button" (click)="leave.emit()">Rời bang</button>
+  } @else {
+    <p>Bạn chưa ở trong bang nào.</p>
+    <form (submit)="$event.preventDefault(); submit('create')">
+      <label for="guild-create-name">Tên bang mới</label>
+      <input id="guild-create-name" maxlength="24" autocomplete="off" [value]="name()" (input)="onName($event)" />
+      <button class="action" type="submit" [disabled]="name().trim().length < 3">Tạo bang</button>
+    </form>
+    <form (submit)="$event.preventDefault(); submit('join')">
+      <label for="guild-join-name">Gia nhập bang theo tên</label>
+      <input id="guild-join-name" maxlength="24" autocomplete="off" [value]="name()" (input)="onName($event)" />
+      <button class="action" type="submit" [disabled]="name().trim().length < 3">Gia nhập</button>
+    </form>
+    <p class="hint">Tên bang gồm 3–24 chữ cái, chữ số, dấu cách, gạch dưới hoặc gạch ngang.</p>
+  }
+</section>

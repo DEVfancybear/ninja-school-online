@@ -82,6 +82,15 @@
     </button>
     <button
       type="button"
+      class="hud__guild ghost"
+      [class.ghost--active]="guildOpen()"
+      (click)="toggleGuild.emit()"
+      aria-label="Bang hội"
+    >
+      Bang
+    </button>
+    <button
+      type="button"
       class="hud__arena ghost"
       [class.ghost--active]="arenaOpen()"
       (click)="toggleArena.emit()"
@@ -100,6 +109,15 @@
           mailBadge()
         }}</span>
       }
+    </button>
+    <button
+      type="button"
+      class="hud__m7 ghost"
+      [class.ghost--active]="m7Open()"
+      (click)="toggleM7.emit()"
+      aria-label="Sự kiện và Thú Vương"
+    >
+      Sự kiện
     </button>
     <button type="button" class="ghost" (click)="toggleChat.emit()">
       {{ chatVisible() ? 'Ẩn chat' : 'Hiện chat' }}

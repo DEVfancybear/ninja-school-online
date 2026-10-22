@@ -1,18 +1,21 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const SERVER_URL = 'http://127.0.0.1:3000';
+const SERVER_PORT = Number(process.env.NINJA_E2E_SERVER_PORT ?? 3000);
+const SERVER_URL = `http://127.0.0.1:${SERVER_PORT}`;
 /**
- * Cổng của client khi chạy e2e. Mặc định 4200; đổi bằng `NINJA_E2E_CLIENT_PORT` khi cổng đó đang
- * bận (ví dụ một dự án khác đang chạy dev server) — `reuseExistingServer` sẽ tưởng nhầm là app của
- * mình và kiểm thử sẽ chạy trên nhầm trang.
+ * Cổng server/client khi chạy E2E. Dùng `NINJA_E2E_SERVER_PORT` và `NINJA_E2E_CLIENT_PORT` để
+ * tránh chạm dev server người dùng; proxy của client trỏ vào đúng server-port này.
  */
 const CLIENT_PORT = Number(process.env.NINJA_E2E_CLIENT_PORT ?? 4200);
 const CLIENT_URL = `http://127.0.0.1:${CLIENT_PORT}`;
+const DEDICATED_DATABASE_URL = process.env.NINJA_E2E_DATABASE_URL;
+const REUSE_SERVER = !process.env.CI && !DEDICATED_DATABASE_URL;
 
 /**
  * Kiểm thử đầu-cuối bằng trình duyệt thật.
- * Dùng đúng cấu hình phát triển (server đọc .env ở gốc repo, client chạy ng serve với proxy /api).
- * Mỗi lần chạy dùng tên tài khoản/nhân vật sinh ngẫu nhiên nên không cần xoá dữ liệu cũ.
+ * Chế độ thường dùng cấu hình phát triển. Để kiểm thử cô lập, đặt `NINJA_E2E_DATABASE_URL` vào DB
+ * disposable và hai biến port ở trên; cấu hình sẽ không tái sử dụng server đang chạy. Mỗi lần chạy
+ * vẫn tạo tên duy nhất, nhưng không coi dữ liệu của DB dùng chung là dữ liệu có thể xoá.
  */
 export default defineConfig({
   testDir: './src',
@@ -32,15 +35,22 @@ export default defineConfig({
     {
       command: 'pnpm --filter @ninja/server dev',
       url: `${SERVER_URL}/health`,
-      reuseExistingServer: !process.env.CI,
+      env: {
+        HOST: '127.0.0.1',
+        PORT: String(SERVER_PORT),
+        CORS_ORIGIN: CLIENT_URL,
+        ...(DEDICATED_DATABASE_URL ? { DATABASE_URL: DEDICATED_DATABASE_URL } : {}),
+      },
+      reuseExistingServer: REUSE_SERVER,
       timeout: 120_000,
       stdout: 'pipe',
     },
     {
       // --host 0.0.0.0: mặc định của Angular chỉ bind IPv6 [::1] nên 127.0.0.1 không kết nối được.
-      command: `pnpm --filter @ninja/client dev --host 0.0.0.0 --port ${CLIENT_PORT}`,
+      command: `pnpm --filter @ninja/client dev --host 0.0.0.0 --port ${CLIENT_PORT} --proxy-config proxy.e2e.conf.cjs`,
       url: CLIENT_URL,
-      reuseExistingServer: !process.env.CI,
+      env: { NINJA_E2E_SERVER_PORT: String(SERVER_PORT) },
+      reuseExistingServer: REUSE_SERVER,
       timeout: 180_000,
       stdout: 'pipe',
     },

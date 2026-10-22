@@ -3,6 +3,8 @@ import {
   BATTLE_TURN_MS,
   DEFEAT_YEN_LOSS_RATIO,
   ErrorCode,
+  FIELD_BOSS_DAILY_LOOT,
+  FIELD_BOSS_ID,
   MONSTER_ENGAGE_RANGE_PX,
   MONSTER_TURN_DELAY_MS,
   Opcode,
@@ -39,6 +41,7 @@ import type { InventoryService } from '../modules/inventory/service.js';
 import type { GameSession } from '../net/session.js';
 import type { SessionRegistry } from '../net/session-registry.js';
 import type { GameData } from '../world/game-data.js';
+import type { BossLootResult } from '../modules/m7/service.js';
 import type { Room, RoomMonster, RoomPlayer } from '../world/room.js';
 import { distance } from '../world/movement.js';
 import {
@@ -96,6 +99,12 @@ export interface BattleServiceOptions {
    * room) để tầng nhiệm vụ cộng tiến độ. Gọi cho **mọi** người thắng trận.
    */
   onMonsterKilled?: (characterId: string, monsterId: string) => void;
+  /** Enforce schedule at encounter admission; rooms are ephemeral and not authoritative. */
+  isFieldBossActive?: () => boolean;
+  /** Unique UTC-day claim and inventory grant run in the M7 service transaction at settlement. */
+  grantBossLoot?: (characterId: string) => Promise<BossLootResult>;
+  /** A victory contributes guild XP once per guild represented in this encounter. */
+  onBossVictory?: (characterIds: readonly string[]) => Promise<void>;
   now?: () => number;
   rng?: Rng;
   onError?: (error: unknown) => void;
@@ -168,6 +177,10 @@ export class BattleService {
     }
 
     const monster = room.monsters().find((candidate) => candidate.id === targetId);
+    if (monster?.monsterId === FIELD_BOSS_ID && !this.options.isFieldBossActive?.()) {
+      session.sendError(ErrorCode.BOSS_CLOSED, 'Thú Vương chỉ xuất hiện trong 15 phút đầu mỗi giờ UTC');
+      return;
+    }
     if (!monster || !monster.alive) {
       session.sendError(
         ErrorCode.MONSTER_GONE,
@@ -626,6 +639,9 @@ export class BattleService {
       for (const combatant of participants) {
         await this.settlePlayer(battle, combatant, outcome, monster);
       }
+      if (outcome === 'victory' && monster && this.monsterDataOf(battle, monster.id)?.id === FIELD_BOSS_ID) {
+        await this.options.onBossVictory?.(participants.map((participant) => participant.id));
+      }
     } finally {
       for (const player of participants) this.settling.delete(player.id);
     }
@@ -684,6 +700,18 @@ export class BattleService {
             name: this.options.gameData.items.get(drop.itemId)?.name ?? drop.itemId,
             qty,
           });
+        }
+      }
+      if (monsterData.id === FIELD_BOSS_ID && this.options.grantBossLoot) {
+        const result = await this.options.grantBossLoot(combatant.id);
+        if (result === 'granted') {
+          drops.push({
+            itemId: FIELD_BOSS_DAILY_LOOT.itemId,
+            name: this.options.gameData.items.get(FIELD_BOSS_DAILY_LOOT.itemId)?.name ?? FIELD_BOSS_DAILY_LOOT.itemId,
+            qty: FIELD_BOSS_DAILY_LOOT.qty,
+          });
+        } else if (result === 'inventory_full') {
+          session?.sendError(ErrorCode.INVENTORY_FULL, 'Túi đồ đã đầy, phần thưởng boss chưa được tính lượt hôm nay; hãy dọn túi rồi thử lại');
         }
       }
 

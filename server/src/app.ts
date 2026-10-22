@@ -15,6 +15,8 @@ import { ChatService } from './modules/chat/service.js';
 import { SocialService } from './modules/social/service.js';
 import { PartyService } from './modules/party/service.js';
 import { MailService } from './modules/mail/service.js';
+import { GuildService } from './modules/guild/service.js';
+import { M7Service } from './modules/m7/service.js';
 import { LeaderboardService } from './modules/leaderboard/service.js';
 import { ArenaService } from './modules/arena/service.js';
 import { EquipmentService } from './modules/equipment/service.js';
@@ -100,7 +102,17 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
   const sessions = new SessionRegistry();
   const socialService = new SocialService(db, characterService, sessions);
   const partyService = new PartyService(characterService, sessions);
+  const fieldBossSchedule = {
+    intervalMinutes: env.FIELD_BOSS_INTERVAL_MINUTES,
+    windowMinutes: env.FIELD_BOSS_WINDOW_MINUTES,
+    startOffsetMinutes: env.FIELD_BOSS_START_OFFSET_MINUTES,
+  };
   const mailService = new MailService(db, inventoryService, gameData);
+  const guildService = new GuildService(db, characterService, sessions);
+  const m7Service = new M7Service(db, inventoryService, sessions, gameData, mailService, {
+    eventEnabled: env.M7_EVENT_ENABLED,
+    fieldBossSchedule,
+  });
   const leaderboardService = new LeaderboardService(db);
   const tick = new TickScheduler();
   const arenaService = new ArenaService(
@@ -114,6 +126,7 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
   const rooms = new RoomManager({
     gameData,
     tick,
+    fieldBossSchedule,
     onError: (error, mapId) => {
       app.log.error({ err: error, mapId }, 'room gặp lỗi trong nhịp tick');
     },
@@ -147,6 +160,9 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
     social: socialService,
     party: partyService,
     mail: mailService,
+    guild: guildService,
+    m7: m7Service,
+    fieldBossSchedule,
     leaderboard: leaderboardService,
     arena: arenaService,
     tick,
