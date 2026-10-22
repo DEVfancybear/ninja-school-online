@@ -196,6 +196,7 @@ describe('M7Panel', () => {
     expect(element.querySelector('.quest')).toBeNull();
     expect(element.querySelector('#boss-title')?.textContent?.trim()).toBe(state.boss.name);
     expect(element.textContent).toContain('2026-10-22 10:03 UTC–2026-10-22 10:04 UTC');
+    expect(element.textContent).toContain('Vật phẩm đặc biệt: 1 × item-da-vun.');
   });
 
   it('shows server-reported quest progress before completion', async () => {
