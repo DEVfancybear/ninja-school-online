@@ -52,8 +52,7 @@ export default defineConfig({
       stdout: 'pipe',
     },
     {
-      // --host 0.0.0.0: mặc định của Angular chỉ bind IPv6 [::1] nên 127.0.0.1 không kết nối được.
-      command: `pnpm --filter @ninja/client dev --host 0.0.0.0 --port ${CLIENT_PORT} --proxy-config proxy.e2e.conf.cjs`,
+      command: `pnpm --filter @ninja/client dev --host 127.0.0.1 --port ${CLIENT_PORT} --proxy-config proxy.e2e.conf.cjs`,
       url: CLIENT_URL,
       env: { NINJA_E2E_SERVER_PORT: String(SERVER_PORT) },
       reuseExistingServer: REUSE_SERVER,

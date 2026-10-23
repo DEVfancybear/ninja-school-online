@@ -102,7 +102,11 @@ async function togglePanel(page: Page, hudClass: string, panelClass: string, ope
   const panel = page.locator(panelClass);
   const isOpen = await panel.isVisible();
   if (isOpen !== open) {
-    await page.locator(hudClass).click();
+    if (open) {
+      await page.locator(hudClass).click();
+    } else {
+      await panel.getByRole('button', { name: 'Đóng bảng Lôi Đài' }).click();
+    }
   }
   if (open) {
     await expect(panel).toBeVisible();

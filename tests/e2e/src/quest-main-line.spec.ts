@@ -315,14 +315,14 @@ async function talkTo(page: Page, npcName: string): Promise<void> {
   await expect(page.locator('.npc-dialog')).toBeVisible();
 }
 
-/** Mở/đóng nhật ký nhiệm vụ bằng nút trên HUD, chỉ bấm khi trạng thái chưa đúng. */
+/** Mở bằng HUD, đóng bằng nút trong nhật ký; chỉ bấm khi trạng thái chưa đúng. */
 async function toggleQuestLog(page: Page, open: boolean): Promise<void> {
   const isOpen = await page.evaluate(() => {
     const api = (globalThis as unknown as { __ninjaWorld?: HookApi }).__ninjaWorld;
     return api ? api.questLogOpen() : false;
   });
   if (isOpen !== open) {
-    await page.locator('.hud__quest').click();
+    await page.locator(open ? '.hud__quest' : '.quest-log__close').click();
   }
   if (open) {
     await expect(page.locator('.quest-log')).toBeVisible();
