@@ -131,11 +131,11 @@ async function killOneMonster(page: Page, name: string): Promise<void> {
   const attack = page.getByRole('button', { name: 'Đánh thường' });
   const deadline = Date.now() + 90_000;
   for (;;) {
+    if (Date.now() > deadline) {
+      throw new Error(`trận với ${name} không kết thúc trong 90 giây`);
+    }
     const current = await battle(page);
     if (!current) {
-      if (Date.now() > deadline) {
-        throw new Error(`trận với ${name} không mở ra`);
-      }
       await page.waitForTimeout(300);
       continue;
     }

@@ -398,11 +398,11 @@ test.describe('đánh quái trong làng để lấy kinh nghiệm', () => {
       const attack = page.getByRole('button', { name: 'Đánh thường' });
       const deadline = Date.now() + 60_000;
       for (;;) {
+        if (Date.now() > deadline) {
+          throw new Error('trận với chuột đồng không kết thúc trong 60 giây');
+        }
         const current = await hook<HookBattle>(page, 'battle');
         if (!current) {
-          if (Date.now() > deadline) {
-            throw new Error('trận với chuột đồng không mở ra');
-          }
           await page.waitForTimeout(300);
           continue;
         }

@@ -126,7 +126,11 @@ async function defeatBossThroughBrowser(pages: readonly Page[]): Promise<HookBat
       const actionKey = `${battle.battleId}:${battle.roundNo}:${battle.actorId}`;
       if (acted.has(actionKey)) continue;
       acted.add(actionKey);
-      await page.getByRole('button', { name: 'Đánh thường' }).click();
+      try {
+        await page.getByRole('button', { name: 'Đánh thường' }).click({ timeout: 2_000 });
+      } catch {
+        acted.delete(actionKey);
+      }
     }
     const battles = await Promise.all(pages.map((page) => hook<HookBattle>(page, 'battle')));
     if (battles.every((battle) => battle?.outcome !== null && battle?.outcome !== undefined)) {
