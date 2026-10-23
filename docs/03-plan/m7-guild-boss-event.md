@@ -19,7 +19,7 @@
 - Server integration trên `ninja_test`: guild error codes, 20-member cap/leader transfer, 3 người chat bang, XP lên cấp, login duplicate + UTC reset, event disable, quest mail idempotency, và 8 settlement đồng thời chỉ cấp 1 boss item.
 - Server admission regressions: concurrent join xác nhận đúng 3 người vào boss và người thứ tư bị `invalid_target`; ordinary PvE concurrent join vẫn đúng 2 người, người thứ ba nhận `invalid_target`; boss ngoài cửa sổ trả đúng `boss_closed` và không mở trận.
 - **Kết quả lịch sử:** Browser E2E M7 PASS 2/2 và `pnpm run ci` PASS đã được ghi nhận trên revision `e00102c6f493a681e4d5a17fdbd714d627c76d3e` với DB disposable `ninja_m7_e2e` và cổng 3307/4307; không dùng DB dev `ninja` hoặc cổng 3000/4200.
-- **Kiểm chứng lịch sử trên `965b93de0d913e2e9a9cd8bef0dd1885f9ad4d0b` (commit cha, không phải HEAD hiện tại):** independent audit xác nhận lint/typecheck/build, client tests 278/278, shared tests 120/120 và E2E safety tests 4/4 PASS. Lượt CI cục bộ sau đó không kết nối được PostgreSQL tại `127.0.0.1:5432`; không coi kết quả này là kiểm chứng DB/E2E. Kiểm chứng cho HEAD mới nhất được theo dõi bằng CI trên GitHub.
+- **Kiểm chứng lịch sử trên `965b93de0d913e2e9a9cd8bef0dd1885f9ad4d0b` (ancestor của HEAD; là commit cha của `de060c5`, không phải HEAD):** independent audit xác nhận lint/typecheck/build, client tests 278/278, shared tests 120/120 và E2E safety tests 4/4 PASS. Lượt CI cục bộ khi đó không kết nối được PostgreSQL tại `127.0.0.1:5432`; không coi kết quả này là kiểm chứng DB/E2E. GitHub Actions run `39890785527` nhắm tới `de060c5c1f806019d4d5f9ab9353c10d374b8176`, không phải commit tài liệu này; kết quả cuối của run đó và kiểm chứng exact HEAD cần được ghi nhận riêng.
 
 ### DB disposable cho browser E2E (PowerShell)
 
