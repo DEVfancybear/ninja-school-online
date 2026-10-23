@@ -228,7 +228,14 @@ export class BattleService {
           return;
         }
 
-        // Recheck after database reads: the room monster could have been defeated while this was queued.
+        // Database reads can cross the schedule boundary before the room's next visibility tick.
+        if (currentMonster.monsterId === FIELD_BOSS_ID && !this.options.isFieldBossActive?.()) {
+          session.sendError(
+            ErrorCode.BOSS_CLOSED,
+            'Thú Vương hiện không xuất hiện theo lịch; hãy quay lại trong khung giờ hoạt động',
+          );
+          return;
+        }
         if (!currentMonster.alive) {
           session.sendError(
             ErrorCode.MONSTER_GONE,

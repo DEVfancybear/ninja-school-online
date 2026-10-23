@@ -1,5 +1,13 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BATTLE_MAX_PLAYERS, ErrorCode, FIELD_BOSS_ID, FIELD_BOSS_MAP_ID, FIELD_BOSS_MAX_PLAYERS, Opcode } from '@ninja/shared';
+import {
+  BATTLE_MAX_PLAYERS,
+  ErrorCode,
+  FIELD_BOSS_ID,
+  FIELD_BOSS_MAP_ID,
+  FIELD_BOSS_MAX_PLAYERS,
+  isFieldBossActive,
+  Opcode,
+} from '@ninja/shared';
 import { eq } from 'drizzle-orm';
 import { accounts, characters } from '../db/schema.js';
 import { closeTestDb, getTestDb, resetDatabase } from '../test/database.js';
@@ -205,6 +213,126 @@ describe('PvE admission reservation', () => {
       tick.dispose();
     }
   });
+
+  it.each([
+    ['character read, new battle', 'character', false],
+    ['character read, existing battle', 'character', true],
+    ['equipment read, new battle', 'equipment', false],
+    ['equipment read, existing battle', 'equipment', true],
+  ] as const)(
+    'rechecks the field-boss schedule after the %s',
+    async (_scenario, delayedRead, joinExisting) => {
+      const db = await getTestDb();
+      const records: (typeof characters.$inferSelect)[] = [];
+      for (let index = 0; index < (joinExisting ? 2 : 1); index += 1) {
+        const [account] = await db
+          .insert(accounts)
+          .values({
+            username: `boss_window_race_${index}`,
+            passwordHash: 'test',
+          })
+          .returning();
+        const [record] = await db
+          .insert(characters)
+          .values({
+            accountId: account!.id,
+            name: `BossWindowRace${index}`,
+            school: 'haruna',
+            class: 'dao',
+            level: 3,
+          })
+          .returning();
+        records.push(record!);
+      }
+
+      let now = Date.parse('2026-01-01T12:14:59.990Z');
+      const closedAt = Date.parse('2026-01-01T12:15:00.000Z');
+      const inventory = new InventoryService(db, gameData);
+      const characterService = new CharacterService(db, inventory, gameData);
+      let crossBoundaryDuringRead: 'character' | 'equipment' | undefined;
+      const originalFindById = characterService.findById.bind(characterService);
+      const findById = vi.spyOn(characterService, 'findById').mockImplementation(async (id) => {
+        const character = await originalFindById(id);
+        if (crossBoundaryDuringRead === 'character') now = closedAt;
+        return character;
+      });
+      const equipment = new EquipmentService(gameData, characterService, inventory);
+      const originalBonusFor = equipment.bonusFor.bind(equipment);
+      const bonusFor = vi.spyOn(equipment, 'bonusFor').mockImplementation(async (id) => {
+        const bonus = await originalBonusFor(id);
+        if (crossBoundaryDuringRead === 'equipment') now = closedAt;
+        return bonus;
+      });
+      const sessions = new SessionRegistry();
+      const tick = new TickScheduler();
+      const rooms = new RoomManager({ gameData, tick, now: () => now });
+      const room = rooms.getOrCreate(FIELD_BOSS_MAP_ID)!;
+      const boss = room.monsters().find((monster) => monster.monsterId === FIELD_BOSS_ID)!;
+      const messagesByCharacter = new Map<string, { op: number; payload: unknown }[]>();
+      const players = records.map((record, index) => {
+        const messages: { op: number; payload: unknown }[] = [];
+        messagesByCharacter.set(record.id, messages);
+        const session: GameSession = {
+          connectionId: `boss-window-race-${index}`,
+          characterId: record.id,
+          mapId: FIELD_BOSS_MAP_ID,
+          closed: false,
+          send: (op, payload) => messages.push({ op, payload }),
+          sendError: (code, message) =>
+            messages.push({ op: Opcode.S2C_ERROR, payload: { code, message } }),
+          replacedByNewLogin: () => undefined,
+        };
+        sessions.register(record.id, session);
+        const player = createPlayer({
+          character: toCharacterDto(record),
+          position: { x: boss.x, y: boss.y },
+          channel: session,
+        });
+        room.addPlayer(player);
+        return { session, player };
+      });
+      const battle = new BattleService({
+        gameData,
+        rooms,
+        sessions,
+        characters: characterService,
+        inventory,
+        equipment,
+        tick,
+        now: () => now,
+        onDefeat: () => undefined,
+        isFieldBossActive: () => isFieldBossActive(now),
+      });
+
+      try {
+        expect(isFieldBossActive(now)).toBe(true);
+        if (joinExisting) {
+          await battle.engage({ ...players[0]!, room, targetId: boss.id });
+          expect(battle.activeCount).toBe(1);
+          expect(now).toBe(Date.parse('2026-01-01T12:14:59.990Z'));
+        }
+
+        const latePlayer = players.at(-1)!;
+        crossBoundaryDuringRead = delayedRead;
+        await battle.engage({ ...latePlayer, room, targetId: boss.id });
+
+        const messages = messagesByCharacter.get(latePlayer.player.id)!;
+        const errors = messages.filter((message) => message.op === Opcode.S2C_ERROR);
+        expect(errors.map((message) => (message.payload as { code: ErrorCode }).code)).toEqual([
+          ErrorCode.BOSS_CLOSED,
+        ]);
+        expect(messages.some((message) => message.op === Opcode.S2C_BATTLE_START)).toBe(false);
+        expect(battle.activeCount).toBe(joinExisting ? 1 : 0);
+        expect(battle.isBusy(latePlayer.player.id)).toBe(false);
+      } finally {
+        findById.mockRestore();
+        bonusFor.mockRestore();
+        battle.dispose();
+        rooms.dispose();
+        tick.dispose();
+      }
+    },
+  );
 
   it('lets three players join a field-boss battle and rejects a fourth with the boss cap', async () => {
     const db = await getTestDb();
