@@ -245,7 +245,7 @@ Nội dung: bạn bè, nhóm, chat thế giới/nhóm/riêng, Lôi Đài 1v1 có
 Nội dung: lập bang/tham gia/rời bang, chat bang, cấp bang; boss dã ngoại theo giờ có giới hạn rơi đồ/ngày; sự kiện đầu tiên (đăng nhập nhận quà + nhiệm vụ sự kiện).
 **Xong khi:** lập bang 3 người, cùng đánh boss theo giờ, nhận quà sự kiện; bot/script không phá được giới hạn ngày.
 
-**Trạng thái M7:** browser E2E cô lập trên `ninja_m7_e2e` PASS 2/2 (gồm boss victory/co-op); `pnpm run ci` PASS trên `main`. Verifier độc lập PASS trên revision tích hợp cuối `e00102c6f493a681e4d5a17fdbd714d627c76d3e`; M7 acceptance đã được xác minh trên checkout tích hợp.
+**Trạng thái M7:** Mã đã tích hợp và push trên `main` tại `965b93de0d913e2e9a9cd8bef0dd1885f9ad4d0b`. Browser E2E M7 PASS 2/2 và full CI PASS là kết quả đã ghi nhận trên revision trước `e00102c6f493a681e4d5a17fdbd714d627c76d3e`. Trên revision `965b93de0d913e2e9a9cd8bef0dd1885f9ad4d0b`, independent audit xác nhận lint/typecheck/build, client 278/278, shared 120/120 và E2E safety 4/4 PASS; server DB-backed tests và browser M7 E2E chưa được rerun vì host không có PostgreSQL tại `127.0.0.1:5432`. Không coi hai kết quả lịch sử là kiểm chứng của HEAD hiện tại.
 
 ### M8 — Hoàn thiện & triển khai (~2 tuần) — *kết thúc Beta*
 Nội dung: âm thanh + hoạt ảnh đầy đủ, tối ưu mobile web (PWA), kiểm thử tải 200 CCU bằng k6, triển khai VPS (nginx + TLS + tên miền), sao lưu DB, trang trạng thái bảo trì.
